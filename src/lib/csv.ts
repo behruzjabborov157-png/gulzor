@@ -63,4 +63,8 @@ export const PRODUCT_CSV_COLUMNS = [
   "prep_time_minutes",
   "image_url",
   "is_demo",
+  "name_ru",
+  "short_description_ru",
+  "description_ru",
+  "care_instructions_ru",
 ];

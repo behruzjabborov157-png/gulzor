@@ -1,5 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
+import { fmt, type Locale } from "@/i18n/config";
+import { getDict } from "@/i18n/dict";
 import { formatUZS } from "@/lib/format";
 import { FlowerIcon } from "./icons";
 
@@ -12,16 +14,26 @@ export function Logo({ light = false }: { light?: boolean }) {
   );
 }
 
-export function Price({ value, compareAt, from, className = "" }: { value: number; compareAt?: number | null; from?: boolean; className?: string }) {
+export function Price({
+  value,
+  compareAt,
+  from,
+  className = "",
+  locale = "uz",
+}: {
+  value: number;
+  compareAt?: number | null;
+  from?: boolean;
+  className?: string;
+  locale?: Locale;
+}) {
+  const t = getDict(locale).common;
   return (
     <span className={`inline-flex flex-wrap items-baseline gap-x-2 ${className}`}>
-      <span className="font-semibold text-charcoal">
-        {formatUZS(value)}
-        {from ? "dan" : null}
-      </span>
+      <span className="font-semibold text-charcoal">{from ? fmt(t.priceFrom, { price: formatUZS(value, locale) }) : formatUZS(value, locale)}</span>
       {compareAt && compareAt > value ? (
-        <s className="text-sm text-muted" aria-label={`Avvalgi narx ${formatUZS(compareAt)}`}>
-          {formatUZS(compareAt)}
+        <s className="text-sm text-muted" aria-label={fmt(t.oldPrice, { price: formatUZS(compareAt, locale) })}>
+          {formatUZS(compareAt, locale)}
         </s>
       ) : null}
     </span>
@@ -35,18 +47,20 @@ export function ProductImage({
   sizes,
   priority,
   className = "",
+  locale = "uz",
 }: {
   src: string | null | undefined;
   alt: string;
   sizes: string;
   priority?: boolean;
   className?: string;
+  locale?: Locale;
 }) {
   if (!src) {
     return (
       <div className={`flex h-full w-full flex-col items-center justify-center gap-2 bg-blush/50 text-forest/60 ${className}`} role="img" aria-label={alt}>
         <FlowerIcon size={40} />
-        <span className="text-xs">Rasm tez orada</span>
+        <span className="text-xs">{getDict(locale).common.photoSoon}</span>
       </div>
     );
   }
@@ -58,7 +72,7 @@ export function SectionHeading({
   title,
   description,
   href,
-  linkLabel = "Barchasini ko‘rish",
+  linkLabel,
 }: {
   eyebrow?: string;
   title: string;
@@ -95,9 +109,9 @@ export function EmptyState({ title, text, action }: { title: string; text?: stri
   );
 }
 
-export function Breadcrumbs({ items }: { items: { href?: string; label: string }[] }) {
+export function Breadcrumbs({ items, label }: { items: { href?: string; label: string }[]; label: string }) {
   return (
-    <nav aria-label="Navigatsiya" className="mb-6 text-sm text-muted">
+    <nav aria-label={label} className="mb-6 text-sm text-muted">
       <ol className="flex flex-wrap items-center gap-1.5">
         {items.map((it, i) => (
           <li key={i} className="flex items-center gap-1.5">

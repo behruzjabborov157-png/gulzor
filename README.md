@@ -1,7 +1,7 @@
 # Gulzor — online flower shop for Uzbekistan
 
 A full e-commerce platform (storefront, cart, checkout, delivery rules, orders, admin
-dashboard, Telegram notifications, Payme/Click payment endpoints) in Uzbek (Latin), prices in UZS.
+dashboard, Telegram notifications, Payme/Click payment endpoints) in Uzbek (Latin) with a full Russian version under `/ru`, prices in UZS.
 
 **Stack:** Next.js 16 (App Router, Server Actions) · React 19 · TypeScript · Tailwind CSS 4 ·
 PostgreSQL via Drizzle ORM (embedded PGlite for local development, any PostgreSQL in production) · Zod · sharp.
@@ -51,7 +51,10 @@ Useful scripts:
 
 ```
 src/
-  app/(store)/        storefront pages (Uzbek URLs: /katalog, /gul/[slug], /savat, /buyurtma, /kuzatish, /hisob …)
+  app/[lang]/(store)/ storefront pages (URLs: /katalog, /gul/[slug], /savat, /buyurtma, /kuzatish, /hisob …;
+                      Russian under /ru/…)
+  i18n/               locale config, server/client helpers, dictionaries (ns/*.ts: uz + ru)
+  proxy.ts            locale routing + CSP/HSTS
   app/admin/          admin: (auth)/kirish = login, (panel)/… = protected dashboard
   app/api/payments/   Payme Merchant API + Click SHOP API callbacks
   app/media/          serves uploaded images (customer uploads are admin-only)
@@ -65,6 +68,23 @@ scripts/              migrate, seed (+ seed-data.ts), create-admin, check-db
 tests/                unit/integration tests and Playwright e2e tests
 docs/                 market research, owner guide (Uzbek), product import template
 ```
+
+### Languages (Uzbek + Russian)
+- Uzbek is the default and has clean URLs (`/katalog`); Russian lives under `/ru/katalog`. `src/proxy.ts`
+  rewrites Uzbek paths to `/uz/…` internally and 308-redirects a typed `/uz/…` back to the clean URL.
+  Every page has `hreflang` alternates and both languages are in the sitemap.
+- UI text lives in `src/i18n/ns/*.ts` (one file per area, `uz` and `ru` objects; TypeScript makes sure
+  every Uzbek key has a Russian one). Server code: `await getT()`; client components: `useT()`.
+- Catalog content (products, categories, variants, delivery zones, shop address/hours) has optional
+  `*_ru` fields, edited in the admin forms ("Rus tilidagi versiya") and via CSV (`name_ru` …). An empty
+  Russian field falls back to the Uzbek text, so nothing is ever blank.
+- Search matches both languages (`products.search_text`, recomputed on every save/import).
+- Orders keep the customer's language: the Russian buyer sees the confirmation, tracking timeline and
+  validation errors in Russian, while the admin panel and Telegram always show Uzbek names plus
+  "Mijoz tili: rus tili".
+- The admin panel is Uzbek only. The Russian texts (UI, legal pages, seeded demo products) were
+  written for this project and **should be proofread by a native speaker** before launch; the Russian
+  offer/privacy texts need the same legal review as the Uzbek ones.
 
 ### How pricing stays honest
 The browser never decides a price. Cart and checkout send only *what* was chosen (product, size,
@@ -148,7 +168,8 @@ Roles: **owner** (everything) and **staff** (orders, products, categories, reque
 
 ### Product import template
 `docs/product-import-template.csv` (also downloadable in **Import / eksport**). Products are matched
-by `slug` (update) or created. Required: `slug,name,price`. Use `|` to separate several
+by `slug` (update) or created. Required: `slug,name,price`. Optional Russian columns: `name_ru`,
+`short_description_ru`, `description_ru`, `care_instructions_ru` (left untouched on update when the column is absent). Use `|` to separate several
 `categories` (category slugs) and `flower_varieties`. Import covers fixed-price products;
 size-based and per-stem products are edited in the product form. **Eksport** downloads the whole
 catalog in the same format, so the workflow is export → edit in Excel → import.
@@ -210,7 +231,7 @@ re-reads the order from the database ("payment pending" until the provider confi
 npm test                                       # 17 unit/integration tests, throwaway DB, no server needed
 E2E_BASE_URL=http://localhost:3000 \
 E2E_ADMIN_EMAIL=… E2E_ADMIN_PASSWORD=… \
-npm run test:e2e                               # 17 Playwright tests (desktop + phone viewport)
+npm run test:e2e                               # 23 Playwright tests (desktop + phone viewport)
 ```
 First time: `npx playwright install chromium`. E2E tests **create real orders** in the database the
 server uses (and one archived test product), so run them against a development database.
@@ -222,7 +243,9 @@ checkout validation, order creation and number, secret-link access, order tracki
 admin login (including a wrong password), order search by number and phone, status change visible to the
 customer, inline price change visible on the storefront, product creation with photo upload and size
 variants, CSV export, custom request with private photo, robots/sitemap/security headers, payment endpoint
-auth, no horizontal scroll on 10 pages at phone width, mobile menu and filters.
+auth, no horizontal scroll on 10 pages at phone width, mobile menu and filters. Russian: `/ru` routing,
+`/uz` redirect, hreflang + sitemap, language switch keeping the query, Cyrillic search, Russian configurator
+prices, cart and checkout with Russian validation messages, Russian confirmation page, admin view of a Russian order.
 
 ---
 
@@ -245,7 +268,8 @@ auth, no horizontal scroll on 10 pages at phone width, mobile menu and filters.
   low stock), orders (search, status workflow with stock return on cancel/reject, delivery edits, internal notes,
   history, Telegram log/resend), products (full editor, image upload, quick inline price/stock/status), categories,
   delivery regions/zones/slots, coupons, requests/subscribers, settings, CSV import/export.
-- SEO: per-page titles and descriptions in Uzbek, canonical URLs, sitemap, robots, Open Graph. Product JSON-LD is
+- Russian version of the whole storefront (`/ru`), with a language switch in the header.
+- SEO: per-page titles and descriptions in Uzbek and Russian, canonical URLs + hreflang, sitemap, robots, Open Graph. Product JSON-LD is
   emitted **only for non-demo products**.
 - Security: per-request nonce-based Content-Security-Policy (`src/proxy.ts`) and HSTS when served over HTTPS,
   server-side authorization on every admin action/page, bcrypt hashes, hashed session tokens,
@@ -264,4 +288,4 @@ auth, no horizontal scroll on 10 pages at phone width, mobile menu and filters.
   verification, so guest orders are deliberately **not** linked to accounts by phone number).
 
 **Deliberately not included:** customer reviews (none exist yet; nothing is invented), "live market price"
-feeds, fake discounts or scarcity, an Instagram feed (only a profile link when configured), a language switcher (Uzbek only).
+feeds, fake discounts or scarcity, an Instagram feed (only a profile link when configured).

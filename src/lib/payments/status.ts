@@ -15,6 +15,8 @@ export async function markOrderPaid(orderId: string, provider: "payme" | "click"
     orderId,
     type: "payment",
     message: `${provider === "payme" ? "Payme" : "Click"} orqali ${formatUZS(amount)} to‘landi`,
+    code: "payment_paid",
+    params: { provider: provider === "payme" ? "Payme" : "Click", amount },
     actor: provider,
     isPublic: true,
   });
@@ -32,5 +34,13 @@ export async function markOrderPaymentCancelled(
 ) {
   const db = await getDb();
   await db.update(schema.orders).set({ paymentStatus: status, updatedAt: new Date() }).where(eq(schema.orders.id, orderId));
-  await db.insert(schema.orderEvents).values({ orderId, type: "payment", message, actor: provider, isPublic: true });
+  await db.insert(schema.orderEvents).values({
+    orderId,
+    type: "payment",
+    message,
+    code: `payment_${status}`,
+    params: { provider: provider === "payme" ? "Payme" : "Click" },
+    actor: provider,
+    isPublic: true,
+  });
 }

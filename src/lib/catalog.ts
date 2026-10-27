@@ -1,10 +1,12 @@
 import { and, asc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import { fromPrice, type PricingProduct } from "@/lib/pricing";
-import { tashkentNow } from "@/lib/time";
+import { DEFAULT_LOCALE, pick, type Locale } from "@/i18n/config";
 import { isOrderable, type ProductCard, type StockState } from "@/lib/catalog-shared";
+import { fromPrice, type PricingProduct } from "@/lib/pricing";
+import { normalizeSearch } from "@/lib/search";
+import { tashkentNow } from "@/lib/time";
 
-export { isOrderable, STOCK_LABEL, type ProductCard, type StockState } from "@/lib/catalog-shared";
+export { isOrderable, type ProductCard, type StockState } from "@/lib/catalog-shared";
 
 const { products: p, productVariants: pv, categories: c, productCategories: pc } = schema;
 
@@ -25,7 +27,7 @@ export function stockState(prod: Product, variants: Variant[], month = tashkentN
   return prod.availability === "made_to_order" ? "made_to_order" : "available";
 }
 
-export function toPricing(prod: Product, variants: Variant[]): PricingProduct {
+export function toPricing(prod: Product, variants: Variant[], locale: Locale = DEFAULT_LOCALE): PricingProduct {
   return {
     pricingMode: prod.pricingMode,
     price: prod.price,
@@ -33,7 +35,7 @@ export function toPricing(prod: Product, variants: Variant[]): PricingProduct {
     minStems: prod.minStems,
     maxStems: prod.maxStems,
     stemStep: prod.stemStep,
-    variants: variants.map((v) => ({ id: v.id, name: v.name, price: v.price, stemCount: v.stemCount, isActive: v.isActive })),
+    variants: variants.map((v) => ({ id: v.id, name: pick(locale, v.name, v.nameRu), price: v.price, stemCount: v.stemCount, isActive: v.isActive })),
   };
 }
 
@@ -45,15 +47,17 @@ function compareFor(prod: Product, variants: Variant[]): number | null {
   return prod.compareAtPrice;
 }
 
-export function toCard(prod: Product, variants: Variant[]): ProductCard {
+export function toCard(prod: Product, variants: Variant[], locale: Locale = DEFAULT_LOCALE): ProductCard {
   const price = fromPrice(toPricing(prod, variants));
   const cmp = compareFor(prod, variants);
+  const name = pick(locale, prod.name, prod.nameRu);
   return {
     id: prod.id,
     slug: prod.slug,
-    name: prod.name,
-    shortDescription: prod.shortDescription,
-    image: prod.images[0] ? { url: prod.images[0].url, alt: prod.images[0].alt || prod.name } : null,
+    name,
+    shortDescription: pick(locale, prod.shortDescription, prod.shortDescriptionRu),
+    // Uploaded alt texts are Uzbek; in Russian the localized product name describes the photo better.
+    image: prod.images[0] ? { url: prod.images[0].url, alt: locale === DEFAULT_LOCALE ? prod.images[0].alt || name : name } : null,
     price,
     compareAtPrice: cmp && cmp > price ? cmp : null,
     hasOptions: prod.pricingMode !== "fixed",
@@ -76,31 +80,22 @@ function inCategory(slug: string): SQL {
     WHERE ${pc.productId} = ${p.id} AND ${c.slug} = ${slug} AND ${c.isActive})`;
 }
 
-/** Removes the many apostrophe variants used in Uzbek Latin so "o'z" matches "o‘z". */
-export function normalizeSearch(s: string) {
-  return s.toLowerCase().replace(/[ʻʼ‘’'`]/g, "").replace(/\s+/g, " ").trim();
-}
-const APOS = "ʻʼ‘’'`";
-
 export type CatalogQuery = {
   q?: string;
   categories?: string[]; // all must match (e.g. type + occasion)
   minPrice?: number;
   maxPrice?: number;
   inStock?: boolean;
-  sort?: "popular" | "price_asc" | "price_desc" | "new";
+  sort?: (typeof SORTS)[number];
   page?: number;
   perPage?: number;
   includeAddons?: boolean;
   excludeIds?: number[];
+  locale?: Locale;
 };
 
-export const SORTS: { value: NonNullable<CatalogQuery["sort"]>; label: string }[] = [
-  { value: "popular", label: "Ommabop" },
-  { value: "price_asc", label: "Arzonroq" },
-  { value: "price_desc", label: "Qimmatroq" },
-  { value: "new", label: "Yangi" },
-];
+/** Sort options; labels come from the dictionary (t.catalog.sorts). */
+export const SORTS = ["popular", "price_asc", "price_desc", "new"] as const;
 
 export async function listProducts(query: CatalogQuery) {
   const db = await getDb();
@@ -111,11 +106,8 @@ export async function listProducts(query: CatalogQuery) {
   if (!query.includeAddons) where.push(eq(p.isAddon, false));
   for (const slug of query.categories ?? []) where.push(inCategory(slug));
   if (query.q) {
-    const term = `%${normalizeSearch(query.q)}%`;
-    where.push(sql`(
-      translate(lower(${p.name}), ${APOS}, '') LIKE ${term}
-      OR translate(lower(${p.shortDescription}), ${APOS}, '') LIKE ${term}
-      OR translate(lower(${p.flowerVarieties}::text), ${APOS}, '') LIKE ${term})`);
+    // search_text holds both languages, normalised in JS (lib/search.ts) so Cyrillic works on any DB locale.
+    where.push(sql`${p.searchText} LIKE ${`%${normalizeSearch(query.q)}%`}`);
   }
   if (query.minPrice != null) where.push(sql`${effectivePrice} >= ${query.minPrice}`);
   if (query.maxPrice != null) where.push(sql`${effectivePrice} <= ${query.maxPrice}`);
@@ -148,39 +140,44 @@ export async function listProducts(query: CatalogQuery) {
     .limit(perPage)
     .offset((page - 1) * perPage);
 
-  return { items: await withVariants(rows), total: count, page, perPage, pages: Math.max(1, Math.ceil(count / perPage)) };
+  return { items: await withVariants(rows, query.locale), total: count, page, perPage, pages: Math.max(1, Math.ceil(count / perPage)) };
 }
 
-export async function withVariants(rows: Product[]): Promise<ProductCard[]> {
+export async function withVariants(rows: Product[], locale: Locale = DEFAULT_LOCALE): Promise<ProductCard[]> {
   if (!rows.length) return [];
   const db = await getDb();
   const vs = await db.select().from(pv).where(inArray(pv.productId, rows.map((r) => r.id)));
-  return rows.map((r) => toCard(r, vs.filter((v) => v.productId === r.id)));
+  return rows.map((r) => toCard(r, vs.filter((v) => v.productId === r.id), locale));
 }
 
-export async function getProductsByIds(ids: number[]): Promise<ProductCard[]> {
+export async function getProductsByIds(ids: number[], locale: Locale = DEFAULT_LOCALE): Promise<ProductCard[]> {
   if (!ids.length) return [];
   const db = await getDb();
   const rows = await db.select().from(p).where(and(inArray(p.id, ids), eq(p.status, "active")));
-  const cards = await withVariants(rows);
+  const cards = await withVariants(rows, locale);
   return ids.map((id) => cards.find((x) => x.id === id)).filter((x): x is ProductCard => !!x);
 }
 
-export async function getProductBySlug(slug: string) {
+export async function getProductBySlug(slug: string, locale: Locale = DEFAULT_LOCALE) {
   const db = await getDb();
   const [prod] = await db.select().from(p).where(and(eq(p.slug, slug), eq(p.status, "active")));
   if (!prod) return null;
   const variants = await db.select().from(pv).where(eq(pv.productId, prod.id)).orderBy(asc(pv.sortOrder), asc(pv.price));
   const cats = await db
-    .select({ id: c.id, slug: c.slug, name: c.name, kind: c.kind })
+    .select({ id: c.id, slug: c.slug, name: c.name, nameRu: c.nameRu, kind: c.kind })
     .from(pc)
     .innerJoin(c, eq(c.id, pc.categoryId))
     .where(and(eq(pc.productId, prod.id), eq(c.isActive, true)));
-  return { product: prod, variants, categories: cats, stock: stockState(prod, variants) };
+  return {
+    product: prod,
+    variants,
+    categories: cats.map((x) => ({ id: x.id, slug: x.slug, kind: x.kind, name: pick(locale, x.name, x.nameRu) })),
+    stock: stockState(prod, variants),
+  };
 }
 
 /** Add-ons that can be attached to bouquets (cards, sweets, toys, vases). */
-export async function getAddons() {
+export async function getAddons(locale: Locale = DEFAULT_LOCALE) {
   const db = await getDb();
   const rows = await db
     .select()
@@ -189,11 +186,11 @@ export async function getAddons() {
     .orderBy(asc(p.price));
   return rows
     .filter((r) => isOrderable(stockState(r, [])))
-    .map((r) => ({ productId: r.id, name: r.name, price: r.price, image: r.images[0]?.url ?? null, slug: r.slug }));
+    .map((r) => ({ productId: r.id, name: pick(locale, r.name, r.nameRu), price: r.price, image: r.images[0]?.url ?? null, slug: r.slug }));
 }
 
 /** Products that share categories with the given product, available first. */
-export async function getRelated(productId: number, categoryIds: number[], limit = 4) {
+export async function getRelated(productId: number, categoryIds: number[], limit = 4, locale: Locale = DEFAULT_LOCALE) {
   const db = await getDb();
   if (!categoryIds.length) return [];
   const rows = await db
@@ -212,26 +209,39 @@ export async function getRelated(productId: number, categoryIds: number[], limit
     )
     .orderBy(sql`${p.salesCount} DESC`, asc(p.id))
     .limit(limit * 3);
-  const cards = await withVariants(rows);
+  const cards = await withVariants(rows, locale);
   return cards.sort((a, b) => Number(isOrderable(b.stock)) - Number(isOrderable(a.stock))).slice(0, limit);
 }
 
-export async function getCategories(kind?: Category["kind"]) {
+/** Category with name/description/SEO fields already in the requested language. */
+export function localizeCategory(row: Category, locale: Locale): Category {
+  if (locale === DEFAULT_LOCALE) return row;
+  return {
+    ...row,
+    name: pick(locale, row.name, row.nameRu),
+    description: pick(locale, row.description, row.descriptionRu),
+    seoTitle: row.seoTitleRu || null,
+    seoDescription: row.seoDescriptionRu || null,
+  };
+}
+
+export async function getCategories(kind?: Category["kind"], locale: Locale = DEFAULT_LOCALE) {
   const db = await getDb();
   const where = kind ? and(eq(c.isActive, true), eq(c.kind, kind)) : eq(c.isActive, true);
-  return db.select().from(c).where(where).orderBy(asc(c.sortOrder), asc(c.name));
+  const rows = await db.select().from(c).where(where).orderBy(asc(c.sortOrder), asc(c.name));
+  return rows.map((r) => localizeCategory(r, locale));
 }
 
-export async function getCategoryBySlug(slug: string) {
+export async function getCategoryBySlug(slug: string, locale: Locale = DEFAULT_LOCALE) {
   const db = await getDb();
   const [row] = await db.select().from(c).where(and(eq(c.slug, slug), eq(c.isActive, true)));
-  return row ?? null;
+  return row ? localizeCategory(row, locale) : null;
 }
 
-/** Budget bands used on the homepage and in filters. */
+/** Budget bands used on the homepage (labels in t.home.budgets, same order). */
 export const BUDGETS = [
-  { label: "250 000 so‘mgacha", min: undefined, max: 250_000 },
-  { label: "250 000 – 500 000 so‘m", min: 250_000, max: 500_000 },
-  { label: "500 000 – 1 000 000 so‘m", min: 500_000, max: 1_000_000 },
-  { label: "1 000 000 so‘mdan yuqori", min: 1_000_000, max: undefined },
+  { min: undefined, max: 250_000 },
+  { min: 250_000, max: 500_000 },
+  { min: 500_000, max: 1_000_000 },
+  { min: 1_000_000, max: undefined },
 ] as const;

@@ -16,7 +16,15 @@ export function uploadRoot() {
   return path.resolve(/*turbopackIgnore: true*/ process.cwd(), process.env.UPLOAD_DIR || "./storage/uploads");
 }
 
-export class UploadError extends Error {}
+/** code lets customer-facing forms translate the problem (t.errors.upload[code]); message is the Uzbek text. */
+export class UploadError extends Error {
+  constructor(
+    public code: "none" | "tooBig" | "notImage" | "format" | "dimensions",
+    message: string,
+  ) {
+    super(message);
+  }
+}
 
 /**
  * Validates the file by decoding it (not by trusting the extension or MIME type),
@@ -24,17 +32,17 @@ export class UploadError extends Error {}
  * Returns the public URL.
  */
 export async function saveImage(file: File, folder: "products" | "requests"): Promise<string> {
-  if (!file || file.size === 0) throw new UploadError("Fayl tanlanmagan");
-  if (file.size > MAX_UPLOAD_BYTES) throw new UploadError("Fayl hajmi 6 MB dan oshmasligi kerak");
+  if (!file || file.size === 0) throw new UploadError("none", "Fayl tanlanmagan");
+  if (file.size > MAX_UPLOAD_BYTES) throw new UploadError("tooBig", "Fayl hajmi 6 MB dan oshmasligi kerak");
   const input = Buffer.from(await file.arrayBuffer());
   let meta: Awaited<ReturnType<ReturnType<typeof sharp>["metadata"]>>;
   try {
     meta = await sharp(input).metadata();
   } catch {
-    throw new UploadError("Fayl rasm emas yoki buzilgan");
+    throw new UploadError("notImage", "Fayl rasm emas yoki buzilgan");
   }
-  if (!meta.format || !ALLOWED.has(meta.format)) throw new UploadError("Faqat JPG, PNG, WEBP rasmlar qabul qilinadi");
-  if ((meta.width ?? 0) * (meta.height ?? 0) > 50_000_000) throw new UploadError("Rasm o‘lchami juda katta");
+  if (!meta.format || !ALLOWED.has(meta.format)) throw new UploadError("format", "Faqat JPG, PNG, WEBP rasmlar qabul qilinadi");
+  if ((meta.width ?? 0) * (meta.height ?? 0) > 50_000_000) throw new UploadError("dimensions", "Rasm o‘lchami juda katta");
 
   const out = await sharp(input).rotate().resize({ width: 1800, height: 1800, fit: "inside", withoutEnlargement: true }).webp({ quality: 82 }).toBuffer();
   const name = `${Date.now().toString(36)}-${randomBytes(8).toString("hex")}.webp`;

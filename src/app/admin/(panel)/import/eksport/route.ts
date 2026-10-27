@@ -33,6 +33,10 @@ export async function GET() {
     p.prepTimeMinutes,
     p.images[0]?.url ?? "",
     p.isDemo ? "1" : "0",
+    p.nameRu,
+    p.shortDescriptionRu,
+    p.descriptionRu,
+    p.careInstructionsRu,
   ]);
   const date = new Date().toISOString().slice(0, 10);
   return new Response(toCsv([PRODUCT_CSV_COLUMNS, ...rows]), {

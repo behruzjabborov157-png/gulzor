@@ -30,6 +30,10 @@ function Fields({ c }: { c?: typeof schema.categories.$inferSelect }) {
       <div className="flex items-end pb-2"><C label="Faol" name="isActive" defaultChecked={c?.isActive ?? true} /></div>
       <F label="SEO sarlavha" name="seoTitle" defaultValue={c?.seoTitle} />
       <div className="sm:col-span-3"><F label="SEO tavsif" name="seoDescription" defaultValue={c?.seoDescription} /></div>
+      <F label="Nomi (rus.)" name="nameRu" defaultValue={c?.nameRu} lang="ru" />
+      <div className="sm:col-span-3"><F label="Tavsif (rus.)" name="descriptionRu" defaultValue={c?.descriptionRu} lang="ru" /></div>
+      <F label="SEO sarlavha (rus.)" name="seoTitleRu" defaultValue={c?.seoTitleRu} lang="ru" />
+      <div className="sm:col-span-3"><F label="SEO tavsif (rus.)" name="seoDescriptionRu" defaultValue={c?.seoDescriptionRu} lang="ru" /></div>
     </div>
   );
 }

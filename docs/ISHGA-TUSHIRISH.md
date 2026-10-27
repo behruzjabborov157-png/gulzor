@@ -112,7 +112,8 @@ Endi `https://gulzor.uz` ochilishi kerak.
 1. **Sozlamalar** — telefon, Telegram username, manzil, ish vaqti, yuridik nom. “Test xabar yuborish” → Telegram’ga xabar kelishini tekshiring.
 2. **Yetkazib berish** — haqiqiy hududlar va narxlarni kiriting, keyin ularni **Faol** qiling.
 3. **Mahsulotlar** — mahsulotlarni qo‘shing (rasm bilan) yoki **Import / eksport** orqali CSV shablonni to‘ldirib yuklang.
-4. **Sozlamalar** — “Demo rejim banneri” o‘chiq ekanini tekshiring.
+4. **Rus tili** — sayt rus tilida ham ishlaydi (`https://gulzor.uz/ru`). Mahsulot, kategoriya, yetkazib berish hududlari va sozlamalardagi “(rus.)” / “Rus tilidagi versiya” maydonlarini to‘ldiring; bo‘sh qolsa, o‘zbekcha matn ko‘rsatiladi. CSV’da `name_ru`, `short_description_ru`, `description_ru`, `care_instructions_ru` ustunlari bor. Ruscha matnlarni (shu jumladan oferta va maxfiylik siyosatini) ishga tushirishdan oldin rus tilini yaxshi biladigan odamga tekshirtiring.
+5. **Sozlamalar** — “Demo rejim banneri” o‘chiq ekanini tekshiring.
 
 ## 8. Yakuniy tekshiruv
 

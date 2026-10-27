@@ -1,12 +1,14 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
+import { DEFAULT_LOCALE, pick, type Locale } from "@/i18n/config";
 import { addDaysISO, hhmmToMinutes, tashkentNow } from "@/lib/time";
 
 export type Zone = typeof schema.deliveryZones.$inferSelect;
 export type Region = typeof schema.deliveryRegions.$inferSelect;
 export type Slot = typeof schema.timeSlots.$inferSelect;
 
-export async function getDeliveryConfig() {
+/** Active regions with their zones (names in the requested language) and active time slots. */
+export async function getDeliveryConfig(locale: Locale = DEFAULT_LOCALE) {
   const db = await getDb();
   const regions = await db
     .select()
@@ -26,12 +28,22 @@ export async function getDeliveryConfig() {
     .where(eq(schema.timeSlots.isActive, true))
     .orderBy(asc(schema.timeSlots.sortOrder), asc(schema.timeSlots.startTime));
   return {
-    regions: regions.map((r) => ({ ...r, zones: zones.filter((z) => z.regionId === r.id) })).filter((r) => r.zones.length),
+    regions: regions
+      .map((r) => ({
+        ...r,
+        name: pick(locale, r.name, r.nameRu),
+        zones: zones
+          .filter((z) => z.regionId === r.id)
+          .map((z) => ({ ...z, name: pick(locale, z.name, z.nameRu), description: pick(locale, z.description, z.descriptionRu) })),
+      }))
+      .filter((r) => r.zones.length),
     slots,
   };
 }
 
-export type SlotOption = { id: number; label: string; available: boolean; reason?: string };
+/** Why a slot cannot be booked; the UI translates it (t.checkout.slotReason). */
+export type SlotReason = "past" | "full" | "noSameDay" | "cutoff" | "tooSoon" | "pickZone";
+export type SlotOption = { id: number; label: string; available: boolean; reason?: SlotReason };
 
 /**
  * Which time slots can still be booked for a date.
@@ -52,16 +64,16 @@ export function computeSlots(opts: {
 
   return opts.slots.map((s) => {
     const base = { id: s.id, label: s.label };
-    if (opts.date < now.date) return { ...base, available: false, reason: "O‘tgan sana" };
+    if (opts.date < now.date) return { ...base, available: false, reason: "past" };
     if (s.capacity != null && (opts.booked.get(s.id) ?? 0) >= s.capacity) {
-      return { ...base, available: false, reason: "Band" };
+      return { ...base, available: false, reason: "full" };
     }
     if (isToday) {
-      if (opts.zone && !opts.zone.sameDayEnabled) return { ...base, available: false, reason: "Bugun yetkazilmaydi" };
+      if (opts.zone && !opts.zone.sameDayEnabled) return { ...base, available: false, reason: "noSameDay" };
       if (opts.zone && now.minutes > hhmmToMinutes(opts.zone.sameDayCutoff)) {
-        return { ...base, available: false, reason: "Bugungi buyurtmalar qabuli yakunlangan" };
+        return { ...base, available: false, reason: "cutoff" };
       }
-      if (hhmmToMinutes(s.startTime) - now.minutes < lead) return { ...base, available: false, reason: "Vaqt yetarli emas" };
+      if (hhmmToMinutes(s.startTime) - now.minutes < lead) return { ...base, available: false, reason: "tooSoon" };
     }
     return { ...base, available: true };
   });

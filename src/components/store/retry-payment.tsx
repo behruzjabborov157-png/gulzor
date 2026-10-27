@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { retryPaymentAction } from "@/app/actions";
+import { useT } from "@/i18n/client";
 
 export function RetryPayment({ number, token }: { number: string; token: string }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const t = useT().t.order;
   if (!token) return null;
   return (
     <>
@@ -18,12 +20,12 @@ export function RetryPayment({ number, token }: { number: string; token: string 
           const url = await retryPaymentAction(number, token);
           if (url) window.location.assign(url);
           else {
-            setError("To‘lov havolasini yaratib bo‘lmadi. Do‘kon bilan bog‘laning.");
+            setError(t.retryFailed);
             setPending(false);
           }
         }}
       >
-        {pending ? "Ochilmoqda…" : "To‘lovni davom ettirish"}
+        {pending ? t.retryOpening : t.retryPayment}
       </button>
       {error ? <span className="text-sm text-danger">{error}</span> : null}
     </>

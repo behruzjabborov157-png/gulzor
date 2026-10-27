@@ -1,3 +1,5 @@
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
+import { getDict } from "@/i18n/dict";
 import type { CheckoutSettings } from "@/lib/settings";
 
 export type PaymentMethod = "cash" | "payme" | "click";
@@ -21,10 +23,11 @@ export function clickCredentials() {
  * Methods offered to customers. An online provider is only shown when the
  * owner enabled it in settings AND its server-side credentials exist.
  */
-export function availablePaymentMethods(c: CheckoutSettings): { id: PaymentMethod; label: string; hint: string }[] {
-  const list: { id: PaymentMethod; label: string; hint: string }[] = [];
-  if (c.cashEnabled) list.push({ id: "cash", label: "Naqd pul", hint: "Buyurtmani qabul qilganda kuryerga yoki do‘konda to‘lanadi" });
-  if (c.paymeEnabled && paymeCredentials()) list.push({ id: "payme", label: "Payme", hint: "Payme orqali onlayn to‘lov" });
-  if (c.clickEnabled && clickCredentials()) list.push({ id: "click", label: "Click", hint: "Click orqali onlayn to‘lov" });
-  return list;
+export function availablePaymentMethods(c: CheckoutSettings, locale: Locale = DEFAULT_LOCALE): { id: PaymentMethod; label: string; hint: string }[] {
+  const t = getDict(locale).checkout.payments;
+  const ids: PaymentMethod[] = [];
+  if (c.cashEnabled) ids.push("cash");
+  if (c.paymeEnabled && paymeCredentials()) ids.push("payme");
+  if (c.clickEnabled && clickCredentials()) ids.push("click");
+  return ids.map((id) => ({ id, ...t[id] }));
 }

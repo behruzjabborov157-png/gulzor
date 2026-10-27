@@ -2,6 +2,8 @@ import { randomBytes, randomInt } from "node:crypto";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, schema } from "@/db";
+import { DEFAULT_LOCALE, fmt, type Locale } from "@/i18n/config";
+import { getDict } from "@/i18n/dict";
 import { normalizePhone } from "@/lib/format";
 import { availablePaymentMethods } from "@/lib/payments/config";
 import { adjustStock, cartLineSchema, quoteCart, StockError, type Quote } from "@/lib/quote";
@@ -37,26 +39,28 @@ export const PAYMENT_METHOD_LABEL: Record<Order["paymentMethod"], string> = {
   click: "Click",
 };
 
-const phone = z
-  .string()
-  .trim()
-  .transform((v, ctx) => {
-    const p = normalizePhone(v);
-    if (!p) {
-      ctx.addIssue({ code: "custom", message: "Telefon raqami noto‘g‘ri (+998 XX XXX XX XX)" });
-      return z.NEVER;
-    }
-    return p;
-  });
+/** Checkout validation with messages in the customer's language. */
+export function makeCheckoutSchema(locale: Locale = DEFAULT_LOCALE) {
+  const e = getDict(locale).errors;
+  const phone = z
+    .string()
+    .trim()
+    .transform((v, ctx) => {
+      const p = normalizePhone(v);
+      if (!p) {
+        ctx.addIssue({ code: "custom", message: e.checkout.phone });
+        return z.NEVER;
+      }
+      return p;
+    });
+  const text = (max: number) => z.string().trim().max(max, fmt(e.checkout.tooLong, { max })).default("");
 
-const text = (max: number) => z.string().trim().max(max, `Ko‘pi bilan ${max} belgi`).default("");
-
-export const checkoutSchema = z
+  return z
   .object({
-    lines: z.array(cartLineSchema).min(1, "Savat bo‘sh").max(30),
+    lines: z.array(cartLineSchema).min(1, e.quote.emptyCart).max(30),
     couponCode: z.string().trim().max(40).optional().nullable(),
     fulfillment: z.enum(["delivery", "pickup"]),
-    customerName: z.string().trim().min(2, "Ismingizni kiriting").max(80),
+    customerName: z.string().trim().min(2, e.checkout.name).max(80),
     customerPhone: phone,
     recipientIsCustomer: z.boolean(),
     recipientName: text(80),
@@ -69,7 +73,7 @@ export const checkoutSchema = z
     apartment: text(40),
     landmark: text(160),
     date: z.string(),
-    slotId: z.number().int().positive({ message: "Vaqtni tanlang" }),
+    slotId: z.number().int().positive({ message: e.checkout.slot }),
     courierNote: text(500),
     cardMessage: text(300),
     paymentMethod: z.enum(["cash", "payme", "click"]),
@@ -77,15 +81,17 @@ export const checkoutSchema = z
   })
   .superRefine((v, ctx) => {
     if (!v.recipientIsCustomer) {
-      if (v.recipientName.length < 2) ctx.addIssue({ code: "custom", path: ["recipientName"], message: "Qabul qiluvchi ismini kiriting" });
-      if (!normalizePhone(v.recipientPhone)) ctx.addIssue({ code: "custom", path: ["recipientPhone"], message: "Qabul qiluvchi telefoni noto‘g‘ri" });
+      if (v.recipientName.length < 2) ctx.addIssue({ code: "custom", path: ["recipientName"], message: e.checkout.recipientName });
+      if (!normalizePhone(v.recipientPhone)) ctx.addIssue({ code: "custom", path: ["recipientPhone"], message: e.checkout.recipientPhone });
     }
     if (v.fulfillment === "delivery") {
-      if (!v.zoneId) ctx.addIssue({ code: "custom", path: ["zoneId"], message: "Hududni tanlang" });
-      if (v.address.length < 5) ctx.addIssue({ code: "custom", path: ["address"], message: "Ko‘cha va uy raqamini kiriting" });
+      if (!v.zoneId) ctx.addIssue({ code: "custom", path: ["zoneId"], message: e.checkout.zone });
+      if (v.address.length < 5) ctx.addIssue({ code: "custom", path: ["address"], message: e.checkout.address });
     }
   });
+}
 
+export const checkoutSchema = makeCheckoutSchema();
 export type CheckoutInput = z.input<typeof checkoutSchema>;
 
 export type CreateOrderResult =
@@ -97,24 +103,25 @@ function orderNumber() {
   return `GZ-${date.slice(2, 4)}${date.slice(5, 7)}${date.slice(8, 10)}-${randomInt(1000, 10000)}`;
 }
 
-export async function createOrder(raw: unknown, customerId: string | null): Promise<CreateOrderResult> {
-  const parsed = checkoutSchema.safeParse(raw);
+export async function createOrder(raw: unknown, customerId: string | null, locale: Locale = DEFAULT_LOCALE): Promise<CreateOrderResult> {
+  const e = getDict(locale).errors.checkout;
+  const parsed = makeCheckoutSchema(locale).safeParse(raw);
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};
     for (const i of parsed.error.issues) fieldErrors[i.path.join(".") || "_"] ??= i.message;
-    return { ok: false, errors: ["Iltimos, belgilangan maydonlarni to‘g‘rilang"], fieldErrors };
+    return { ok: false, errors: [e.fixFields], fieldErrors };
   }
   const v = parsed.data;
   const { checkout } = await getSettings();
 
   if (!availablePaymentMethods(checkout).some((m) => m.id === v.paymentMethod)) {
-    return { ok: false, errors: ["Tanlangan to‘lov usuli hozir mavjud emas"], fieldErrors: { paymentMethod: "To‘lov usulini tanlang" } };
+    return { ok: false, errors: [e.paymentUnavailable], fieldErrors: { paymentMethod: e.paymentRequired } };
   }
 
   // Authoritative server-side recalculation of every price, fee and availability.
   const quote = await quoteCart(
     { lines: v.lines, couponCode: v.couponCode, fulfillment: v.fulfillment, zoneId: v.zoneId, date: v.date, slotId: v.slotId },
-    { forCheckout: true },
+    { forCheckout: true, locale },
   );
   if (quote.errors.length) return { ok: false, errors: quote.errors, quote };
 
@@ -175,8 +182,9 @@ export async function createOrder(raw: unknown, customerId: string | null): Prom
             anonymous: v.anonymous,
             regionId: quote.zone?.regionId ?? null,
             zoneId: quote.zone?.id ?? null,
-            regionName: quote.zone?.regionName ?? null,
-            zoneName: quote.zone?.name ?? null,
+            regionName: quote.zone?.regionNameUz ?? null,
+            zoneName: quote.zone?.nameUz ?? null,
+            locale,
             district: v.fulfillment === "delivery" ? v.district : "",
             neighborhood: v.fulfillment === "delivery" ? v.neighborhood : "",
             address: v.fulfillment === "delivery" ? v.address : checkout.pickupAddress,
@@ -201,14 +209,14 @@ export async function createOrder(raw: unknown, customerId: string | null): Prom
             orderId: order.id,
             productId: l.productId,
             variantId: l.variantId,
-            productName: l.name,
-            variantName: l.variantName,
+            productName: l.nameUz,
+            variantName: l.variantNameUz,
             stems: l.stems,
             color: l.color,
             imageUrl: l.image,
             unitPrice: l.unitPrice,
             quantity: l.quantity,
-            addons: l.addons,
+            addons: l.addonsUz,
             lineTotal: l.lineTotal,
           })),
         );
@@ -222,6 +230,7 @@ export async function createOrder(raw: unknown, customerId: string | null): Prom
           orderId: order.id,
           type: "status",
           toStatus: "new",
+          code: "order_received",
           message: "Buyurtma qabul qilindi",
           actor: "customer",
           isPublic: true,
@@ -243,15 +252,15 @@ export async function createOrder(raw: unknown, customerId: string | null): Prom
         }
         return order;
       });
-    } catch (e) {
-      if (e instanceof StockError) return { ok: false, errors: [e.message + ". Savatni yangilang."] };
-      if (e instanceof SlotFullError) return { ok: false, errors: [e.message], fieldErrors: { slotId: e.message } };
-      if ((e as Error).message === "COUPON_EXHAUSTED") return { ok: false, errors: ["Promokoddan foydalanish limiti tugagan"] };
-      if (isUniqueViolation(e, "orders_number_idx")) continue; // order number collision — retry
-      throw e;
+    } catch (err) {
+      if (err instanceof StockError) return { ok: false, errors: [e.stockGone] };
+      if (err instanceof SlotFullError) return { ok: false, errors: [e.slotFull], fieldErrors: { slotId: e.slotFull } };
+      if ((err as Error).message === "COUPON_EXHAUSTED") return { ok: false, errors: [getDict(locale).errors.quote.couponExhausted] };
+      if (isUniqueViolation(err, "orders_number_idx")) continue; // order number collision — retry
+      throw err;
     }
   }
-  if (!created) return { ok: false, errors: ["Buyurtma raqamini yaratib bo‘lmadi, qayta urinib ko‘ring"] };
+  if (!created) return { ok: false, errors: [e.numberFailed] };
 
   return { ok: true, orderId: created.id, number: created.number, accessToken, paymentMethod: created.paymentMethod };
 }
@@ -322,6 +331,8 @@ export async function changeOrderStatus(orderId: string, to: Order["status"], ac
       type: "status",
       toStatus: to,
       message: `Holat: ${ORDER_STATUS_LABEL[to]}${reason ? ` — ${reason}` : ""}`,
+      code: "status",
+      params: reason ? { reason } : null,
       actor,
       isPublic: true,
     });

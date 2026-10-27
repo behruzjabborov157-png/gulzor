@@ -56,13 +56,17 @@ export const categories = pgTable(
     id: serial("id").primaryKey(),
     slug: text("slug").notNull(),
     name: text("name").notNull(),
+    nameRu: text("name_ru"),
     kind: categoryKind("kind").notNull(),
     description: text("description").notNull().default(""),
+    descriptionRu: text("description_ru"),
     imageUrl: text("image_url"),
     sortOrder: integer("sort_order").notNull().default(0),
     isActive: boolean("is_active").notNull().default(true),
     seoTitle: text("seo_title"),
     seoDescription: text("seo_description"),
+    seoTitleRu: text("seo_title_ru"),
+    seoDescriptionRu: text("seo_description_ru"),
   },
   (t) => [uniqueIndex("categories_slug_idx").on(t.slug)],
 );
@@ -77,6 +81,19 @@ export const products = pgTable(
     description: text("description").notNull().default(""),
     careInstructions: text("care_instructions").notNull().default(""),
     flowerVarieties: jsonb("flower_varieties").$type<string[]>().notNull().default([]),
+    /* Russian content — optional; the storefront falls back to Uzbek when empty. */
+    nameRu: text("name_ru"),
+    shortDescriptionRu: text("short_description_ru"),
+    descriptionRu: text("description_ru"),
+    careInstructionsRu: text("care_instructions_ru"),
+    sizeLabelRu: text("size_label_ru"),
+    flowerVarietiesRu: jsonb("flower_varieties_ru").$type<string[]>().notNull().default([]),
+    /** Russian labels for colorOptions, same order (the Uzbek value is what gets stored on orders). */
+    colorOptionsRu: jsonb("color_options_ru").$type<string[]>().notNull().default([]),
+    seoTitleRu: text("seo_title_ru"),
+    seoDescriptionRu: text("seo_description_ru"),
+    /** Lower-cased, apostrophe-free text in both languages, maintained by the app for search. */
+    searchText: text("search_text").notNull().default(""),
     stemCount: integer("stem_count"),
     sizeLabel: text("size_label"),
     primaryCategoryId: integer("primary_category_id").references(() => categories.id, { onDelete: "set null" }),
@@ -142,6 +159,7 @@ export const productVariants = pgTable(
       .references(() => products.id, { onDelete: "cascade" }),
     /** e.g. "Kichik", "O‘rtacha", "Katta" */
     name: text("name").notNull(),
+    nameRu: text("name_ru"),
     stemCount: integer("stem_count"),
     price: integer("price").notNull(),
     compareAtPrice: integer("compare_at_price"),
@@ -162,6 +180,7 @@ export const deliveryRegions = pgTable(
     id: serial("id").primaryKey(),
     slug: text("slug").notNull(),
     name: text("name").notNull(),
+    nameRu: text("name_ru"),
     isActive: boolean("is_active").notNull().default(true),
     sortOrder: integer("sort_order").notNull().default(0),
     note: text("note").notNull().default(""),
@@ -175,8 +194,10 @@ export const deliveryZones = pgTable("delivery_zones", {
     .notNull()
     .references(() => deliveryRegions.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
+  nameRu: text("name_ru"),
   /** Districts / areas covered, shown to customers. */
   description: text("description").notNull().default(""),
+  descriptionRu: text("description_ru"),
   fee: integer("fee").notNull().default(0),
   freeFrom: integer("free_from"),
   minOrder: integer("min_order"),
@@ -329,6 +350,8 @@ export const orders = pgTable(
     paymentMethod: paymentMethod("payment_method").notNull(),
     paymentStatus: paymentStatus("payment_status").notNull().default("pending"),
     fulfillment: fulfillment("fulfillment").notNull(),
+    /** Language the customer ordered in (uz / ru). */
+    locale: text("locale").notNull().default("uz"),
     customerName: text("customer_name").notNull(),
     customerPhone: text("customer_phone").notNull(),
     recipientName: text("recipient_name").notNull(),
@@ -400,6 +423,9 @@ export const orderEvents = pgTable(
     type: text("type").$type<"status" | "payment" | "note" | "notification" | "edit">().notNull(),
     toStatus: text("to_status"),
     message: text("message").notNull().default(""),
+    /** Machine-readable event (e.g. "order_received", "payment_paid") so customer pages can show it in their language. */
+    code: text("code"),
+    params: jsonb("params").$type<Record<string, string | number>>(),
     actor: text("actor").notNull().default("system"),
     /** Whether this event is shown on the customer tracking page. */
     isPublic: boolean("is_public").notNull().default(false),

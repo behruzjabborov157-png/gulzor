@@ -81,11 +81,11 @@ export const CATEGORIES: { slug: string; name: string; kind: "flower" | "bouquet
   { slug: "kuzgi-kolleksiya", name: "Kuzgi kolleksiya", kind: "collection", description: "Kuz ranglaridagi xrizantema, gortenziya va atirgullar.", image: "chrysanthemum-mix" },
 ];
 
-const CARE_CUT =
+export const CARE_CUT =
   "Poyalarni o‘tkir pichoq bilan qiya kesib, toza sovuq suvga soling. Suvni har kuni almashtiring va har 2 kunda poyalarni 1–2 sm qisqartiring. Guldastani to‘g‘ridan-to‘g‘ri quyosh nuri, isitgich va mevalar yonida qoldirmang.";
-const CARE_BOX =
+export const CARE_BOX =
   "Gullar maxsus namlikni saqlovchi gubkaga o‘rnatilgan. Har 2 kunda gubkaga ozgina suv quying, qutini salqin joyda saqlang.";
-const CARE_PLANT =
+export const CARE_PLANT =
   "Yorug‘, lekin to‘g‘ridan-to‘g‘ri quyosh tushmaydigan joyga qo‘ying. Tuproq yuzasi quriganda sug‘oring, ortiqcha suv to‘planib qolmasin.";
 
 export const PRODUCTS: SeedProduct[] = [

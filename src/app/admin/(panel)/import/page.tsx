@@ -14,7 +14,10 @@ export default async function ImportAdmin() {
         <h2 className="text-2xl">Mahsulotlarni eksport qilish</h2>
         <p className="text-sm text-muted">Joriy katalogni CSV (Excel’da ochiladi) ko‘rinishida yuklab oling, narx va qoldiqlarni tahrirlab, qayta import qiling.</p>
         <div className="flex flex-wrap gap-2">
-          <a href="/admin/import/eksport" className="btn-primary btn-sm">CSV yuklab olish</a>
+          {/* A file download from a route handler, not a page — a plain <a download> is correct here. */}
+          <a href="/admin/import/eksport" className="btn-primary btn-sm" download>
+            CSV yuklab olish
+          </a>
           <a href="/product-import-template.csv" className="btn-secondary btn-sm" download>Bo‘sh shablon</a>
         </div>
       </section>

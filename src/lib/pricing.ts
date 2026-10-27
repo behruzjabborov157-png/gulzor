@@ -36,11 +36,17 @@ export type PricedLine =
       stems: number | null;
       addons: PricedAddon[];
     }
-  | { ok: false; error: string };
+  | { ok: false; error: PriceError };
+
+/** Machine-readable pricing problem; translated with t.errors.price[code] and params. */
+export type PriceError = {
+  code: "quantity" | "size" | "noPrice" | "stems" | "addonDuplicate" | "addonMissing" | "addonQuantity";
+  params?: Record<string, number>;
+};
 
 export function priceLine(p: PricingProduct, sel: LineSelection, addonCatalog: AddonPrice[]): PricedLine {
   if (!Number.isInteger(sel.quantity) || sel.quantity < 1 || sel.quantity > MAX_LINE_QUANTITY) {
-    return { ok: false, error: `Miqdor 1 dan ${MAX_LINE_QUANTITY} gacha bo‘lishi kerak` };
+    return { ok: false, error: { code: "quantity", params: { max: MAX_LINE_QUANTITY } } };
   }
 
   let basePrice = p.price;
@@ -49,7 +55,7 @@ export function priceLine(p: PricingProduct, sel: LineSelection, addonCatalog: A
 
   if (p.pricingMode === "variants") {
     const v = p.variants.find((x) => x.id === sel.variantId && x.isActive);
-    if (!v) return { ok: false, error: "Guldasta o‘lchamini tanlang" };
+    if (!v) return { ok: false, error: { code: "size" } };
     basePrice = v.price;
     variantName = v.name;
     stems = v.stemCount;
@@ -58,25 +64,25 @@ export function priceLine(p: PricingProduct, sel: LineSelection, addonCatalog: A
     const max = p.maxStems ?? 201;
     const step = Math.max(1, p.stemStep || 1);
     const n = sel.stems ?? NaN;
-    if (!p.stemPrice) return { ok: false, error: "Narx belgilanmagan" };
+    if (!p.stemPrice) return { ok: false, error: { code: "noPrice" } };
     if (!Number.isInteger(n) || n < min || n > max || (n - min) % step !== 0) {
-      return { ok: false, error: `Gullar soni ${min}–${max} oralig‘ida bo‘lishi kerak` };
+      return { ok: false, error: { code: "stems", params: { min, max } } };
     }
     basePrice = p.stemPrice * n;
     stems = n;
   }
 
-  if (!Number.isFinite(basePrice) || basePrice <= 0) return { ok: false, error: "Narx belgilanmagan" };
+  if (!Number.isFinite(basePrice) || basePrice <= 0) return { ok: false, error: { code: "noPrice" } };
 
   const addons: PricedAddon[] = [];
   const seen = new Set<number>();
   for (const a of sel.addons ?? []) {
-    if (seen.has(a.productId)) return { ok: false, error: "Qo‘shimcha takrorlangan" };
+    if (seen.has(a.productId)) return { ok: false, error: { code: "addonDuplicate" } };
     seen.add(a.productId);
     const found = addonCatalog.find((x) => x.productId === a.productId);
-    if (!found) return { ok: false, error: "Tanlangan qo‘shimcha hozir mavjud emas" };
+    if (!found) return { ok: false, error: { code: "addonMissing" } };
     if (!Number.isInteger(a.quantity) || a.quantity < 1 || a.quantity > MAX_ADDON_QUANTITY) {
-      return { ok: false, error: "Qo‘shimcha miqdori noto‘g‘ri" };
+      return { ok: false, error: { code: "addonQuantity" } };
     }
     addons.push({ productId: found.productId, name: found.name, unitPrice: found.price, quantity: a.quantity });
   }

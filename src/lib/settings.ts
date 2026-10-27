@@ -7,10 +7,12 @@ export type StoreSettings = {
   phone: string;
   email: string;
   address: string;
+  addressRu: string;
   /** Telegram username of the shop for customer contact, without "@". */
   telegramUsername: string;
   instagramUrl: string;
   workingHours: string;
+  workingHoursRu: string;
   /** Legal entity details shown in the footer (optional). */
   legalName: string;
 };
@@ -18,8 +20,10 @@ export type StoreSettings = {
 export type CheckoutSettings = {
   serviceFee: number;
   serviceFeeLabel: string;
+  serviceFeeLabelRu: string;
   pickupEnabled: boolean;
   pickupAddress: string;
+  pickupAddressRu: string;
   pickupPrepMinutes: number;
   cashEnabled: boolean;
   couponsEnabled: boolean;
@@ -37,17 +41,21 @@ export const DEFAULT_STORE: StoreSettings = {
   phone: "",
   email: "",
   address: "",
+  addressRu: "",
   telegramUsername: "",
   instagramUrl: "",
   workingHours: "",
+  workingHoursRu: "",
   legalName: "",
 };
 
 export const DEFAULT_CHECKOUT: CheckoutSettings = {
   serviceFee: 0,
   serviceFeeLabel: "Xizmat haqi",
+  serviceFeeLabelRu: "Сервисный сбор",
   pickupEnabled: false,
   pickupAddress: "",
+  pickupAddressRu: "",
   pickupPrepMinutes: 60,
   cashEnabled: true,
   couponsEnabled: true,

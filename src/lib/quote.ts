@@ -1,8 +1,10 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, schema } from "@/db";
+import { DEFAULT_LOCALE, fmt, pick, type Locale } from "@/i18n/config";
+import { getDict, priceErrorText } from "@/i18n/dict";
 import { isOrderable, stockState, toPricing, type StockState } from "@/lib/catalog";
-import { bookedSlotCounts, computeSlots, dateWindow, getDeliveryConfig } from "@/lib/delivery";
+import { bookedSlotCounts, computeSlots, dateWindow, getDeliveryConfig, type SlotOption } from "@/lib/delivery";
 import { formatUZS } from "@/lib/format";
 import { couponDiscount, deliveryFeeFor, MAX_ADDON_QUANTITY, MAX_LINE_QUANTITY, priceLine, type PricedAddon } from "@/lib/pricing";
 import { getSettings } from "@/lib/settings";
@@ -35,12 +37,19 @@ export type QuotedLine = {
   index: number;
   productId: number;
   slug: string | null;
+  /** Name in the customer's language (for display). */
   name: string;
+  /** Uzbek originals — stored on the order so the admin panel and Telegram stay in Uzbek. */
+  nameUz: string;
+  variantNameUz: string | null;
+  addonsUz: PricedAddon[];
   image: string | null;
   variantId: number | null;
   variantName: string | null;
   stems: number | null;
+  /** Stored colour value (Uzbek option) and its label in the customer's language. */
   color: string | null;
+  colorLabel: string | null;
   addons: PricedAddon[];
   quantity: number;
   unitPrice: number;
@@ -60,15 +69,28 @@ export type Quote = {
   serviceFee: number;
   serviceFeeLabel: string;
   total: number;
-  zone: { id: number; name: string; regionId: number; regionName: string; fee: number; freeFrom: number | null; minOrder: number | null } | null;
-  slots: { id: number; label: string; available: boolean; reason?: string }[];
+  zone: {
+    id: number;
+    name: string;
+    regionId: number;
+    regionName: string;
+    nameUz: string;
+    regionNameUz: string;
+    fee: number;
+    freeFrom: number | null;
+    minOrder: number | null;
+  } | null;
+  slots: SlotOption[];
   prepMinutes: number;
   containsDemo: boolean;
-  /** Blocking problems; checkout must not proceed while non-empty. */
+  /** Blocking problems (in the customer's language); checkout must not proceed while non-empty. */
   errors: string[];
 };
 
-export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean } = {}): Promise<Quote> {
+export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean; locale?: Locale } = {}): Promise<Quote> {
+  const locale = opts.locale ?? DEFAULT_LOCALE;
+  const t = getDict(locale).errors.quote;
+  const uzs = (n: number) => formatUZS(n, locale);
   const db = await getDb();
   const { checkout } = await getSettings();
   const errors: string[] = [];
@@ -85,9 +107,9 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
     : [];
 
   const prodById = new Map(prods.map((x) => [x.id, x]));
-  const addonCatalog = prods
-    .filter((x) => x.isAddon && x.status === "active" && isOrderable(stockState(x, [])))
-    .map((x) => ({ productId: x.id, name: x.name, price: x.price }));
+  const orderableAddons = prods.filter((x) => x.isAddon && x.status === "active" && isOrderable(stockState(x, [])));
+  const addonCatalog = orderableAddons.map((x) => ({ productId: x.id, name: pick(locale, x.name, x.nameRu), price: x.price }));
+  const addonCatalogUz = orderableAddons.map((x) => ({ productId: x.id, name: x.name, price: x.price }));
 
   /* ---- Price every line ---- */
   const demand = new Map<string, number>(); // stock key -> requested quantity
@@ -97,12 +119,16 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
       index,
       productId: l.productId,
       slug: prod?.slug ?? null,
-      name: prod?.name ?? "Mahsulot topilmadi",
+      name: prod ? pick(locale, prod.name, prod.nameRu) : t.productMissing,
+      nameUz: prod?.name ?? t.productMissing,
+      variantNameUz: null,
+      addonsUz: [],
       image: prod?.images[0]?.url ?? null,
       variantId: l.variantId ?? null,
       variantName: null,
       stems: l.stems ?? null,
       color: l.color ?? null,
+      colorLabel: l.color ?? null,
       addons: [],
       quantity: l.quantity,
       unitPrice: 0,
@@ -112,20 +138,24 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
       stock: "missing",
       error: null,
     };
-    if (!prod || prod.status !== "active") return { ...base, error: "Bu mahsulot endi sotuvda emas" };
+    if (!prod || prod.status !== "active") return { ...base, error: t.notForSale };
 
     const pvs = vars.filter((v) => v.productId === prod.id);
     const stock = stockState(prod, pvs);
     base.stock = stock;
-    if (!isOrderable(stock)) return { ...base, error: stock === "out_of_season" ? "Hozir mavsumda emas" : "Hozircha mavjud emas" };
-    if (input.fulfillment === "delivery" && !prod.deliveryEligible) return { ...base, error: "Bu mahsulotni yetkazib bo‘lmaydi" };
-    if (input.fulfillment === "pickup" && !prod.pickupEligible) return { ...base, error: "Bu mahsulotni olib ketib bo‘lmaydi" };
+    if (!isOrderable(stock)) return { ...base, error: stock === "out_of_season" ? t.outOfSeason : t.outOfStock };
+    if (input.fulfillment === "delivery" && !prod.deliveryEligible) return { ...base, error: t.noDelivery };
+    if (input.fulfillment === "pickup" && !prod.pickupEligible) return { ...base, error: t.noPickup };
     if (l.color && prod.colorOptions.length && !prod.colorOptions.includes(l.color)) {
-      return { ...base, error: "Tanlangan rang mavjud emas" };
+      return { ...base, error: t.colorMissing };
     }
+    if (l.color && locale === "ru") base.colorLabel = prod.colorOptionsRu[prod.colorOptions.indexOf(l.color)] || l.color;
 
-    const priced = priceLine(toPricing(prod, pvs), l, addonCatalog.filter((a) => a.productId !== prod.id));
-    if (!priced.ok) return { ...base, error: priced.error };
+    const others = <T extends { productId: number }>(c: T[]) => c.filter((a) => a.productId !== prod.id);
+    const priced = priceLine(toPricing(prod, pvs, locale), l, others(addonCatalog));
+    if (!priced.ok) return { ...base, error: priceErrorText(locale, priced.error) };
+    // Same calculation with Uzbek names, for what gets stored on the order.
+    const pricedUz = priceLine(toPricing(prod, pvs), l, others(addonCatalogUz));
 
     if (prod.pricingMode === "variants" && l.variantId) {
       const k = `v:${l.variantId}`;
@@ -137,8 +167,10 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
     return {
       ...base,
       variantName: priced.variantName,
+      variantNameUz: pricedUz.ok ? pricedUz.variantName : priced.variantName,
       stems: priced.stems,
       addons: priced.addons,
+      addonsUz: pricedUz.ok ? pricedUz.addons : priced.addons,
       unitPrice: priced.unitPrice,
       lineTotal: priced.lineTotal,
     };
@@ -148,21 +180,21 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
   for (const [key, qty] of demand) {
     const [kind, idStr] = key.split(":");
     const id = Number(idStr);
-    const available =
-      kind === "v" ? vars.find((v) => v.id === id)?.stockQuantity : prodById.get(id)?.stockQuantity;
+    const available = kind === "v" ? vars.find((v) => v.id === id)?.stockQuantity : prodById.get(id)?.stockQuantity;
     if (available != null && qty > available) {
-      const name = kind === "v" ? prodById.get(vars.find((v) => v.id === id)!.productId)?.name : prodById.get(id)?.name;
-      errors.push(`“${name}” uchun omborda faqat ${available} dona qoldi`);
+      const prod = kind === "v" ? prodById.get(vars.find((v) => v.id === id)!.productId) : prodById.get(id);
+      const name = prod ? pick(locale, prod.name, prod.nameRu) : "";
+      errors.push(fmt(t.stockLimit, { name, n: available }));
       for (const line of lines) {
         const hit = kind === "v" ? line.variantId === id : line.productId === id || line.addons.some((a) => a.productId === id);
-        if (hit && !line.error) line.error = `Omborda ${available} dona qoldi`;
+        if (hit && !line.error) line.error = fmt(t.stockLimitLine, { n: available });
       }
     }
   }
 
   const lineErrors = lines.filter((l) => l.error);
-  if (lineErrors.length) errors.push("Savatdagi ayrim mahsulotlarni buyurtma qilib bo‘lmaydi");
-  if (opts.forCheckout && lines.length === 0) errors.push("Savat bo‘sh");
+  if (lineErrors.length) errors.push(t.someUnavailable);
+  if (opts.forCheckout && lines.length === 0) errors.push(t.emptyCart);
 
   const valid = lines.filter((l) => !l.error);
   const subtotal = valid.reduce((s, l) => s + l.lineTotal, 0);
@@ -174,19 +206,19 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
   const code = input.couponCode?.trim().toUpperCase();
   if (code) {
     if (!checkout.couponsEnabled) {
-      coupon = { code, applied: false, message: "Promokodlar hozir qabul qilinmaydi" };
+      coupon = { code, applied: false, message: t.couponsOff };
     } else {
       const [cp] = await db.select().from(schema.coupons).where(eq(schema.coupons.code, code));
       const now = new Date();
       if (!cp || !cp.isActive || (cp.startsAt && cp.startsAt > now) || (cp.endsAt && cp.endsAt < now)) {
-        coupon = { code, applied: false, message: "Promokod topilmadi yoki muddati tugagan" };
+        coupon = { code, applied: false, message: t.couponInvalid };
       } else if (cp.usageLimit != null && cp.usedCount >= cp.usageLimit) {
-        coupon = { code, applied: false, message: "Promokoddan foydalanish limiti tugagan" };
+        coupon = { code, applied: false, message: t.couponExhausted };
       } else if (subtotal < cp.minSubtotal) {
-        coupon = { code, applied: false, message: `Promokod ${formatUZS(cp.minSubtotal)}dan yuqori buyurtmalar uchun` };
+        coupon = { code, applied: false, message: fmt(t.couponMin, { amount: uzs(cp.minSubtotal) }) };
       } else {
         discount = couponDiscount(cp, subtotal);
-        coupon = { code, applied: true, message: `Chegirma: ${formatUZS(discount)}` };
+        coupon = { code, applied: true, message: fmt(t.couponApplied, { amount: uzs(discount) }) };
       }
     }
     if (opts.forCheckout && coupon && !coupon.applied) errors.push(coupon.message);
@@ -203,33 +235,35 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
       .innerJoin(schema.deliveryRegions, eq(schema.deliveryRegions.id, schema.deliveryZones.regionId))
       .where(and(eq(schema.deliveryZones.id, input.zoneId), eq(schema.deliveryZones.isActive, true), eq(schema.deliveryRegions.isActive, true)));
     if (!row) {
-      errors.push("Tanlangan hududga yetkazib berish mavjud emas");
+      errors.push(t.zoneUnavailable);
     } else {
       zone = {
         id: row.z.id,
-        name: row.z.name,
+        name: pick(locale, row.z.name, row.z.nameRu),
         regionId: row.r.id,
-        regionName: row.r.name,
+        regionName: pick(locale, row.r.name, row.r.nameRu),
+        nameUz: row.z.name,
+        regionNameUz: row.r.name,
         fee: row.z.fee,
         freeFrom: row.z.freeFrom,
         minOrder: row.z.minOrder,
       };
       deliveryFee = deliveryFeeFor(row.z, afterDiscount);
       if (row.z.minOrder != null && afterDiscount < row.z.minOrder) {
-        errors.push(`Bu hudud uchun minimal buyurtma: ${formatUZS(row.z.minOrder)}`);
+        errors.push(fmt(t.zoneMinOrder, { amount: uzs(row.z.minOrder) }));
       }
     }
   } else if (opts.forCheckout && input.fulfillment === "delivery") {
-    errors.push("Yetkazib berish hududini tanlang");
+    errors.push(t.zoneRequired);
   }
-  if (input.fulfillment === "pickup" && !checkout.pickupEnabled) errors.push("Olib ketish hozir mavjud emas");
+  if (input.fulfillment === "pickup" && !checkout.pickupEnabled) errors.push(t.pickupOff);
 
   /* ---- Date & slot ---- */
-  let slots: Quote["slots"] = [];
+  let slots: SlotOption[] = [];
   if (input.date && isISODate(input.date) && input.fulfillment) {
     const win = dateWindow(checkout.maxDaysAhead);
     if (input.date < win.min || input.date > win.max) {
-      errors.push("Yetkazib berish sanasi noto‘g‘ri");
+      errors.push(t.dateInvalid);
     } else {
       const { slots: all } = await getDeliveryConfig();
       let zoneRow = null;
@@ -244,15 +278,15 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
         prepMinutes,
         booked: await bookedSlotCounts(input.date),
       });
-      if (input.fulfillment === "delivery" && !zoneRow) slots = slots.map((s) => ({ ...s, available: false, reason: "Avval hududni tanlang" }));
+      if (input.fulfillment === "delivery" && !zoneRow) slots = slots.map((s) => ({ ...s, available: false, reason: "pickZone" as const }));
     }
   } else if (opts.forCheckout) {
-    errors.push("Sanani tanlang");
+    errors.push(t.dateRequired);
   }
   if (opts.forCheckout) {
     const chosen = slots.find((s) => s.id === input.slotId);
-    if (!chosen) errors.push("Yetkazib berish vaqtini tanlang");
-    else if (!chosen.available) errors.push(`Tanlangan vaqt mavjud emas: ${chosen.reason ?? ""}`);
+    if (!chosen) errors.push(t.slotRequired);
+    else if (!chosen.available) errors.push(t.slotUnavailable);
   }
 
   const serviceFee = valid.length ? checkout.serviceFee : 0;
@@ -265,7 +299,7 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
     coupon,
     deliveryFee,
     serviceFee,
-    serviceFeeLabel: checkout.serviceFeeLabel,
+    serviceFeeLabel: pick(locale, checkout.serviceFeeLabel, checkout.serviceFeeLabelRu),
     total,
     zone,
     slots,

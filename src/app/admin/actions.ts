@@ -24,6 +24,7 @@ import { saveImage, UploadError } from "@/lib/storage";
 import { notifyOrder, sendTelegram } from "@/lib/telegram";
 import { isISODate } from "@/lib/time";
 import { parseCsv, PRODUCT_CSV_COLUMNS } from "@/lib/csv";
+import { buildSearchText } from "@/lib/search";
 
 /* ------------------------------------------------------------------ */
 /* Auth                                                                */
@@ -174,6 +175,7 @@ export async function saveProductAction(productId: number | null, _: FormState, 
     .map((id, i) => ({
       id: id ? Number(id) : null,
       name: String(form.getAll("variant_name")[i] ?? "").trim(),
+      nameRu: String(form.getAll("variant_name_ru")[i] ?? "").trim() || null,
       stemCount: int(form.getAll("variant_stems")[i] ?? null),
       price: int(form.getAll("variant_price")[i] ?? null),
       compareAtPrice: int(form.getAll("variant_compare")[i] ?? null),
@@ -211,14 +213,29 @@ export async function saveProductAction(productId: number | null, _: FormState, 
   const [dup] = await db.select({ id: schema.products.id }).from(schema.products).where(eq(schema.products.slug, slug));
   if (dup && dup.id !== productId) return { ok: false, errors: { slug: "Bu slug band" } };
 
+  const shortDescription = String(form.get("shortDescription") ?? "").trim();
+  const flowerVarieties = lines(form.get("flowerVarieties"));
+  const ru = {
+    nameRu: String(form.get("nameRu") ?? "").trim() || null,
+    shortDescriptionRu: String(form.get("shortDescriptionRu") ?? "").trim() || null,
+    descriptionRu: String(form.get("descriptionRu") ?? "").trim() || null,
+    careInstructionsRu: String(form.get("careInstructionsRu") ?? "").trim() || null,
+    sizeLabelRu: String(form.get("sizeLabelRu") ?? "").trim() || null,
+    flowerVarietiesRu: lines(form.get("flowerVarietiesRu")),
+    colorOptionsRu: lines(form.get("colorOptionsRu")),
+    seoTitleRu: String(form.get("seoTitleRu") ?? "").trim() || null,
+    seoDescriptionRu: String(form.get("seoDescriptionRu") ?? "").trim() || null,
+  };
   const values = {
     name,
     slug,
-    shortDescription: String(form.get("shortDescription") ?? "").trim(),
+    shortDescription,
     description: String(form.get("description") ?? "").trim(),
     careInstructions: String(form.get("careInstructions") ?? "").trim(),
-    flowerVarieties: lines(form.get("flowerVarieties")),
+    flowerVarieties,
     colorOptions: lines(form.get("colorOptions")),
+    ...ru,
+    searchText: buildSearchText({ name, shortDescription, flowerVarieties, ...ru }),
     stemCount,
     sizeLabel: String(form.get("sizeLabel") ?? "").trim() || null,
     primaryCategoryId: primaryCategoryId && categoryIds.includes(primaryCategoryId) ? primaryCategoryId : (categoryIds[0] ?? null),
@@ -271,7 +288,7 @@ export async function saveProductAction(productId: number | null, _: FormState, 
     const keep = new Set(variants.filter((v) => v.id).map((v) => v.id));
     for (const c of current) if (!keep.has(c.id)) await tx.delete(schema.productVariants).where(eq(schema.productVariants.id, c.id));
     for (const v of variants) {
-      const data = { name: v.name, stemCount: v.stemCount, price: v.price ?? 0, compareAtPrice: v.compareAtPrice, stockQuantity: v.stockQuantity, isActive: v.isActive, sortOrder: v.sortOrder };
+      const data = { name: v.name, nameRu: v.nameRu, stemCount: v.stemCount, price: v.price ?? 0, compareAtPrice: v.compareAtPrice, stockQuantity: v.stockQuantity, isActive: v.isActive, sortOrder: v.sortOrder };
       if (v.id && current.some((c) => c.id === v.id)) await tx.update(schema.productVariants).set(data).where(eq(schema.productVariants.id, v.id));
       else await tx.insert(schema.productVariants).values({ ...data, productId: pid });
     }
@@ -325,6 +342,10 @@ export async function saveCategoryAction(categoryId: number | null, _: FormState
     slug,
     kind: kind.data,
     description: String(form.get("description") ?? "").trim(),
+    nameRu: String(form.get("nameRu") ?? "").trim() || null,
+    descriptionRu: String(form.get("descriptionRu") ?? "").trim() || null,
+    seoTitleRu: String(form.get("seoTitleRu") ?? "").trim() || null,
+    seoDescriptionRu: String(form.get("seoDescriptionRu") ?? "").trim() || null,
     imageUrl: String(form.get("imageUrl") ?? "").trim() || null,
     sortOrder: int(form.get("sortOrder")) || 0,
     isActive: form.get("isActive") === "on",
@@ -352,6 +373,7 @@ export async function saveRegionAction(regionId: number | null, _: FormState, fo
     isActive: form.get("isActive") === "on",
     sortOrder: int(form.get("sortOrder")) || 0,
     note: String(form.get("note") ?? "").trim(),
+    nameRu: String(form.get("nameRu") ?? "").trim() || null,
   };
   if (regionId) await db.update(schema.deliveryRegions).set(values).where(eq(schema.deliveryRegions.id, regionId));
   else await db.insert(schema.deliveryRegions).values(values);
@@ -378,6 +400,8 @@ export async function saveZoneAction(zoneId: number | null, _: FormState, form: 
     regionId,
     name,
     description: String(form.get("description") ?? "").trim(),
+    nameRu: String(form.get("nameRu") ?? "").trim() || null,
+    descriptionRu: String(form.get("descriptionRu") ?? "").trim() || null,
     fee,
     freeFrom,
     minOrder,
@@ -489,12 +513,16 @@ export async function saveSettingsAction(_: FormState, form: FormData): Promise<
     telegramUsername: tgUser,
     instagramUrl: insta,
     workingHours: s("workingHours"),
+    workingHoursRu: s("workingHoursRu"),
+    addressRu: s("addressRu"),
     legalName: s("legalName"),
   });
   await saveSetting("checkout", {
     ...DEFAULT_CHECKOUT,
     serviceFee: n("serviceFee", 0),
     serviceFeeLabel: s("serviceFeeLabel") || "Xizmat haqi",
+    serviceFeeLabelRu: s("serviceFeeLabelRu") || "Сервисный сбор",
+    pickupAddressRu: s("pickupAddressRu"),
     pickupEnabled: form.get("pickupEnabled") === "on",
     pickupAddress: s("pickupAddress"),
     pickupPrepMinutes: n("pickupPrepMinutes", 60),
@@ -543,6 +571,7 @@ export async function importProductsAction(_: FormState, form: FormData): Promis
   for (const [i, row] of rows.slice(1).entries()) {
     if (row.every((c) => !c.trim())) continue;
     const r = Object.fromEntries(header.map((h, j) => [h, (row[j] ?? "").trim()]));
+    const ruCol = (k: string) => (header.includes(k) ? r[k] || null : undefined);
     const line = i + 2;
     const slug = slugify(r.slug || r.name);
     const price = Number(r.price.replace(/\s/g, ""));
@@ -571,6 +600,11 @@ export async function importProductsAction(_: FormState, form: FormData): Promis
       description: r.description ?? "",
       careInstructions: r.care_instructions ?? "",
       flowerVarieties: (r.flower_varieties || "").split("|").map((x) => x.trim()).filter(Boolean),
+      // Russian columns are optional: only touch them when the CSV has them (older files must not wipe translations).
+      nameRu: ruCol("name_ru"),
+      shortDescriptionRu: ruCol("short_description_ru"),
+      descriptionRu: ruCol("description_ru"),
+      careInstructionsRu: ruCol("care_instructions_ru"),
       stemCount: r.stem_count ? Number(r.stem_count) || null : null,
       sizeLabel: r.size_label || null,
       price,
@@ -585,18 +619,20 @@ export async function importProductsAction(_: FormState, form: FormData): Promis
       images: r.image_url ? [{ url: r.image_url, alt: r.name }] : [],
       updatedAt: new Date(),
     };
+    let searchText = buildSearchText(values);
     await db.transaction(async (tx) => {
       const [existing] = await tx.select().from(schema.products).where(eq(schema.products.slug, slug));
       let pid: number;
       if (existing) {
+        searchText = buildSearchText({ ...existing, ...Object.fromEntries(Object.entries(values).filter(([, v]) => v !== undefined)) });
         await tx
           .update(schema.products)
-          .set({ ...values, images: values.images.length ? values.images : existing.images, ...(existing.price !== price ? { priceUpdatedAt: new Date() } : {}) })
+          .set({ ...values, searchText, images: values.images.length ? values.images : existing.images, ...(existing.price !== price ? { priceUpdatedAt: new Date() } : {}) })
           .where(eq(schema.products.id, existing.id));
         pid = existing.id;
         updated++;
       } else {
-        const [row2] = await tx.insert(schema.products).values({ ...values, priceUpdatedAt: new Date() }).returning({ id: schema.products.id });
+        const [row2] = await tx.insert(schema.products).values({ ...values, searchText, priceUpdatedAt: new Date() }).returning({ id: schema.products.id });
         pid = row2.id;
         created++;
       }

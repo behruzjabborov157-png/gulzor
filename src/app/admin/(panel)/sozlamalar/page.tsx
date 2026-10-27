@@ -32,7 +32,9 @@ export default async function SettingsAdmin() {
             <F label="Email" name="email" type="email" defaultValue={store.email} />
             <F label="Instagram havolasi" name="instagramUrl" defaultValue={store.instagramUrl} placeholder="https://instagram.com/..." />
             <F label="Manzil" name="address" defaultValue={store.address} />
+            <F label="Manzil (rus.)" name="addressRu" defaultValue={store.addressRu} lang="ru" />
             <F label="Ish vaqti" name="workingHours" defaultValue={store.workingHours} placeholder="Har kuni 08:00–22:00" />
+            <F label="Ish vaqti (rus.)" name="workingHoursRu" defaultValue={store.workingHoursRu} placeholder="Ежедневно 08:00–22:00" lang="ru" />
             <input type="hidden" name="tagline" value={store.tagline} />
           </div>
         </section>
@@ -42,8 +44,10 @@ export default async function SettingsAdmin() {
           <div className="grid gap-3 sm:grid-cols-3">
             <F label="Xizmat haqi, so‘m (0 = yo‘q)" name="serviceFee" defaultValue={checkout.serviceFee} inputMode="numeric" />
             <F label="Xizmat haqi nomi" name="serviceFeeLabel" defaultValue={checkout.serviceFeeLabel} />
+            <F label="Xizmat haqi nomi (rus.)" name="serviceFeeLabelRu" defaultValue={checkout.serviceFeeLabelRu} lang="ru" />
             <F label="Necha kun oldinga buyurtma (maks.)" name="maxDaysAhead" defaultValue={checkout.maxDaysAhead} inputMode="numeric" />
             <F label="Olib ketish manzili" name="pickupAddress" defaultValue={checkout.pickupAddress} />
+            <F label="Olib ketish manzili (rus.)" name="pickupAddressRu" defaultValue={checkout.pickupAddressRu} lang="ru" />
             <F label="Olib ketish uchun tayyorlash (daqiqa)" name="pickupPrepMinutes" defaultValue={checkout.pickupPrepMinutes} inputMode="numeric" />
           </div>
           <div className="flex flex-wrap gap-x-6 gap-y-2 pt-2">

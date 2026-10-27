@@ -46,7 +46,9 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
           <span className="badge bg-forest text-ivory">{ORDER_STATUS_LABEL[o.status]}</span>
           <span className="badge bg-blush text-charcoal">{PAYMENT_METHOD_LABEL[o.paymentMethod]} · {PAYMENT_STATUS_LABEL[o.paymentStatus]}</span>
         </div>
-        <p className="mt-1 text-sm text-muted">Yaratildi: {formatDateTime(o.createdAt)}</p>
+        <p className="mt-1 text-sm text-muted">
+          Yaratildi: {formatDateTime(o.createdAt)} · Mijoz tili: {o.locale === "ru" ? "rus tili" : "o‘zbek tili"}
+        </p>
       </div>
 
       {o.containsDemo ? <Alert tone="warning">Buyurtmada namuna (demo) mahsulot bor — narx va tarkibni mijoz bilan tasdiqlang.</Alert> : null}

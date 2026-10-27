@@ -2,13 +2,6 @@
 
 export type StockState = "available" | "made_to_order" | "out_of_stock" | "out_of_season";
 
-export const STOCK_LABEL: Record<StockState, string> = {
-  available: "Mavjud",
-  made_to_order: "Buyurtma asosida",
-  out_of_stock: "Hozircha mavjud emas",
-  out_of_season: "Mavsumda emas",
-};
-
 export function isOrderable(s: StockState) {
   return s === "available" || s === "made_to_order";
 }

@@ -60,6 +60,7 @@ export function orderMessage(o: OrderForMessage, heading = "🌸 Yangi buyurtma"
     `<b>${heading}: ${o.number}</b>${o.containsDemo ? " ⚠️ DEMO mahsulot bor" : ""}`,
     "",
     `<b>Mijoz:</b> ${esc(o.customerName)}, ${formatPhone(o.customerPhone)}`,
+    o.locale === "ru" ? "<b>Mijoz tili:</b> rus tili" : null,
     `<b>Qabul qiluvchi:</b> ${esc(o.recipientName)}, ${formatPhone(o.recipientPhone)}${o.anonymous ? " (anonim)" : ""}`,
     `<b>${o.fulfillment === "pickup" ? "Olib ketish" : "Manzil"}:</b> ${where}`,
     `<b>Sana va vaqt:</b> ${formatDateISO(o.deliveryDate)}, ${esc(o.slotLabel)}`,

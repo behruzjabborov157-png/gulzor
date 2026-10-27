@@ -1,28 +1,30 @@
 import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Manrope } from "next/font/google";
+import { getDict } from "@/i18n/dict";
+import { getLocale } from "@/i18n/server";
 import { siteUrl } from "@/lib/settings";
 import "./globals.css";
 
 const display = Cormorant_Garamond({
-  subsets: ["latin", "latin-ext"],
+  subsets: ["latin", "latin-ext", "cyrillic"],
   weight: ["400", "500", "600"],
   variable: "--font-cormorant",
   display: "swap",
 });
-const sans = Manrope({ subsets: ["latin", "latin-ext"], variable: "--font-manrope", display: "swap" });
+const sans = Manrope({ subsets: ["latin", "latin-ext", "cyrillic"], variable: "--font-manrope", display: "swap" });
 
-export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl()),
-  title: {
-    default: "Gulzor — Toshkentda gul yetkazib berish va onlayn gul buyurtma qilish",
-    template: "%s | Gulzor",
-  },
-  description:
-    "Gulzor — onlayn gul do‘koni: guldastalar, atirgullar, lolalar, qutidagi gullar va sovg‘alar. Narxlar so‘mda, yetkazib berish sanasi va vaqtini o‘zingiz tanlaysiz.",
-  applicationName: "Gulzor",
-  openGraph: { type: "website", locale: "uz_UZ", siteName: "Gulzor" },
-  formatDetection: { telephone: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  const t = getDict(locale).meta;
+  return {
+    metadataBase: new URL(siteUrl()),
+    title: { default: t.siteTitle, template: "%s | Gulzor" },
+    description: t.siteDescription,
+    applicationName: "Gulzor",
+    openGraph: { type: "website", locale: t.ogLocale, siteName: "Gulzor" },
+    formatDetection: { telephone: false },
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: "#2e4a3b",
@@ -30,9 +32,9 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="uz" className={`${display.variable} ${sans.variable}`}>
+    <html lang={await getLocale()} className={`${display.variable} ${sans.variable}`}>
       <body className="min-h-dvh">{children}</body>
     </html>
   );

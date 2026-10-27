@@ -5,7 +5,15 @@ loadEnv();
 import { sql } from "drizzle-orm";
 import { closeDb, getDb, schema } from "@/db";
 import { DEFAULT_CHECKOUT, DEFAULT_STORE } from "@/lib/settings";
-import { CARE_DEFAULT, CATEGORIES, PRODUCTS } from "./seed-data";
+import { buildSearchText } from "@/lib/search";
+import { CARE_BOX, CARE_CUT, CARE_DEFAULT, CARE_PLANT, CATEGORIES, PRODUCTS } from "./seed-data";
+import { CARE_RU, CATEGORIES_RU, PRODUCTS_RU, VARIANT_RU } from "./seed-data-ru";
+
+const careRu = new Map([
+  [CARE_CUT, CARE_RU.cut],
+  [CARE_BOX, CARE_RU.box],
+  [CARE_PLANT, CARE_RU.plant],
+]);
 
 type Credit = { file: string; title: string; author: string; license: string; source: string };
 
@@ -53,6 +61,8 @@ async function main() {
           name: c.name,
           kind: c.kind,
           description: c.description,
+          nameRu: CATEGORIES_RU[c.slug]?.name ?? null,
+          descriptionRu: CATEGORIES_RU[c.slug]?.description ?? null,
           imageUrl: c.image ? `/images/demo/${c.image}.webp` : null,
           sortOrder: i,
         })),
@@ -62,6 +72,8 @@ async function main() {
 
     for (const p of noDemo ? [] : PRODUCTS) {
       const mode = p.variants ? "variants" : p.perStem ? "per_stem" : "fixed";
+      const ru = PRODUCTS_RU[p.slug];
+      const care = p.addon ? "" : (p.care ?? CARE_DEFAULT);
       const [row] = await tx
         .insert(schema.products)
         .values({
@@ -69,7 +81,22 @@ async function main() {
           name: p.name,
           shortDescription: p.short,
           description: p.description,
-          careInstructions: p.addon ? "" : (p.care ?? CARE_DEFAULT),
+          careInstructions: care,
+          nameRu: ru?.name ?? null,
+          shortDescriptionRu: ru?.short ?? null,
+          descriptionRu: ru?.description ?? null,
+          careInstructionsRu: care ? (careRu.get(care) ?? null) : null,
+          sizeLabelRu: ru?.size ?? null,
+          flowerVarietiesRu: ru?.flowers ?? [],
+          colorOptionsRu: ru?.colors ?? [],
+          searchText: buildSearchText({
+            name: p.name,
+            nameRu: ru?.name,
+            shortDescription: p.short,
+            shortDescriptionRu: ru?.short,
+            flowerVarieties: p.flowers,
+            flowerVarietiesRu: ru?.flowers,
+          }),
           flowerVarieties: p.flowers,
           stemCount: p.stems ?? null,
           sizeLabel: p.size ?? null,
@@ -97,7 +124,7 @@ async function main() {
         .returning();
       if (p.variants) {
         await tx.insert(schema.productVariants).values(
-          p.variants.map((v, i) => ({ productId: row.id, name: v.name, stemCount: v.stems ?? null, price: v.price, compareAtPrice: v.compareAt ?? null, sortOrder: i })),
+          p.variants.map((v, i) => ({ productId: row.id, name: v.name, nameRu: VARIANT_RU[v.name] ?? null, stemCount: v.stems ?? null, price: v.price, compareAtPrice: v.compareAt ?? null, sortOrder: i })),
         );
       }
       const ids = [...new Set(p.categories.map((s) => catId.get(s)).filter((x): x is number => x != null))];
@@ -108,11 +135,12 @@ async function main() {
     /* Delivery — DEMO values. Configure real areas, fees and windows in /admin/yetkazib-berish. */
     const [tashkent] = await tx
       .insert(schema.deliveryRegions)
-      .values({ slug: "toshkent-shahri", name: "Toshkent shahri", sortOrder: 0, note: "Demo sozlama — haqiqiy hududlar va narxlarni admin panelda kiriting." })
+      .values({ slug: "toshkent-shahri", name: "Toshkent shahri", nameRu: "Ташкент", sortOrder: 0, note: "Demo sozlama — haqiqiy hududlar va narxlarni admin panelda kiriting." })
       .returning();
     await tx.insert(schema.deliveryRegions).values({
       slug: "samarqand-shahri",
       name: "Samarqand shahri",
+      nameRu: "Самарканд",
       isActive: false,
       sortOrder: 1,
       note: "O‘chirilgan: xizmat yo‘lga qo‘yilganda yoqing.",
@@ -123,6 +151,8 @@ async function main() {
         isActive: !noDemo,
         name: "Markaziy tumanlar",
         description: "Mirobod, Yakkasaroy, Shayxontohur, Yunusobod, Mirzo Ulug‘bek, Chilonzor, Olmazor, Uchtepa, Yashnobod",
+        nameRu: "Центральные районы",
+        descriptionRu: "Мирабадский, Яккасарайский, Шайхантахурский, Юнусабадский, Мирзо-Улугбекский, Чиланзарский, Алмазарский, Учтепинский, Яшнабадский",
         fee: 30_000,
         freeFrom: 700_000,
         minOrder: 100_000,
@@ -136,6 +166,8 @@ async function main() {
         isActive: !noDemo,
         name: "Chekka tumanlar",
         description: "Sergeli, Bektemir, Yangihayot",
+        nameRu: "Отдалённые районы",
+        descriptionRu: "Сергелийский, Бектемирский, Янгихаётский",
         fee: 45_000,
         freeFrom: 1_000_000,
         minOrder: 150_000,

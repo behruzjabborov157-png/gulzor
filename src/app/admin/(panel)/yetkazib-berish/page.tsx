@@ -18,6 +18,8 @@ function ZoneFields({ z, regionId }: { z?: Zone; regionId: number }) {
       <F label="Bepul yetkazish (dan), so‘m" name="freeFrom" defaultValue={z?.freeFrom} inputMode="numeric" placeholder="yo‘q" />
       <F label="Minimal buyurtma, so‘m" name="minOrder" defaultValue={z?.minOrder} inputMode="numeric" placeholder="yo‘q" />
       <div className="sm:col-span-2"><F label="Qamrab olingan tumanlar (mijozga ko‘rinadi)" name="description" defaultValue={z?.description} /></div>
+      <F label="Hudud nomi (rus.)" name="nameRu" defaultValue={z?.nameRu} lang="ru" />
+      <div className="sm:col-span-3"><F label="Qamrab olingan tumanlar (rus.)" name="descriptionRu" defaultValue={z?.descriptionRu} lang="ru" /></div>
       <F label="Shu kunga buyurtma qabuli (gacha), SS:DD" name="sameDayCutoff" defaultValue={z?.sameDayCutoff ?? "18:00"} pattern="[0-2][0-9]:[0-5][0-9]" />
       <F label="Minimal oldindan vaqt (daqiqa)" name="minLeadMinutes" defaultValue={z?.minLeadMinutes ?? 120} inputMode="numeric" />
       <F label="Tartib" name="sortOrder" defaultValue={z?.sortOrder ?? 0} inputMode="numeric" />
@@ -58,6 +60,7 @@ export default async function DeliveryAdmin() {
               <AdminForm action={saveRegionAction.bind(null, r.id)}>
                 <div className="grid gap-3 sm:grid-cols-4">
                   <F label="Nomi" name="name" defaultValue={r.name} />
+                  <F label="Nomi (rus.)" name="nameRu" defaultValue={r.nameRu} lang="ru" />
                   <F label="Slug" name="slug" defaultValue={r.slug} />
                   <F label="Tartib" name="sortOrder" defaultValue={r.sortOrder} />
                   <div className="flex items-end pb-2"><C label="Faol" name="isActive" defaultChecked={r.isActive} /></div>
@@ -97,6 +100,7 @@ export default async function DeliveryAdmin() {
         <AdminForm action={saveRegionAction.bind(null, null)} submitLabel="Qo‘shish" resetOnSuccess>
           <div className="grid gap-3 sm:grid-cols-4">
             <F label="Nomi *" name="name" required />
+            <F label="Nomi (rus.)" name="nameRu" lang="ru" />
             <F label="Slug" name="slug" placeholder="avtomatik" />
             <F label="Tartib" name="sortOrder" defaultValue={0} />
             <div className="flex items-end pb-2"><C label="Faol" name="isActive" /></div>
