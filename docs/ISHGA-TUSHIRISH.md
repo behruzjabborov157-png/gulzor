@@ -21,14 +21,15 @@ Agar dasturchi yordam bersa, unga shu faylni ko‘rsating.
 
 ```bash
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y nginx postgresql certbot python3-certbot-nginx git
+sudo apt install -y nginx postgresql certbot python3-certbot-nginx git gh
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt install -y nodejs
 node -v          # v22.x bo‘lishi kerak
 
-sudo useradd --system --create-home --home-dir /opt/gulzor --shell /usr/sbin/nologin gulzor
-sudo mkdir -p /var/lib/gulzor/uploads /var/backups/gulzor
-sudo chown -R gulzor:gulzor /var/lib/gulzor /var/backups/gulzor
+# gulzor foydalanuvchisi: uy papkasi /home/gulzor, dastur esa alohida — bo‘sh /opt/gulzor papkasida
+sudo useradd --system --create-home --shell /bin/bash gulzor
+sudo mkdir -p /opt/gulzor /var/lib/gulzor/uploads /var/backups/gulzor
+sudo chown -R gulzor:gulzor /opt/gulzor /var/lib/gulzor /var/backups/gulzor
 ```
 
 ## 2. Ma’lumotlar bazasi (PostgreSQL)
@@ -44,9 +45,14 @@ sudo -u postgres psql -c "CREATE DATABASE gulzor OWNER gulzor ENCODING 'UTF8' LC
 ## 3. Dasturni joylash
 
 ```bash
-sudo -u gulzor -s /bin/bash          # gulzor foydalanuvchisi nomidan ishlash
+sudo -iu gulzor                       # gulzor foydalanuvchisi nomidan ishlash
+
+# Repozitoriy yopiq (private) — avval GitHub’ga kiring (bir martalik):
+gh auth login --web --git-protocol https
+gh auth setup-git
+
 cd /opt/gulzor
-git clone <repozitoriya-manzili> .   # yoki fayllarni nusxalang
+git clone https://github.com/behruzjabborov157-png/gulzor.git .   # oxiridagi nuqta muhim
 npm ci
 cp .env.example .env.local
 chmod 600 .env.local
@@ -111,7 +117,7 @@ Endi `https://gulzor.uz` ochilishi kerak.
 ## 8. Yakuniy tekshiruv
 
 ```bash
-sudo -u gulzor bash -c "cd /opt/gulzor && npm run launch:check -- --send-test"
+sudo -iu gulzor bash -c "cd /opt/gulzor && npm run launch:check -- --send-test"
 ```
 
 Natijada **0 failed** bo‘lishi kerak. Ogohlantirishlarni (WARN) ko‘rib chiqing. So‘ng o‘zingiz
@@ -133,7 +139,7 @@ sudo -u gulzor crontab -e
 ## 10. Yangilash
 
 ```bash
-sudo -u gulzor -s /bin/bash
+sudo -iu gulzor
 cd /opt/gulzor && git pull && npm ci && npm run db:migrate && npm run build
 exit
 sudo systemctl restart gulzor
