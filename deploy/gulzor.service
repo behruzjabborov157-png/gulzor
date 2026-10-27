@@ -1,0 +1,30 @@
+# systemd unit for Gulzor. Install:
+#   sudo cp deploy/gulzor.service /etc/systemd/system/gulzor.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now gulzor
+# Logs: journalctl -u gulzor -f
+[Unit]
+Description=Gulzor flower shop (Next.js)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=gulzor
+Group=gulzor
+WorkingDirectory=/opt/gulzor
+Environment=NODE_ENV=production
+Environment=PORT=3000
+# Secrets live in /opt/gulzor/.env.local (chmod 600, owned by gulzor) — Next.js loads it automatically.
+# Listen on localhost only: nginx is the public entry point (and sets the client IP used for rate limits).
+ExecStart=/usr/bin/node node_modules/next/dist/bin/next start -p 3000 -H 127.0.0.1
+Restart=always
+RestartSec=5
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/gulzor/.next /var/lib/gulzor
+
+[Install]
+WantedBy=multi-user.target
