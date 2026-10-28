@@ -47,10 +47,6 @@ sudo -u postgres psql -c "CREATE DATABASE gulzor OWNER gulzor ENCODING 'UTF8' LC
 ```bash
 sudo -iu gulzor                       # gulzor foydalanuvchisi nomidan ishlash
 
-# Repozitoriy yopiq (private) — avval GitHub’ga kiring (bir martalik):
-gh auth login --web --git-protocol https
-gh auth setup-git
-
 cd /opt/gulzor
 git clone https://github.com/behruzjabborov157-png/gulzor.git .   # oxiridagi nuqta muhim
 npm ci
