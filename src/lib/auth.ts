@@ -65,7 +65,20 @@ export async function destroySession(userType: UserType) {
   jar.delete(COOKIE[userType]);
 }
 
-export type AdminUser = { id: string; email: string; name: string; role: "owner" | "staff" };
+/**
+ * Deletes a customer account (Google Play requires self-service deletion). Saved addresses and
+ * favorites go with it (ON DELETE CASCADE); orders stay for the shop's records but are unlinked
+ * (customer_id → NULL). Every session of the account is revoked, on all devices.
+ */
+export async function deleteCustomerAccount(customerId: string) {
+  const db = await getDb();
+  await db.transaction(async (tx) => {
+    await tx.delete(schema.sessions).where(and(eq(schema.sessions.userType, "customer"), eq(schema.sessions.userId, customerId)));
+    await tx.delete(schema.customers).where(eq(schema.customers.id, customerId));
+  });
+}
+
+export type AdminUser ={ id: string; email: string; name: string; role: "owner" | "staff" };
 
 export async function getAdmin(): Promise<AdminUser | null> {
   const id = await sessionUserId("admin");

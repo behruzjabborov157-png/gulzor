@@ -11,6 +11,7 @@ import { getLocale } from "@/i18n/server";
 import {
   clientIp,
   createSession,
+  deleteCustomerAccount,
   destroySession,
   getCustomer,
   hashPassword,
@@ -268,6 +269,28 @@ export async function logoutAction() {
   const locale = await getLocale();
   await destroySession("customer");
   redirect(localePath(locale, "/"));
+}
+
+/** Self-service account deletion: needs the current password and an explicit confirmation. */
+export async function deleteAccountAction(_: FormState, form: FormData): Promise<FormState> {
+  const locale = await getLocale();
+  const t = getDict(locale).account.deleteAccount;
+  const customer = await getCustomer();
+  if (!customer) redirect(localePath(locale, "/hisob") + "?next=" + encodeURIComponent(localePath(locale, "/hisobni-ochirish")));
+  const errors: Record<string, string> = {};
+  if (form.get("confirm") !== "on") errors.confirm = t.confirmRequired;
+  const password = String(form.get("password") ?? "");
+  if (!password) errors.password = t.passwordRequired;
+  if (Object.keys(errors).length) return { ok: false, errors };
+  const key = `delete-account:${customer.id}`;
+  if (!(await rateLimit(key, 5, 900))) return { ok: false, message: getDict(locale).errors.form.tooMany15 };
+  const db = await getDb();
+  const [row] = await db.select({ hash: schema.customers.passwordHash }).from(schema.customers).where(eq(schema.customers.id, customer.id));
+  if (!row || !(await verifyPassword(password, row.hash))) return { ok: false, errors: { password: t.wrongPassword } };
+  await deleteCustomerAccount(customer.id);
+  await destroySession("customer");
+  await resetRateLimit(key);
+  redirect(localePath(locale, "/hisobni-ochirish") + "?ochirildi=1");
 }
 
 export async function deleteAddressAction(id: number) {

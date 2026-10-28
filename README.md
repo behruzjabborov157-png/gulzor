@@ -96,6 +96,10 @@ docs/                 market research, owner guide (Uzbek), product import templ
 - Android app: built with Bubblewrap from the live manifest (checked against `@bubblewrap/core` 1.27).
   `/.well-known/assetlinks.json` is generated from `TWA_PACKAGE_NAME` + `TWA_SHA256_FINGERPRINTS`
   (404 until set). Step-by-step guide in Uzbek: `docs/ANDROID-ILOVA.md`.
+- Google Play listing texts (uz/ru), Data safety answers and graphics: `docs/play-store/`
+  (`node scripts/play-store-assets.mjs <site-url>` re-renders the banner and phone screenshots from the live site).
+- Customers can delete their own account at `/hisobni-ochirish` (password + confirmation; addresses,
+  favorites and sessions go with it, orders are kept but unlinked) — required by Google Play.
 
 ### How pricing stays honest
 The browser never decides a price. Cart and checkout send only *what* was chosen (product, size,
@@ -239,10 +243,10 @@ re-reads the order from the database ("payment pending" until the provider confi
 ## 8. Testing
 
 ```bash
-npm test                                       # 18 unit/integration tests, throwaway DB, no server needed
+npm test                                       # 19 unit/integration tests, throwaway DB, no server needed
 E2E_BASE_URL=http://localhost:3000 \
 E2E_ADMIN_EMAIL=… E2E_ADMIN_PASSWORD=… \
-npm run test:e2e                               # 26 Playwright tests (desktop + phone viewport)
+npm run test:e2e                               # 28 Playwright tests (desktop + phone viewport)
 ```
 First time: `npx playwright install chromium`. E2E tests **create real orders** in the database the
 server uses (and one archived test product), so run them against a development database.
@@ -252,7 +256,7 @@ price/availability filters, unavailable product with alternatives, bouquet custo
 add-on) and live price, cart quantity changes, coupon, delivery fee, free-delivery threshold, server-side
 checkout validation, order creation and number, secret-link access, order tracking (buyer phone only),
 admin login (including a wrong password), order search by number and phone, status change visible to the
-customer, inline price change visible on the storefront, PWA manifest/icons/offline page/iPhone install hint, product creation with photo upload and size
+customer, inline price change visible on the storefront, PWA manifest/icons/offline page/iPhone install hint, self-service account deletion, product creation with photo upload and size
 variants, CSV export, custom request with private photo, robots/sitemap/security headers, payment endpoint
 auth, no horizontal scroll on 10 pages at phone width, mobile menu and filters. Russian: `/ru` routing,
 `/uz` redirect, hreflang + sitemap, language switch keeping the query, Cyrillic search, Russian configurator
@@ -272,7 +276,7 @@ prices, cart and checkout with Russian validation messages, Russian confirmation
   availability (same-day cut-off, preparation/lead time, slot capacity), card message, courier note, review step.
 - Orders stored in PostgreSQL with atomic stock reservation, unique order number, confirmation page via
   secret link, tracking page with status timeline, guest checkout, optional customer accounts (order history,
-  saved addresses, repeat order).
+  saved addresses, repeat order, self-service account deletion).
 - Custom bouquet requests with a secure image upload (re-encoded, metadata stripped, visible to admins only).
 - Newsletter sign-up with explicit consent text stored.
 - Admin: analytics (revenue, orders, average order value, cancellations, paid total, daily sales chart, bestsellers,

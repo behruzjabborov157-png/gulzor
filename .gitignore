@@ -12,3 +12,6 @@ playwright-report
 # Android signing keys must never be committed
 *.keystore
 *.jks
+
+# Play Store screenshots are regenerated from the live site (scripts/play-store-assets.mjs)
+docs/play-store/screenshots/

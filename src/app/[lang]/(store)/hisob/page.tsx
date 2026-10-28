@@ -143,9 +143,12 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         )}
       </section>
 
-      <p className="mt-12 text-sm">
+      <p className="mt-12 flex flex-wrap justify-between gap-4 text-sm">
         <Link href={lp("/sevimlilar")} className="text-forest underline">
           {t.favoritesLink}
+        </Link>
+        <Link href={lp("/hisobni-ochirish")} className="text-muted underline hover:text-danger">
+          {t.deleteLink}
         </Link>
       </p>
     </div>

@@ -15,12 +15,15 @@ const svg = (scale, rounded) => `<svg xmlns="http://www.w3.org/2000/svg" width="
 </svg>`;
 
 fs.mkdirSync("public/icons", { recursive: true });
+fs.mkdirSync("docs/play-store", { recursive: true });
 const out = [
   ["public/icons/icon-192.png", 192, svg(1, true)],
   ["public/icons/icon-512.png", 512, svg(1, true)],
   ["public/icons/maskable-512.png", 512, svg(0.72, false)],
   ["public/icons/apple-touch-icon.png", 180, svg(0.85, false)],
   ["src/app/icon.png", 64, svg(1, true)],
+  // Google Play hi-res icon: full square, Play applies its own rounded mask.
+  ["docs/play-store/play-icon-512.png", 512, svg(1, false)],
 ];
 for (const [file, size, s] of out) {
   await sharp(Buffer.from(s)).resize(size, size).png().toFile(file);

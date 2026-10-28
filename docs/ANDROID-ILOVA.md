@@ -179,13 +179,10 @@ Tekshiring:
    ```
    (birinchisi — sizning yuklash kalitingiz, ikkinchisi — Google’niki), so‘ng `sudo systemctl restart gulzor`.
    Busiz Play’dan o‘rnatilgan ilovada manzil satri ko‘rinadi.
-4. Do‘kon sahifasini to‘ldiring: qisqa va to‘liq tavsif (o‘zbekcha/ruscha), ikonka 512×512
-   (`public/icons/icon-512.png`), telefon skrinshotlari (kamida 2 ta), 1024×500 banner.
-5. **Maxfiylik siyosati** havolasi: `https://gulzor.uz/maxfiylik`.
-6. **Data safety** bo‘limi: ilova ism, telefon raqami va yetkazib berish manzilini **buyurtma uchun** to‘playdi,
-   uchinchi tomonga sotmaydi; to‘lov kartasi ma’lumotlari Payme/Click’da kiritiladi (sizning serveringizga kelmaydi).
-7. **Content rating** anketasi, **Target audience** — 18+ yoki 13+ (TWA 13 yoshdan kichik bolalarga mo‘ljallangan ilovalar uchun mos emas).
-8. Yangi shaxsiy dasturchi hisoblari uchun Google ishlab chiqarishga chiqarishdan oldin
+4. Do‘kon sahifasi, ikonka, banner, skrinshotlar, **Data safety**, **Content rating**, **Target audience**
+   va **hisobni o‘chirish havolasi** — hammasi tayyor: **`docs/play-store/README.md`**.
+5. **Maxfiylik siyosati:** `https://gulzor.uz/maxfiylik` · **Hisobni o‘chirish:** `https://gulzor.uz/hisobni-ochirish`.
+6. Yangi shaxsiy dasturchi hisoblari uchun Google ishlab chiqarishga chiqarishdan oldin
    **yopiq test** (bir necha testerlar bilan ma’lum muddat) talab qilishi mumkin — Play Console ko‘rsatmalariga amal qiling.
 
 ### 8. Ilovani yangilash

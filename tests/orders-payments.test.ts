@@ -29,6 +29,7 @@ const { migrate } = realPg ? await import("drizzle-orm/postgres-js/migrator") : 
 const { sql } = await import("drizzle-orm");
 const { changeOrderStatus, createOrder, notifyNewOrder } = await import("@/lib/orders");
 const { rateLimit } = await import("@/lib/rate-limit");
+const { deleteCustomerAccount } = await import("@/lib/auth");
 const { paymeRpc } = await import("@/lib/payments/payme");
 const { clickRequest } = await import("@/lib/payments/click");
 const { saveSetting, DEFAULT_CHECKOUT } = await import("@/lib/settings");
@@ -243,4 +244,32 @@ test("cancelling returns stock, coupon use and sales count", async () => {
 test("rate limiter is atomic under concurrency", async () => {
   const results = await Promise.all(Array.from({ length: 20 }, () => rateLimit("test:burst", 5, 60)));
   assert.equal(results.filter(Boolean).length, 5);
+});
+
+test("account deletion removes the account, addresses, favorites and sessions but keeps unlinked orders", async () => {
+  const db = await getDb();
+  await db.update(schema.products).set({ stockQuantity: null }).where(eq(schema.products.id, productId));
+  const [c] = await db.insert(schema.customers).values({ name: "O‘chiriladigan", phone: "+998907770011", passwordHash: "x" }).returning();
+  const [other] = await db.insert(schema.customers).values({ name: "Boshqa", phone: "+998907770022", passwordHash: "x" }).returning();
+  await db.insert(schema.customerAddresses).values({ customerId: c.id, recipientName: "A", recipientPhone: "+998907770011", address: "Chilonzor 1" });
+  await db.insert(schema.favorites).values({ customerId: c.id, productId });
+  const future = new Date(Date.now() + 3600_000);
+  await db.insert(schema.sessions).values([
+    { id: "del-s1", userType: "customer", userId: c.id, expiresAt: future },
+    { id: "del-s2", userType: "customer", userId: c.id, expiresAt: future },
+    { id: "keep-s", userType: "customer", userId: other.id, expiresAt: future },
+  ]);
+  const res = await createOrder(checkout({ customerPhone: "+998907770011" }), c.id);
+  assert.ok(res.ok, JSON.stringify(res));
+
+  await deleteCustomerAccount(c.id);
+
+  assert.equal((await db.select().from(schema.customers).where(eq(schema.customers.id, c.id))).length, 0);
+  assert.equal((await db.select().from(schema.customerAddresses).where(eq(schema.customerAddresses.customerId, c.id))).length, 0);
+  assert.equal((await db.select().from(schema.favorites).where(eq(schema.favorites.customerId, c.id))).length, 0);
+  const sessions = await db.select({ id: schema.sessions.id }).from(schema.sessions);
+  assert.deepEqual(sessions.map((s) => s.id).filter((id) => id.endsWith("-s1") || id.endsWith("-s2") || id === "keep-s"), ["keep-s"]);
+  const [o] = await db.select().from(schema.orders).where(eq(schema.orders.number, res.number));
+  assert.equal(o.customerId, null); // order kept for the shop, no longer linked to the account
+  assert.equal(o.customerPhone, "+998907770011");
 });
