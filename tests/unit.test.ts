@@ -4,6 +4,7 @@ import { parseCsv, toCsv } from "@/lib/csv";
 import { computeSlots } from "@/lib/delivery";
 import { formatPhoneInput } from "@/components/ui/phone-input";
 import { formatUZS, maskPhone, normalizePhone } from "@/lib/format";
+import { buildAssetLinks } from "@/lib/twa";
 import { couponDiscount, deliveryFeeFor, fromPrice, priceLine, type PricingProduct } from "@/lib/pricing";
 
 const fixed: PricingProduct = { pricingMode: "fixed", price: 149_000, stemPrice: null, minStems: null, maxStems: null, stemStep: 1, variants: [] };
@@ -107,4 +108,16 @@ test("phone input formatting while typing", () => {
   assert.equal(formatPhoneInput("+99"), "+99"); // typing the prefix by hand
   assert.equal(formatPhoneInput("90123456789999"), "+998 90 123 45 67"); // extra digits dropped
   assert.equal(formatPhoneInput(""), "");
+});
+
+test("Android app asset links: only served when package and fingerprints are valid", () => {
+  const fp = Array.from({ length: 32 }, (_, i) => i.toString(16).padStart(2, "0")).join(":");
+  assert.equal(buildAssetLinks("", ""), null);
+  assert.equal(buildAssetLinks("uz.gulzor.app", ""), null);
+  assert.equal(buildAssetLinks("uz.gulzor.app", "AB:CD"), null); // truncated fingerprint
+  assert.equal(buildAssetLinks("Gulzor App", fp), null); // not a package name
+  const links = buildAssetLinks("uz.gulzor.app", `${fp}, ${fp.toUpperCase()}\n${"FF:".repeat(31)}FF`);
+  assert.deepEqual(links?.[0].relation, ["delegate_permission/common.handle_all_urls"]);
+  assert.equal(links?.[0].target.package_name, "uz.gulzor.app");
+  assert.deepEqual(links?.[0].target.sha256_cert_fingerprints, [fp.toUpperCase(), `${"FF:".repeat(31)}FF`]);
 });

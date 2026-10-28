@@ -1,3 +1,4 @@
+import { InstallApp } from "@/components/pwa";
 import Link from "next/link";
 import { Suspense } from "react";
 import { InstagramIcon, PhoneIcon, TelegramIcon, UserIcon } from "@/components/ui/icons";
@@ -92,6 +93,7 @@ export function Footer({ store, locale }: { store: StoreSettings; locale: Locale
         <div>
           <Logo light />
           <p className="mt-4 max-w-xs text-sm leading-relaxed text-ivory/70">{t.tagline}</p>
+          <InstallApp />
           <div className="mt-5 flex gap-2">
             {tg ? (
               <a href={tg} target="_blank" rel="noopener noreferrer" className="flex h-10 w-10 items-center justify-center rounded-full bg-ivory/10 hover:bg-ivory/20" aria-label="Telegram">

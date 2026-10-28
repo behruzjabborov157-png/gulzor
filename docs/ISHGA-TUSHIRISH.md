@@ -125,6 +125,9 @@ Natijada **0 failed** bo‘lishi kerak. Ogohlantirishlarni (WARN) ko‘rib chiqi
 telefondan bitta sinov buyurtma bering → Telegram’ga xabar kelganini va admin panelda ko‘rinishini
 tekshiring → sinov buyurtmani “Bekor qilish” qiling.
 
+Telefonda saytni ilova sifatida o‘rnatib ko‘ring (pastdagi “Ilovani o‘rnatish” tugmasi).
+Android ilova (Google Play) yasash — alohida qo‘llanma: `docs/ANDROID-ILOVA.md`.
+
 ## 9. Zaxira nusxa va kuzatuv
 
 ```bash

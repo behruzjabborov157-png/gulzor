@@ -32,6 +32,8 @@ export function proxy(request: NextRequest) {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' blob: data:",
     "font-src 'self'",
+    "worker-src 'self'",
+    "manifest-src 'self'",
     `connect-src 'self'${isDev ? " ws: wss:" : ""}`,
     "object-src 'none'",
     "base-uri 'self'",
@@ -65,6 +67,6 @@ export const config = {
   matcher: [
     // Pages only (prefetches included — the language rewrite must apply to them too).
     // Skips API callbacks, static files, optimised images, uploaded media and metadata files.
-    "/((?!api|_next/static|_next/image|images|media|favicon.ico|robots.txt|sitemap.xml|product-import-template.csv).*)",
+    "/((?!api|_next/static|_next/image|images|media|favicon.ico|icon.png|icons|manifest.webmanifest|sw.js|offline.html|\\.well-known|robots.txt|sitemap.xml|product-import-template.csv).*)",
   ],
 };

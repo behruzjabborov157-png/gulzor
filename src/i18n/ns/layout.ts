@@ -29,6 +29,11 @@ const uz = {
   search: { label: "Gullarni qidirish", placeholder: "Atirgul, lola, guldasta…", submit: "Qidirish", toggle: "Qidiruv" },
   menu: { open: "Menyuni ochish", title: "Menyu", main: "Asosiy", more: "Qo‘shimcha" },
   language: { label: "Til", switchTo: "Русская версия", short: "Ру" },
+  install: {
+    button: "Ilovani o‘rnatish",
+    iosHint: "Safari’da pastdagi «Ulashish» tugmasini bosing va «Bosh ekranga qo‘shish» (На экран «Домой») ni tanlang.",
+    installed: "Gulzor ilovasi o‘rnatildi.",
+  },
   footer: {
     tagline: "Har bir munosabat va har bir inson uchun mehr bilan tanlangan guldastalar.",
     catalog: "Katalog",
@@ -77,6 +82,11 @@ const ru: typeof uz = {
   search: { label: "Поиск цветов", placeholder: "Розы, тюльпаны, букет…", submit: "Найти", toggle: "Поиск" },
   menu: { open: "Открыть меню", title: "Меню", main: "Основное", more: "Дополнительно" },
   language: { label: "Язык", switchTo: "O‘zbekcha versiya", short: "O‘z" },
+  install: {
+    button: "Установить приложение",
+    iosHint: "В Safari нажмите кнопку «Поделиться» внизу экрана и выберите «На экран «Домой»».",
+    installed: "Приложение Gulzor установлено.",
+  },
   footer: {
     tagline: "Букеты, подобранные с любовью — для каждого повода и каждого человека.",
     catalog: "Каталог",
