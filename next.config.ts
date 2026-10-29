@@ -22,6 +22,8 @@ const nextConfig: NextConfig = {
       // Framing of pages is controlled by CSP frame-ancestors (src/proxy.ts) so Telegram Web can host the Mini App;
       // the admin area additionally keeps the legacy header.
       { source: "/admin/:path*", headers: [{ key: "X-Frame-Options", value: "DENY" }] },
+      { source: "/florist/:path*", headers: [{ key: "X-Frame-Options", value: "DENY" }] },
+      { source: "/florist", headers: [{ key: "X-Frame-Options", value: "DENY" }] },
     ];
   },
 };

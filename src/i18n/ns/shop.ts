@@ -29,6 +29,8 @@ const uz = {
   allCities: "Barcha shaharlar",
   cityLabel: "Shahar",
   removeFilter: "Filtrni olib tashlash",
+  openYourShop: "Gul do‘koningiz bormi? Gulzor’da do‘kon oching",
+  openShopShort: "Do‘kon ochish",
 };
 
 const ru: typeof uz = {
@@ -59,6 +61,8 @@ const ru: typeof uz = {
   allCities: "Все города",
   cityLabel: "Город",
   removeFilter: "Убрать фильтр",
+  openYourShop: "У вас цветочный магазин? Откройте его на Gulzor",
+  openShopShort: "Открыть магазин",
 };
 
 const ns = { uz, ru };

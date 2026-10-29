@@ -26,8 +26,24 @@ function FieldError({ error }: { error?: string }) {
   return error ? <p className="mt-1 text-sm text-danger">{error}</p> : null;
 }
 
-export function ProductForm({ product: p, variants, categoryIds, categories }: { product: Product | null; variants: Variant[]; categoryIds: number[]; categories: Category[] }) {
-  const [state, action, pending] = useActionState<FormState, FormData>(saveProductAction.bind(null, p?.id ?? null), {});
+export function ProductForm({
+  product: p,
+  variants,
+  categoryIds,
+  categories,
+  saveAction = saveProductAction,
+  floristMode = false,
+}: {
+  product: Product | null;
+  variants: Variant[];
+  categoryIds: number[];
+  categories: Category[];
+  /** Server action that saves (admin by default; the florist panel passes its own, scoped one). */
+  saveAction?: (productId: number | null, state: FormState, form: FormData) => Promise<FormState>;
+  /** Florists don't see Gulzor's curation flags (demo, featured, premium). */
+  floristMode?: boolean;
+}) {
+  const [state, action, pending] = useActionState<FormState, FormData>(saveAction.bind(null, p?.id ?? null), {});
   const [mode, setMode] = useState<Product["pricingMode"]>(p?.pricingMode ?? "fixed");
   const [rows, setRows] = useState<VRow[]>(
     variants.length
@@ -191,10 +207,10 @@ export function ProductForm({ product: p, variants, categoryIds, categories }: {
           {check("deliveryEligible", "Yetkazib berish mumkin", p?.deliveryEligible ?? true)}
           {check("pickupEligible", "Olib ketish mumkin", p?.pickupEligible ?? true)}
           {check("isAddon", "Qo‘shimcha sovg‘a (guldastaga qo‘shiladi)", p?.isAddon ?? false)}
-          {check("isFeatured", "Tavsiya etilgan", p?.isFeatured ?? false)}
+          {floristMode ? null : check("isFeatured", "Tavsiya etilgan", p?.isFeatured ?? false)}
           {check("isNew", "Yangi", p?.isNew ?? false)}
-          {check("isPremium", "Premium", p?.isPremium ?? false)}
-          {check("isDemo", "Namuna (demo) mahsulot", p?.isDemo ?? false)}
+          {floristMode ? null : check("isPremium", "Premium", p?.isPremium ?? false)}
+          {floristMode ? null : check("isDemo", "Namuna (demo) mahsulot", p?.isDemo ?? false)}
         </div>
       </section>
 

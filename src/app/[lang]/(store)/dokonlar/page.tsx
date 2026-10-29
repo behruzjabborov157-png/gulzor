@@ -26,9 +26,14 @@ export default async function ShopsPage() {
   return (
     <div className="container-page pt-8">
       <Breadcrumbs label={dict.common.breadcrumbs} items={[{ href: lp("/"), label: dict.common.home }, { label: t.listTitle }]} />
-      <header className="mb-10 max-w-3xl">
-        <h1 className="text-4xl sm:text-5xl">{t.listTitle}</h1>
-        <p className="mt-3 text-muted">{t.listIntro}</p>
+      <header className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="max-w-3xl">
+          <h1 className="text-4xl sm:text-5xl">{t.listTitle}</h1>
+          <p className="mt-3 text-muted">{t.listIntro}</p>
+        </div>
+        <Link href="/florist/royxatdan-otish" className="btn-secondary shrink-0">
+          {t.openYourShop}
+        </Link>
       </header>
       {shops.length === 0 ? (
         <EmptyState title={t.noShops} />

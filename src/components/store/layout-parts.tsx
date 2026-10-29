@@ -128,6 +128,7 @@ export function Footer({ store, locale }: { store: StoreSettings; locale: Locale
             <li><Link href={lp("/yetkazib-berish")} className="hover:text-ivory">{t.deliveryPayment}</Link></li>
             <li><Link href={lp("/kuzatish")} className="hover:text-ivory">{t.track}</Link></li>
             <li><Link href={lp("/dokonlar")} className="hover:text-ivory">{getDict(locale).layout.extra.shops}</Link></li>
+            <li><Link href="/florist/royxatdan-otish" className="hover:text-ivory">{getDict(locale).shop.openShopShort}</Link></li>
             <li><Link href={lp("/maxsus-guldasta")} className="hover:text-ivory">{t.custom}</Link></li>
             <li><Link href={lp("/oferta")} className="hover:text-ivory">{t.offer}</Link></li>
             <li><Link href={lp("/maxfiylik")} className="hover:text-ivory">{t.privacy}</Link></li>

@@ -572,3 +572,94 @@ test("marketplace storefront: shop and city filters, hidden unapproved shops, sh
     setBotTransport(null);
   }
 });
+
+test("florist panel: registration, and a florist can only touch its own products, orders and zones", async () => {
+  const db = await getDb();
+  const fp = await import("@/lib/florist-panel");
+  const { saveProductForm, canEditProduct } = await import("@/lib/product-save");
+  const application = {
+    shopName: "Bahor gullari",
+    contactName: "Dilnoza",
+    email: "Bahor@Example.uz",
+    password: "juda-uzun-parol-123",
+    phone: "90 555 11 22",
+    telegramUsername: "@bahor_gullari",
+    regionId,
+    address: "Chilonzor 9-kvartal, 12",
+    legalName: "YaTT Dilnoza Karimova",
+    taxId: "123456789",
+    description: "",
+    acceptTerms: true,
+  };
+
+  // Validation and registration.
+  const bad = await fp.registerFlorist({ ...application, taxId: "12345", acceptTerms: false });
+  assert.equal(bad.ok, false);
+  assert.ok(!bad.ok && bad.errors.taxId && bad.errors.acceptTerms);
+  const reg = await fp.registerFlorist(application);
+  assert.ok(reg.ok, JSON.stringify(reg));
+  const [shop] = await db.select().from(schema.florists).where(eq(schema.florists.id, reg.floristId));
+  assert.equal(shop.status, "pending"); // needs Gulzor's approval before anything is sold
+  assert.equal(shop.slug, "bahor-gullari");
+  const [user] = await db.select().from(schema.adminUsers).where(eq(schema.adminUsers.id, reg.userId));
+  assert.equal(user.role, "florist");
+  assert.equal(user.floristId, reg.floristId);
+  assert.equal(user.email, "bahor@example.uz");
+  const again = await fp.registerFlorist(application);
+  assert.ok(!again.ok && again.errors.email, "the same email cannot register twice");
+
+  const mine = { kind: "florist" as const, floristId: reg.floristId };
+  // Products: create own (curation flags ignored), never edit someone else's.
+  const form = new FormData();
+  for (const [k, v] of Object.entries({ name: "Bahor guldastasi", price: "180000", pricingMode: "fixed", status: "active", isDemo: "on", isPremium: "on", isNew: "on", deliveryEligible: "on" })) form.set(k, v);
+  const created = await saveProductForm(mine, null, form);
+  assert.ok(created.state.ok && created.id, JSON.stringify(created.state));
+  const [own] = await db.select().from(schema.products).where(eq(schema.products.id, created.id!));
+  assert.equal(own.floristId, reg.floristId);
+  assert.equal(own.isDemo, false);
+  assert.equal(own.isPremium, false);
+  assert.equal(own.isNew, true);
+  assert.equal(await canEditProduct(mine, productId), false);
+  const hijack = await saveProductForm(mine, productId, form);
+  assert.equal(hijack.state.ok, false);
+  const [untouched] = await db.select().from(schema.products).where(eq(schema.products.id, productId));
+  assert.notEqual(untouched.name, "Bahor guldastasi");
+
+  // Zones: own ones only.
+  const zoneInput = { regionId, name: "Chilonzor", nameRu: null, description: "", fee: 20_000, freeFrom: null, minOrder: null, sameDayEnabled: true, sameDayCutoff: "17:00", minLeadMinutes: 120, isActive: true };
+  assert.deepEqual(await fp.saveFloristZone(reg.floristId, null, zoneInput), { ok: true });
+  const stolenZone = await fp.saveFloristZone(reg.floristId, zoneId, { ...zoneInput, fee: 1 });
+  assert.equal(stolenZone.ok, false);
+  const [platformZone] = await db.select().from(schema.deliveryZones).where(eq(schema.deliveryZones.id, zoneId));
+  assert.equal(platformZone.fee, 30_000);
+
+  // Orders: another shop's order is invisible; own orders follow the florist rules.
+  await db.update(schema.products).set({ stockQuantity: null }).where(eq(schema.products.id, productId));
+  const platformOrder = await createOrder(checkout(), null);
+  assert.ok(platformOrder.ok);
+  assert.equal(await fp.floristOrder(reg.floristId, platformOrder.orderId), null);
+  assert.equal((await fp.floristChangeStatus(reg.floristId, "d@x.uz", platformOrder.orderId, "confirmed")).ok, false);
+
+  await db.update(schema.florists).set({ status: "approved" }).where(eq(schema.florists.id, reg.floristId));
+  const [myZone] = await db.select().from(schema.deliveryZones).where(eq(schema.deliveryZones.floristId, reg.floristId));
+  const myOrder = await createOrder(checkout({ lines: [{ productId: created.id!, quantity: 1, addons: [] }], zoneId: myZone.id }), null);
+  assert.ok(myOrder.ok, JSON.stringify(myOrder));
+  assert.ok((await fp.floristOrders(reg.floristId)).some((o) => o.id === myOrder.orderId));
+  assert.ok(!(await fp.floristOrders(reg.floristId)).some((o) => o.id === platformOrder.orderId));
+  assert.equal((await fp.floristChangeStatus(reg.floristId, "d@x.uz", myOrder.orderId, "rejected", "")).ok, false); // a reason is required
+  assert.equal((await fp.floristChangeStatus(reg.floristId, "d@x.uz", myOrder.orderId, "cancelled", "xohlamadim")).ok, false); // cancelling is Gulzor's call
+  assert.equal((await fp.floristMarkCashPaid(reg.floristId, "d@x.uz", myOrder.orderId)).ok, false); // not prepared yet
+  for (const to of ["confirmed", "preparing", "ready", "dispatched", "delivered"] as const) {
+    assert.deepEqual(await fp.floristChangeStatus(reg.floristId, "d@x.uz", myOrder.orderId, to), { ok: true }, to);
+  }
+  assert.deepEqual(await fp.floristMarkCashPaid(reg.floristId, "d@x.uz", myOrder.orderId), { ok: true });
+  const [paid] = await db.select().from(schema.orders).where(eq(schema.orders.id, myOrder.orderId));
+  assert.equal(paid.paymentStatus, "paid");
+
+  // The report counts the delivered order with its commission (default 10% on goods).
+  const report = await fp.floristSalesReport(reg.floristId);
+  assert.equal(report.length, 1);
+  assert.equal(Number(report[0].orders), 1);
+  assert.equal(Number(report[0].goods), 180_000);
+  assert.equal(Number(report[0].commission), 18_000);
+});

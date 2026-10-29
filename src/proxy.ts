@@ -10,7 +10,8 @@ import { NextResponse, type NextRequest } from "next/server";
  */
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
+  // Back-office areas (Gulzor staff and florists): no language prefix, never framed.
+  const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/") || pathname === "/florist" || pathname.startsWith("/florist/");
 
   // /uz/... is never a public URL — send it to the clean Uzbek address.
   if (pathname === "/uz" || pathname.startsWith("/uz/")) {
