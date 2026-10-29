@@ -30,6 +30,11 @@ export async function sendTelegram(html: string): Promise<SendResult> {
   }
 }
 
+/** Map links for a delivery point shared from Telegram. */
+export function mapLinks(lat: number, lon: number) {
+  return { yandex: `https://yandex.uz/maps/?pt=${lon},${lat}&z=17&l=map`, google: `https://maps.google.com/?q=${lat},${lon}` };
+}
+
 const PAYMENT_LABEL: Record<string, string> = { cash: "Naqd (qabul qilganda)", payme: "Payme", click: "Click" };
 const PAYMENT_STATUS: Record<string, string> = {
   pending: "Kutilmoqda",
@@ -66,6 +71,9 @@ export function orderMessage(o: OrderForMessage, heading = "🌸 Yangi buyurtma"
       : null,
     `<b>Qabul qiluvchi:</b> ${esc(o.recipientName)}, ${formatPhone(o.recipientPhone)}${o.anonymous ? " (anonim)" : ""}`,
     `<b>${o.fulfillment === "pickup" ? "Olib ketish" : "Manzil"}:</b> ${where}`,
+    o.latitude != null && o.longitude != null
+      ? `📍 <a href="${mapLinks(o.latitude, o.longitude).yandex}">Yandex xarita</a> · <a href="${mapLinks(o.latitude, o.longitude).google}">Google xarita</a>`
+      : null,
     `<b>Sana va vaqt:</b> ${formatDateISO(o.deliveryDate)}, ${esc(o.slotLabel)}`,
     "",
     items,

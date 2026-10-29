@@ -1,4 +1,43 @@
-# Telegram orqali buyurtma (Mini App)
+# Telegram orqali buyurtma: bot va Mini App
+
+Mijozlar Telegram’da ikki usulda buyurtma bera oladi:
+
+1. **Botning o‘zida, tugmalar bilan** (Evos/Bellissimo uslubida) — ko‘pchilik mijozlar uchun eng qulayi.
+2. **«Do‘kon» tugmasi (Mini App)** — sayt Telegram ichida ochiladi; xohlagan mijoz undan foydalanadi.
+
+Ikkalasi ham saytdagi bilan **bir xil baza va bir xil server kodi**dan foydalanadi: admin panelda narx, mahsulot,
+qoldiq, hudud yoki vaqt oralig‘ini o‘zgartirsangiz — botda ham darhol o‘zgaradi. Buyurtmalar sizga **oldingidek** keladi.
+
+## Botda buyurtma — qanday ishlaydi
+
+| Qadam | Mijoz ko‘radigan narsa |
+|---|---|
+| `/start` | Til tanlash: 🇺🇿 O‘zbekcha / 🇷🇺 Русский |
+| Menyu | 🌸 Katalog · 🛒 Savat · 📦 Buyurtmalarim · 📞 Aloqa · 🌐 Til |
+| Katalog | Bo‘limlar (Guldastalar, Atirgullar, Lolalar, Qutidagi, Savatdagi gullar, O‘simliklar, Sovg‘alar) → guldastalar ro‘yxati narxi bilan |
+| Mahsulot | Rasm, tavsif, narx; o‘lcham tugmalari, gullar soni ➖/➕, rang, miqdor ➖/➕; «🛒 Savatga · narx» |
+| Savat | Ro‘yxat va summa; ❌ o‘chirish, 🧹 tozalash, ✅ Rasmiylashtirish |
+| Telefon | «📱 Raqamni yuborish» tugmasi (yoki qo‘lda yozish) |
+| Qabul qiluvchi | 🙋 O‘zim / 🎁 Boshqa odam (ismi va telefoni) |
+| Manzil | Hudud tugmalari (narxi bilan) → manzilni yozish yoki «📍 Lokatsiyani yuborish» (+ kvartira/mo‘ljal) |
+| Vaqt | Kun tugmalari → faqat **bo‘sh** vaqt oraliqlari |
+| Otkritka | Matn yoziladi yoki «⏭ O‘tkazib yuborish» |
+| To‘lov | Sozlamalarda yoqilgan usullar (naqd; Payme/Click — ulangan bo‘lsa, «💳 To‘lash» tugmasi bilan) |
+| Tasdiqlash | To‘liq xulosa va jami summa → ✅ Tasdiqlash |
+| Keyin | Bot buyurtma raqamini yuboradi; har bir holat o‘zgarishida mijozga xabar boradi |
+
+- Narx, yetkazish narxi va bo‘sh vaqtlar **serverda** hisoblanadi (sayt bilan bir xil); eski tugmalar qayta bosilsa ham
+  takroriy buyurtma yaratilmaydi.
+- Mijoz lokatsiya yuborsa, sizga keladigan xabarda va admin panelda **Yandex/Google xarita** havolalari bo‘ladi.
+- 📦 Buyurtmalarim — mijozning botdagi so‘nggi 5 ta buyurtmasi va holati.
+- 📞 Aloqa — Admin → Sozlamalardagi telefon, Telegram, manzil va ish vaqti.
+- Mijozning tili, savati va qaysi qadamda turgani bazada saqlanadi — server qayta ishga tushsa ham yo‘qolmaydi.
+
+Hozircha botda sovg‘a qo‘shimchalari (shokolad, o‘yinchoq) alohida tanlanmaydi — ular «Sovg‘alar» bo‘limidan oddiy mahsulot sifatida qo‘shiladi.
+
+---
+
+# Mini App («Do‘kon» tugmasi)
 
 Mijoz Telegram’da botingizni ochadi → pastdagi **«Do‘kon»** tugmasini bosadi → saytingiz Telegram ichida ochiladi.
 Ism Telegram’dan avtomatik olinadi, telefon — bitta tugma bilan (Telegram mijozdan ruxsat so‘raydi).
@@ -74,7 +113,7 @@ sudo -iu gulzor bash -c "cd /opt/gulzor && npm run telegram:setup"
 Buyruq quyidagilarni qiladi va har birini ✔ bilan ko‘rsatadi:
 - pastki menyuga **«Do‘kon»** tugmasini qo‘yadi (saytingizga havola bilan);
 - `/start` buyrug‘i, botning qisqa va to‘liq tavsifi (o‘zbekcha va ruscha);
-- **webhook** — bot `/start` ga javob berishi uchun (Telegram so‘rovlari maxfiy kalit bilan tekshiriladi).
+- **webhook** — bot xabarlar va tugma bosishlariga javob berishi uchun (Telegram so‘rovlari maxfiy kalit bilan tekshiriladi).
 
 Buyruqni istalgancha qayta ishlatish mumkin (masalan, domen o‘zgarsa).
 

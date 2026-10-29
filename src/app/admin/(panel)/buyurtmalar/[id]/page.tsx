@@ -8,6 +8,7 @@ import { DeliveryEditForm } from "@/components/admin/delivery-edit-form";
 import { Alert } from "@/components/ui/primitives";
 import { requireAdmin } from "@/lib/auth";
 import { formatDateISO, formatDateTime, formatPhone, formatUZS } from "@/lib/format";
+import { mapLinks } from "@/lib/telegram";
 import { ORDER_STATUS_LABEL, ORDER_TRANSITIONS, PAYMENT_METHOD_LABEL, PAYMENT_STATUS_LABEL, getOrderWithItems } from "@/lib/orders";
 
 export const metadata = { title: "Buyurtma" };
@@ -97,6 +98,18 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
           <p><strong>{o.recipientName}</strong> · <a href={`tel:${o.recipientPhone}`} className="text-wine">{formatPhone(o.recipientPhone)}</a>{o.anonymous ? " · anonim" : ""}</p>
           <p className="mt-2 text-muted">{o.fulfillment === "pickup" ? "Olib ketish" : "Manzil"}</p>
           <p>{[o.regionName, o.zoneName, o.district, o.neighborhood, o.address, o.apartment && `kv. ${o.apartment}`, o.landmark && `mo‘ljal: ${o.landmark}`].filter(Boolean).join(", ")}</p>
+          {o.latitude != null && o.longitude != null ? (
+            <p className="mt-1">
+              📍{" "}
+              <a href={mapLinks(o.latitude, o.longitude).yandex} target="_blank" rel="noopener noreferrer" className="text-wine underline">
+                Yandex xarita
+              </a>{" "}
+              ·{" "}
+              <a href={mapLinks(o.latitude, o.longitude).google} target="_blank" rel="noopener noreferrer" className="text-wine underline">
+                Google xarita
+              </a>
+            </p>
+          ) : null}
           <p className="mt-2 text-muted">Sana va vaqt</p>
           <p>{formatDateISO(o.deliveryDate)}, {o.slotLabel}</p>
           {o.cardMessage ? (<><p className="mt-2 text-muted">Otkritka</p><p className="italic">“{o.cardMessage}”</p></>) : null}

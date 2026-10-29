@@ -108,7 +108,21 @@ function orderNumber() {
   return `GZ-${date.slice(2, 4)}${date.slice(5, 7)}${date.slice(8, 10)}-${randomInt(1000, 10000)}`;
 }
 
-export async function createOrder(raw: unknown, customerId: string | null, locale: Locale = DEFAULT_LOCALE): Promise<CreateOrderResult> {
+/**
+ * Server-only extras that never come from the request body: the ordering bot passes the Telegram user
+ * (its webhook is authenticated by Telegram's secret header) and a shared map location.
+ */
+export type CreateOrderOptions = {
+  telegram?: { id: number; username?: string };
+  location?: { latitude: number; longitude: number };
+};
+
+export async function createOrder(
+  raw: unknown,
+  customerId: string | null,
+  locale: Locale = DEFAULT_LOCALE,
+  opts: CreateOrderOptions = {},
+): Promise<CreateOrderResult> {
   const e = getDict(locale).errors.checkout;
   const parsed = makeCheckoutSchema(locale).safeParse(raw);
   if (!parsed.success) {
@@ -138,7 +152,7 @@ export async function createOrder(raw: unknown, customerId: string | null, local
   const recipientPhone = v.recipientIsCustomer ? v.customerPhone : normalizePhone(v.recipientPhone)!;
   const accessToken = randomBytes(18).toString("base64url");
   // Ordered inside the Telegram Mini App: link the Telegram account (signature-checked, never trusted blindly).
-  const tgUser = telegramUserFromInitData(v.telegramInitData);
+  const tgUser = opts.telegram ?? telegramUserFromInitData(v.telegramInitData);
   const db = await getDb();
 
   let created: Order | null = null;
@@ -185,6 +199,8 @@ export async function createOrder(raw: unknown, customerId: string | null, local
             idempotencyKey: v.submissionId ?? null,
             telegramUserId: tgUser ? String(tgUser.id) : null,
             telegramUsername: tgUser?.username ?? null,
+            latitude: opts.location?.latitude ?? null,
+            longitude: opts.location?.longitude ?? null,
             customerId,
             paymentMethod: v.paymentMethod,
             fulfillment: v.fulfillment,

@@ -35,6 +35,8 @@ const { changeOrderStatus, createOrder, notifyNewOrder } = await import("@/lib/o
 const { rateLimit } = await import("@/lib/rate-limit");
 const { deleteCustomerAccount } = await import("@/lib/auth");
 const { notifyOrderEmail } = await import("@/lib/email");
+const { handleUpdate } = await import("@/lib/bot/handler");
+const { setBotTransport } = await import("@/lib/bot/api");
 const { paymeRpc } = await import("@/lib/payments/payme");
 const { clickRequest } = await import("@/lib/payments/click");
 const { saveSetting, DEFAULT_CHECKOUT } = await import("@/lib/settings");
@@ -381,4 +383,77 @@ test("Mini App orders are linked to the verified Telegram user; forged initData 
   assert.ok(forged.ok); // the order itself is still accepted…
   const [b] = await db.select().from(schema.orders).where(eq(schema.orders.number, forged.number));
   assert.equal(b.telegramUserId, null); // …but not linked to any Telegram account
+});
+
+test("ordering bot: full chat from /start to a saved order, with prices and slots from the database", async () => {
+  const db = await getDb();
+  await db.update(schema.products).set({ stockQuantity: null, price: 200_000 }).where(eq(schema.products.id, productId));
+  const calls: { method: string; body: Record<string, unknown> }[] = [];
+  setBotTransport(async (method, body) => {
+    calls.push({ method, body });
+    return { ok: true, result: { message_id: 99, photo: [{ file_id: "f1" }] } };
+  });
+  const chat = { id: 900001, type: "private" };
+  const from = { id: 900001, first_name: "Bot", last_name: "Mijoz", username: "bot_mijoz", language_code: "uz" };
+  let n = 0;
+  const say = (m: Record<string, unknown>) => handleUpdate({ message: { message_id: ++n, chat, from, ...m } });
+  const tap = (data: string) => handleUpdate({ callback_query: { id: `cb${++n}`, from, data, message: { message_id: n, chat } } });
+  const lastText = () => {
+    const c = [...calls].reverse().find((x) => x.method === "sendMessage" || x.method === "editMessageText");
+    return String(c?.body.text ?? "");
+  };
+  const buttons = () =>
+    calls.flatMap((c) => ((c.body.reply_markup as { inline_keyboard?: { callback_data?: string }[][] })?.inline_keyboard ?? []).flat().map((b) => b.callback_data));
+
+  try {
+    await say({ text: "/start" });
+    assert.match(lastText(), /Tilni tanlang/);
+    await tap("L:uz");
+    assert.match(lastText(), /xush kelibsiz/);
+
+    await tap(`P:${productId}`);
+    const card = calls.find((c) => c.method === "sendPhoto" || (c.method === "sendMessage" && String(c.body.text ?? c.body.caption).includes("Test atirgullar")));
+    assert.ok(card, "product card sent");
+    await tap(`Q:${productId}:+`); // quantity 2
+    await tap(`A:${productId}`);
+    assert.match(lastText(), /Savatga qo‘shildi/);
+
+    await tap("O");
+    assert.match(lastText(), /Telefon raqamingizni yuboring/);
+    await say({ contact: { phone_number: "998901234567", user_id: from.id } });
+    await tap("RS:1"); // I receive the flowers myself; pickup is off, so the zone question follows
+    assert.ok(buttons().includes(`Z:${zoneId}`), "zone buttons come from the database");
+    await tap(`Z:${zoneId}`);
+    await say({ location: { latitude: 41.311, longitude: 69.279 } });
+    await say({ text: "kv. 12, 3-qavat" });
+    await tap(`D:${tomorrow}`);
+    assert.ok(buttons().includes(`T:${slotId}`), "only real time slots are offered");
+    await tap(`T:${slotId}`);
+    await say({ text: "Tabriklayman!" });
+    assert.ok(buttons().includes("Y:cash"));
+    await tap("Y:cash");
+    assert.match(lastText(), /Jami: 430\s000/); // 2 × 200 000 + 30 000 delivery, computed by the server
+    const task = await tap("OK");
+    assert.ok(task?.notifyOrderId, "owner notification is scheduled");
+    assert.match(lastText(), /Buyurtmangiz qabul qilindi!\nRaqam: GZ-/);
+
+    const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, task!.notifyOrderId));
+    assert.equal(o.telegramUserId, "900001");
+    assert.equal(o.telegramUsername, "bot_mijoz");
+    assert.equal(o.customerName, "Bot Mijoz");
+    assert.equal(o.customerPhone, "+998901234567");
+    assert.equal(o.latitude, 41.311);
+    assert.equal(o.landmark, "kv. 12, 3-qavat");
+    assert.equal(o.cardMessage, "Tabriklayman!");
+    assert.equal(o.total, 430_000);
+    assert.equal(o.slotId, slotId);
+
+    // A second tap on the old "Confirm" button cannot create another order.
+    const again = await tap("OK");
+    assert.equal(again, null);
+    const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(schema.orders).where(eq(schema.orders.telegramUserId, "900001"));
+    assert.equal(count, 1);
+  } finally {
+    setBotTransport(null);
+  }
 });

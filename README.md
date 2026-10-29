@@ -100,6 +100,16 @@ docs/                 market research, owner guide (Uzbek), product import templ
 - Editorial photos (`public/images/editorial`, Unsplash License, credited on `/rasm-mualliflari`) set the mood only; they are
   never shown as products. Product photos come from the catalogue (demo ones are Wikimedia Commons, flagged as demo).
 
+### Telegram ordering bot (`src/lib/bot/`)
+- Button-driven ordering inside the chat: language → menu → catalogue sections → product card (photo, sizes, stems ±,
+  colours, quantity ±) → cart → phone (request_contact) → recipient → zone → address or location → day → free slots →
+  card text → payment → summary → confirm. Prices, stock, zones, slots and payment methods come from `priceLine`,
+  `quoteCart`, `availablePaymentMethods` and the order is created by `createOrder` (idempotent per checkout).
+- State per chat in `tg_sessions`; product photos converted to JPEG and uploaded once (`tg_media` file_id cache);
+  shared locations stored on the order (`latitude/longitude`, migration 0004) and shown as map links to the owner.
+- The webhook only trusts updates carrying Telegram's secret header; the bot's own order is linked to the Telegram user
+  through a server-only option, never from the request body. Tested end to end with a stubbed Bot API transport.
+
 ### Telegram Mini App (`docs/TELEGRAM-MINI-APP.md`)
 - The same site runs inside Telegram from the shop bot's "Do‘kon" menu button. `src/components/telegram.tsx` loads
   telegram-web-app.js only when launched from Telegram, calls ready/expand, drives Telegram's Back button, prefills the
@@ -275,7 +285,7 @@ re-reads the order from the database ("payment pending" until the provider confi
 ## 8. Testing
 
 ```bash
-npm test                                       # 23 unit/integration tests, throwaway DB, no server needed
+npm test                                       # 24 unit/integration tests, throwaway DB, no server needed
 E2E_BASE_URL=http://localhost:3000 \
 E2E_ADMIN_EMAIL=… E2E_ADMIN_PASSWORD=… \
 npm run test:e2e                               # 34 Playwright tests (desktop + phone viewport)

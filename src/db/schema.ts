@@ -2,6 +2,7 @@ import { relations } from "drizzle-orm";
 import {
   boolean,
   date,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -385,6 +386,9 @@ export const orders = pgTable(
     /** Set only for orders placed in the Telegram Mini App, from signature-verified initData. */
     telegramUserId: text("telegram_user_id"),
     telegramUsername: text("telegram_username"),
+    /** Delivery point shared as a Telegram location (bot orders); shown to the courier as a map link. */
+    latitude: doublePrecision("latitude"),
+    longitude: doublePrecision("longitude"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -541,4 +545,25 @@ export const orderEventsRelations = relations(orderEvents, ({ one }) => ({
 export const paymentsRelations = relations(payments, ({ one }) => ({
   order: one(orders, { fields: [payments.orderId], references: [orders.id] }),
 }));
+
+/* ------------------------------------------------------------------ */
+/* Telegram ordering bot                                               */
+/* ------------------------------------------------------------------ */
+
+/** Conversation state per private chat with the shop bot (language, cart, checkout step). */
+export const tgSessions = pgTable("tg_sessions", {
+  chatId: text("chat_id").primaryKey(),
+  locale: text("locale").$type<"uz" | "ru">(),
+  step: text("step").notNull().default("idle"),
+  cart: jsonb("cart").$type<{ productId: number; variantId: number | null; stems: number | null; color: string | null; quantity: number }[]>().notNull().default([]),
+  draft: jsonb("draft").$type<Record<string, unknown>>().notNull().default({}),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Telegram file_id of product photos already uploaded by the bot (so each photo is uploaded once). */
+export const tgMedia = pgTable("tg_media", {
+  url: text("url").primaryKey(),
+  fileId: text("file_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
