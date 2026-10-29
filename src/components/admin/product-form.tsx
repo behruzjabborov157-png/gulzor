@@ -62,7 +62,7 @@ export function ProductForm({ product: p, variants, categoryIds, categories }: {
   );
   const check = (name: string, label: string, def: boolean) => (
     <label className="flex items-center gap-2 text-sm">
-      <input type="checkbox" name={name} defaultChecked={def} className="h-4 w-4 accent-forest" /> {label}
+      <input type="checkbox" name={name} defaultChecked={def} className="h-4 w-4 accent-wine" /> {label}
     </label>
   );
 
@@ -138,7 +138,7 @@ export function ProductForm({ product: p, variants, categoryIds, categories }: {
                       <td className="pr-2 pb-2"><input name="variant_price" defaultValue={r.price} inputMode="numeric" className="field w-32 py-2" aria-label="Narx" /></td>
                       <td className="pr-2 pb-2"><input name="variant_compare" defaultValue={r.compareAtPrice} inputMode="numeric" className="field w-32 py-2" aria-label="Avvalgi narx" /></td>
                       <td className="pr-2 pb-2"><input name="variant_stock" defaultValue={r.stockQuantity} placeholder="∞" inputMode="numeric" className="field w-20 py-2" aria-label="Ombor" /></td>
-                      <td className="pr-2 pb-2"><input type="checkbox" name="variant_active" value={i} defaultChecked={r.isActive} className="h-4 w-4 accent-forest" aria-label="Faol" /></td>
+                      <td className="pr-2 pb-2"><input type="checkbox" name="variant_active" value={i} defaultChecked={r.isActive} className="h-4 w-4 accent-wine" aria-label="Faol" /></td>
                       <td className="pb-2"><button type="button" onClick={() => setRows((x) => x.filter((y) => y.key !== r.key))} className="text-danger" aria-label="O‘chirish">×</button></td>
                     </tr>
                   ))}
@@ -180,7 +180,7 @@ export function ProductForm({ product: p, variants, categoryIds, categories }: {
           <legend className="label">Mavsumiy oylar (hech biri tanlanmasa — yil bo‘yi)</legend>
           <div className="flex flex-wrap gap-2">
             {UZ_MONTHS.map((m, i) => (
-              <label key={m} className="chip cursor-pointer gap-1.5 py-1 text-xs has-[:checked]:border-forest has-[:checked]:bg-forest has-[:checked]:text-ivory">
+              <label key={m} className="chip cursor-pointer gap-1.5 py-1 text-xs has-[:checked]:border-wine has-[:checked]:bg-wine has-[:checked]:text-ivory">
                 <input type="checkbox" name="seasonalMonths" value={i + 1} defaultChecked={p?.seasonalMonths.includes(i + 1)} className="sr-only" />
                 {m}
               </label>
@@ -205,7 +205,7 @@ export function ProductForm({ product: p, variants, categoryIds, categories }: {
             <legend className="label">{KIND_LABEL[kind]}</legend>
             <div className="flex flex-wrap gap-2">
               {categories.filter((c) => c.kind === kind).map((c) => (
-                <label key={c.id} className="chip cursor-pointer gap-1.5 py-1 text-xs has-[:checked]:border-forest has-[:checked]:bg-forest has-[:checked]:text-ivory">
+                <label key={c.id} className="chip cursor-pointer gap-1.5 py-1 text-xs has-[:checked]:border-wine has-[:checked]:bg-wine has-[:checked]:text-ivory">
                   <input type="checkbox" name="categoryIds" value={c.id} defaultChecked={categoryIds.includes(c.id)} className="sr-only" />
                   {c.name}
                 </label>
@@ -229,11 +229,11 @@ export function ProductForm({ product: p, variants, categoryIds, categories }: {
           <ul className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             {p.images.map((img) => (
               <li key={img.url} className="space-y-2">
-                <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-ivory-deep">
+                <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-cream">
                   <Image src={img.url} alt={img.alt} fill sizes="200px" className="object-cover" />
                 </div>
                 <label className="flex items-center gap-2 text-xs">
-                  <input type="checkbox" name="keepImage" value={img.url} defaultChecked className="accent-forest" /> Saqlash
+                  <input type="checkbox" name="keepImage" value={img.url} defaultChecked className="accent-wine" /> Saqlash
                 </label>
                 <input name="keepImageAlt" defaultValue={img.alt} className="field px-2 py-1.5 text-xs" aria-label="Rasm tavsifi (alt)" />
                 {img.credit ? <p className="text-[10px] text-muted">© {img.credit}, {img.license}</p> : null}
@@ -243,7 +243,7 @@ export function ProductForm({ product: p, variants, categoryIds, categories }: {
         ) : null}
         <div>
           <label htmlFor="p-new" className="label">Yangi rasmlar qo‘shish</label>
-          <input ref={fileRef} id="p-new" name="newImages" type="file" multiple accept="image/jpeg,image/png,image/webp" className="block text-sm file:mr-3 file:rounded-full file:border-0 file:bg-forest/10 file:px-4 file:py-2 file:text-forest" />
+          <input ref={fileRef} id="p-new" name="newImages" type="file" multiple accept="image/jpeg,image/png,image/webp" className="block text-sm file:mr-3 file:rounded-full file:border-0 file:bg-wine/10 file:px-4 file:py-2 file:text-wine" />
           <FieldError error={err("newImages")} />
         </div>
       </section>

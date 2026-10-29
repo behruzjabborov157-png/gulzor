@@ -69,7 +69,7 @@ export function CustomRequestForm({ occasions, minDate, maxDate }: { occasions: 
       </div>
       <div>
         <label htmlFor="image" className="label">{t.image}</label>
-        <input {...a("image")} type="file" accept="image/jpeg,image/png,image/webp" className="block w-full text-sm file:mr-3 file:rounded-full file:border-0 file:bg-forest/10 file:px-4 file:py-2 file:text-forest" />
+        <input {...a("image")} type="file" accept="image/jpeg,image/png,image/webp" className="block w-full text-sm file:mr-3 file:rounded-full file:border-0 file:bg-wine/10 file:px-4 file:py-2 file:text-wine" />
         <p className="mt-1 text-xs text-muted">{t.imageHint}</p>
         <FieldError id="image-err" error={err("image")} />
       </div>

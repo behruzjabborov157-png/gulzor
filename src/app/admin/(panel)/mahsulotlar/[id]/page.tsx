@@ -17,7 +17,7 @@ export default async function ProductEditPage({ params, searchParams }: { params
   if (id === "yangi") {
     return (
       <div className="max-w-4xl">
-        <Link href="/admin/mahsulotlar" className="text-sm text-muted hover:text-forest">← Mahsulotlar</Link>
+        <Link href="/admin/mahsulotlar" className="text-sm text-muted hover:text-wine">← Mahsulotlar</Link>
         <h1 className="mt-2 mb-6 text-4xl">Yangi mahsulot</h1>
         <ProductForm product={null} variants={[]} categoryIds={[]} categories={categories} />
       </div>
@@ -33,10 +33,10 @@ export default async function ProductEditPage({ params, searchParams }: { params
 
   return (
     <div className="max-w-4xl">
-      <Link href="/admin/mahsulotlar" className="text-sm text-muted hover:text-forest">← Mahsulotlar</Link>
+      <Link href="/admin/mahsulotlar" className="text-sm text-muted hover:text-wine">← Mahsulotlar</Link>
       <div className="mt-2 mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-4xl">{product.name}</h1>
-        {product.status === "active" ? <Link href={`/gul/${product.slug}`} target="_blank" className="text-sm text-forest underline">Saytda ko‘rish ↗</Link> : null}
+        {product.status === "active" ? <Link href={`/gul/${product.slug}`} target="_blank" className="text-sm text-wine underline">Saytda ko‘rish ↗</Link> : null}
       </div>
       {saqlandi ? <p className="mb-4 rounded-xl bg-success/5 px-4 py-3 text-sm text-success" role="status">Mahsulot yaratildi.</p> : null}
       <ProductForm product={product} variants={variants} categoryIds={pcs.map((x) => x.categoryId)} categories={categories} />

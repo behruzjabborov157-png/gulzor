@@ -15,6 +15,7 @@ export type ProductCard = {
   price: number;
   compareAtPrice: number | null;
   hasOptions: boolean;
+  quickAdd: boolean;
   stock: StockState;
   isNew: boolean;
   isPremium: boolean;

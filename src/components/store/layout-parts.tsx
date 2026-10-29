@@ -27,7 +27,7 @@ function navItems(locale: Locale): NavItem[] {
 }
 
 export function DemoBanner({ locale }: { locale: Locale }) {
-  return <div className="bg-forest px-4 py-2 text-center text-xs text-ivory/90">{getDict(locale).layout.demoBanner}</div>;
+  return <div className="bg-wine px-4 py-2 text-center text-xs text-ivory/90">{getDict(locale).layout.demoBanner}</div>;
 }
 
 export function Header({ customerName, locale }: { customerName: string | null; locale: Locale }) {
@@ -56,7 +56,7 @@ export function Header({ customerName, locale }: { customerName: string | null; 
           </Suspense>
           <Link
             href={localePath(locale, "/hisob")}
-            className="hidden h-10 items-center gap-2 rounded-full px-2 text-sm hover:bg-forest/5 sm:flex"
+            className="hidden h-10 items-center gap-2 rounded-full px-2 text-sm hover:bg-wine/5 sm:flex"
             aria-label={customerName ? fmt(t.accountOf, { name: customerName }) : t.signInOrRegister}
           >
             <UserIcon size={21} />
@@ -70,7 +70,7 @@ export function Header({ customerName, locale }: { customerName: string | null; 
         <ul className="container-page flex h-11 items-center justify-between gap-4 text-[13px] font-medium text-charcoal/85">
           {nav.map((it) => (
             <li key={it.href}>
-              <Link href={it.href} className="py-3 transition hover:text-forest">
+              <Link href={it.href} className="py-3 transition hover:text-wine">
                 {it.label}
               </Link>
             </li>
@@ -88,7 +88,7 @@ export function Footer({ store, locale }: { store: StoreSettings; locale: Locale
   const address = pick(locale, store.address, store.addressRu);
   const hours = pick(locale, store.workingHours, store.workingHoursRu);
   return (
-    <footer className="mt-24 bg-forest-deep text-ivory/85">
+    <footer className="mt-24 bg-plum text-ivory/85">
       <div className="container-page grid gap-10 py-14 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <Logo light />

@@ -15,8 +15,11 @@ type Credit = { file: string; title: string; author: string; license: string; so
 
 export default async function CreditsPage() {
   const t = getDict(await getLocale()).common.credits;
-  const file = path.join(/*turbopackIgnore: true*/ process.cwd(), "public/images/demo/credits.json");
-  const credits: Credit[] = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : [];
+  // Editorial photos (Unsplash) first, then the demo product photos (Wikimedia Commons).
+  const credits: Credit[] = ["public/images/editorial/credits.json", "public/images/demo/credits.json"].flatMap((rel) => {
+    const file = path.join(/*turbopackIgnore: true*/ process.cwd(), rel);
+    return fs.existsSync(file) ? (JSON.parse(fs.readFileSync(file, "utf8")) as Credit[]) : [];
+  });
   return (
     <div className="container-page max-w-3xl pt-12">
       <h1 className="text-4xl">{t.title}</h1>
@@ -24,7 +27,7 @@ export default async function CreditsPage() {
       <ul className="mt-8 divide-y divide-line text-sm">
         {credits.map((c) => (
           <li key={c.file} className="py-3">
-            <a href={c.source} target="_blank" rel="noopener noreferrer" className="font-medium text-forest hover:underline">
+            <a href={c.source} target="_blank" rel="noopener noreferrer" className="font-medium text-wine hover:underline">
               {c.title}
             </a>
             <p className="text-muted">{fmt(t.author, { author: c.author || t.unknown, license: c.license })}</p>

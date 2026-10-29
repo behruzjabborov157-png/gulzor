@@ -18,7 +18,7 @@ export function Summary({ quote, loading, showDeliveryHint }: { quote: Quote | n
   const { locale, t: dict } = useT();
   const t = dict.cart;
   const uzs = (n: number) => formatUZS(n, locale);
-  if (!quote) return <div className="h-40 animate-pulse rounded-2xl bg-ivory-deep" aria-label={t.calculating} />;
+  if (!quote) return <div className="h-40 animate-pulse rounded-2xl bg-cream" aria-label={t.calculating} />;
   return (
     <dl className={`space-y-2.5 text-sm transition-opacity ${loading ? "opacity-60" : ""}`} aria-live="polite">
       <div className="flex justify-between">
@@ -58,7 +58,7 @@ export function Summary({ quote, loading, showDeliveryHint }: { quote: Quote | n
       ) : null}
       <div className="flex items-baseline justify-between border-t border-line pt-3">
         <dt className="font-semibold">{t.total}</dt>
-        <dd className="font-display text-2xl text-forest">{uzs(quote.total)}</dd>
+        <dd className="font-display text-2xl text-wine">{uzs(quote.total)}</dd>
       </div>
       {quote.zone?.freeFrom && quote.deliveryFee > 0 ? (
         <p className="text-xs text-muted">{fmt(t.freeDeliveryLeft, { amount: uzs(quote.zone.freeFrom - (quote.subtotal - quote.discount)) })}</p>
@@ -82,7 +82,7 @@ export function CartView({ zones }: { zones: ZoneOption[] }) {
       : null,
   );
 
-  if (!hydrated) return <div className="h-64 animate-pulse rounded-2xl bg-ivory-deep" />;
+  if (!hydrated) return <div className="h-64 animate-pulse rounded-2xl bg-cream" />;
   if (lines.length === 0) {
     return (
       <EmptyState
@@ -116,13 +116,13 @@ export function CartView({ zones }: { zones: ZoneOption[] }) {
           const productHref = href(`/gul/${l.slug}`);
           return (
             <li key={l.key} className="flex gap-4 py-6">
-              <Link href={productHref} className="relative h-28 w-24 shrink-0 overflow-hidden rounded-2xl bg-ivory-deep sm:h-32 sm:w-28">
+              <Link href={productHref} className="relative h-28 w-24 shrink-0 overflow-hidden rounded-2xl bg-cream sm:h-32 sm:w-28">
                 <ProductImage src={l.image} alt={name} sizes="112px" locale={locale} />
               </Link>
               <div className="flex min-w-0 flex-1 flex-col">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <Link href={productHref} className="font-medium hover:text-forest">
+                    <Link href={productHref} className="font-medium hover:text-wine">
                       {name}
                     </Link>
                     <p className="mt-0.5 text-sm text-muted">
@@ -165,7 +165,7 @@ export function CartView({ zones }: { zones: ZoneOption[] }) {
                       <PlusIcon size={15} />
                     </button>
                   </div>
-                  <Link href={href(`/gul/${l.slug}?tahrir=${encodeURIComponent(l.key)}`)} className="text-sm text-forest underline-offset-4 hover:underline">
+                  <Link href={href(`/gul/${l.slug}?tahrir=${encodeURIComponent(l.key)}`)} className="text-sm text-wine underline-offset-4 hover:underline">
                     {t.edit}
                   </Link>
                   <button type="button" onClick={() => removeLine(l.key)} className="ml-auto inline-flex items-center gap-1.5 text-sm text-muted hover:text-danger">

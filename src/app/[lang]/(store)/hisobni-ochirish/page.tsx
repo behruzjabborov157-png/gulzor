@@ -85,13 +85,13 @@ export default async function DeleteAccountPage({ searchParams }: { searchParams
         {store.phone || tg ? (
           <>
             {store.phone ? (
-              <a href={`tel:${store.phone}`} className="text-forest underline">
+              <a href={`tel:${store.phone}`} className="text-wine underline">
                 {formatPhone(store.phone)}
               </a>
             ) : null}
             {store.phone && tg ? " · " : null}
             {tg ? (
-              <a href={tg} target="_blank" rel="noopener noreferrer" className="text-forest underline">
+              <a href={tg} target="_blank" rel="noopener noreferrer" className="text-wine underline">
                 Telegram
               </a>
             ) : null}

@@ -48,7 +48,7 @@ export default async function ProductsAdmin({ searchParams }: { searchParams: Pr
           <option value="archived">Arxiv</option>
         </select>
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" name="demo" value="1" defaultChecked={sp.demo === "1"} className="accent-forest" /> Faqat namunalar
+          <input type="checkbox" name="demo" value="1" defaultChecked={sp.demo === "1"} className="accent-wine" /> Faqat namunalar
         </label>
         <button className="btn-secondary btn-sm">Filtrlash</button>
       </form>
@@ -75,11 +75,11 @@ export default async function ProductsAdmin({ searchParams }: { searchParams: Pr
                 <tr key={p.id} className="align-middle">
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-3">
-                      <div className="relative h-12 w-10 shrink-0 overflow-hidden rounded-lg bg-ivory-deep">
+                      <div className="relative h-12 w-10 shrink-0 overflow-hidden rounded-lg bg-cream">
                         {p.images[0] ? <Image src={p.images[0].url} alt="" fill sizes="40px" className="object-cover" /> : null}
                       </div>
                       <div>
-                        <Link href={`/admin/mahsulotlar/${p.id}`} className="font-medium hover:text-forest hover:underline">{p.name}</Link>
+                        <Link href={`/admin/mahsulotlar/${p.id}`} className="font-medium hover:text-wine hover:underline">{p.name}</Link>
                         <p className="text-xs text-muted">
                           {p.isDemo ? "namuna · " : ""}{p.isAddon ? "qo‘shimcha · " : ""}{p.pricingMode === "variants" ? "o‘lchamlar" : p.pricingMode === "per_stem" ? "donalab" : "qat’iy narx"} · {p.salesCount} sotilgan
                         </p>

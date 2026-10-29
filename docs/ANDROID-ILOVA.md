@@ -92,8 +92,8 @@ Quyidagilarga e’tibor bering:
 | Starting version code | `1` |
 | Display mode | `standalone` |
 | Orientation | `portrait` |
-| Status bar color | `#2E4A3B` |
-| Splash screen color | `#FBF8F3` |
+| Status bar color | `#7a1732` |
+| Splash screen color | `#fbf6ef` |
 | Icon URL / Maskable icon URL | avtomatik (`/icons/icon-512.png`, `/icons/maskable-512.png`) |
 | Monochrome icon URL | bo‘sh qoldiring (Enter) |
 | Include app shortcuts? | **Yes** (Katalog, Savat, Buyurtmani kuzatish) |
@@ -105,7 +105,7 @@ Quyidagilarga e’tibor bering:
 
 Keyin yaratilgan `twa-manifest.json` faylida ikki qatorni o‘zgartiring:
 ```json
-"navigationColor": "#2E4A3B",
+"navigationColor": "#7a1732",
 "enableNotifications": false,
 ```
 (Sayt hozir push-bildirishnoma yubormaydi, shuning uchun ruxsat so‘rash shart emas.)

@@ -9,7 +9,7 @@ import { useT } from "@/i18n/client";
 export function FavoritesView() {
   const { cards } = useFavoriteCards();
   const { locale, t, href } = useT();
-  if (!cards) return <div className="h-64 animate-pulse rounded-2xl bg-ivory-deep" />;
+  if (!cards) return <div className="h-64 animate-pulse rounded-2xl bg-cream" />;
   if (!cards.length) {
     return (
       <EmptyState

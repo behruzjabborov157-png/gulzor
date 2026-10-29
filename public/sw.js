@@ -3,7 +3,7 @@
 //   when the network is down, a navigation shows /offline.html instead of the browser error.
 // - Hashed build files, icons and catalogue photos are cached (they never change under the same URL).
 // - Admin pages, API callbacks, uploaded media and anything that is not a GET are never touched.
-const VERSION = "gulzor-v1";
+const VERSION = "gulzor-v2";
 const STATIC_CACHE = `${VERSION}-static`;
 const IMAGE_CACHE = `${VERSION}-images`;
 const PRECACHE = ["/offline.html", "/icons/icon-192.png", "/icons/icon-512.png"];

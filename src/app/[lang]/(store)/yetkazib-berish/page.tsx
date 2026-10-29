@@ -41,7 +41,7 @@ export default async function DeliveryPage() {
         ) : (
           <div className="card overflow-x-auto">
             <table className="w-full min-w-[560px] text-left text-sm">
-              <thead className="border-b border-line bg-ivory-deep text-xs tracking-wide text-muted uppercase">
+              <thead className="border-b border-line bg-cream text-xs tracking-wide text-muted uppercase">
                 <tr>
                   <th scope="col" className="px-5 py-3 font-semibold">
                     {t.colZone}
@@ -124,7 +124,7 @@ export default async function DeliveryPage() {
         )}
       </section>
 
-      <section className="card mt-10 bg-blush/30 p-6" aria-labelledby="other-h">
+      <section className="card mt-10 bg-petal/30 p-6" aria-labelledby="other-h">
         <h2 id="other-h" className="text-2xl">
           {t.otherTitle}
         </h2>

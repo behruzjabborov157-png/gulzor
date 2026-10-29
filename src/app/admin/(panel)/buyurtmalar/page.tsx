@@ -1,24 +1,24 @@
 import Link from "next/link";
-import { and, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, lt, or, sql, type SQL } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireAdmin } from "@/lib/auth";
 import { formatDateISO, formatDateTime, formatPhone, formatUZS, normalizePhone } from "@/lib/format";
-import { ORDER_STATUS_LABEL, PAYMENT_STATUS_LABEL, type Order } from "@/lib/orders";
+import { ORDER_STATUS_LABEL, PAYMENT_METHOD_LABEL, PAYMENT_STATUS_LABEL, type Order } from "@/lib/orders";
 
 export const metadata = { title: "Buyurtmalar" };
 
 const STATUS_STYLE: Record<Order["status"], string> = {
-  new: "bg-blush text-charcoal",
-  confirmed: "bg-sage-light text-forest",
-  preparing: "bg-sage-light text-forest",
-  ready: "bg-sage-light text-forest",
-  dispatched: "bg-forest/15 text-forest",
-  delivered: "bg-forest text-ivory",
+  new: "bg-petal text-charcoal",
+  confirmed: "bg-sage-light text-wine",
+  preparing: "bg-sage-light text-wine",
+  ready: "bg-sage-light text-wine",
+  dispatched: "bg-wine/15 text-wine",
+  delivered: "bg-wine text-ivory",
   cancelled: "bg-charcoal/10 text-muted",
   rejected: "bg-charcoal/10 text-muted",
 };
 
-export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ q?: string; holat?: string; sana?: string; sahifa?: string }> }) {
+export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ q?: string; holat?: string; sana?: string; yaratilgan?: string; sahifa?: string }> }) {
   await requireAdmin();
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
@@ -27,7 +27,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const where: SQL[] = [];
   if (q) {
     const phone = normalizePhone(q);
-    const digits = q.replace(/D/g, "");
+    const digits = q.replace(/\D/g, "");
     const conds: SQL[] = [ilike(schema.orders.number, `%${q}%`), ilike(schema.orders.customerName, `%${q}%`)];
     if (phone) conds.push(eq(schema.orders.customerPhone, phone), eq(schema.orders.recipientPhone, phone));
     else if (digits.length >= 4) conds.push(ilike(schema.orders.customerPhone, `%${digits}%`), ilike(schema.orders.recipientPhone, `%${digits}%`));
@@ -35,6 +35,11 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   }
   if (sp.holat && sp.holat in ORDER_STATUS_LABEL) where.push(eq(schema.orders.status, sp.holat as Order["status"]));
   if (sp.sana && /^\d{4}-\d{2}-\d{2}$/.test(sp.sana)) where.push(eq(schema.orders.deliveryDate, sp.sana));
+  // Order (creation) date as a Tashkent calendar day.
+  if (sp.yaratilgan && /^\d{4}-\d{2}-\d{2}$/.test(sp.yaratilgan)) {
+    const from = new Date(`${sp.yaratilgan}T00:00:00+05:00`);
+    where.push(gte(schema.orders.createdAt, from), lt(schema.orders.createdAt, new Date(from.getTime() + 86_400_000)));
+  }
 
   const db = await getDb();
   const cond = where.length ? and(...where) : undefined;
@@ -52,6 +57,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     if (q) u.set("q", q);
     if (sp.holat) u.set("holat", sp.holat);
     if (sp.sana) u.set("sana", sp.sana);
+    if (sp.yaratilgan) u.set("yaratilgan", sp.yaratilgan);
     if (p > 1) u.set("sahifa", String(p));
     return `/admin/buyurtmalar?${u}`;
   };
@@ -59,19 +65,29 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   return (
     <div>
       <h1 className="mb-6 text-4xl">Buyurtmalar</h1>
-      <form className="card mb-6 grid gap-3 p-4 sm:grid-cols-[1fr_200px_180px_auto]" role="search">
-        <label className="sr-only" htmlFor="q">Qidiruv</label>
-        <input id="q" name="q" defaultValue={q} placeholder="Buyurtma raqami, telefon yoki ism" className="field py-2.5" />
-        <label className="sr-only" htmlFor="holat">Holat</label>
-        <select id="holat" name="holat" defaultValue={sp.holat ?? ""} className="field py-2.5">
-          <option value="">Barcha holatlar</option>
-          {Object.entries(ORDER_STATUS_LABEL).map(([k, v]) => (
-            <option key={k} value={k}>{v}</option>
-          ))}
-        </select>
-        <label className="sr-only" htmlFor="sana">Yetkazish sanasi</label>
-        <input id="sana" name="sana" type="date" defaultValue={sp.sana ?? ""} className="field py-2.5" />
-        <button className="btn-primary btn-sm">Qidirish</button>
+      <form className="card mb-6 grid items-end gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[1fr_190px_165px_165px_auto]" role="search">
+        <div>
+          <label className="mb-1 block text-xs text-muted" htmlFor="q">Qidiruv</label>
+          <input id="q" name="q" defaultValue={q} placeholder="Buyurtma raqami, telefon yoki ism" className="field py-2.5" />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-muted" htmlFor="holat">Holat</label>
+          <select id="holat" name="holat" defaultValue={sp.holat ?? ""} className="field py-2.5">
+            <option value="">Barcha holatlar</option>
+            {Object.entries(ORDER_STATUS_LABEL).map(([k, v]) => (
+              <option key={k} value={k}>{v}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-muted" htmlFor="yaratilgan">Buyurtma sanasi</label>
+          <input id="yaratilgan" name="yaratilgan" type="date" defaultValue={sp.yaratilgan ?? ""} className="field py-2.5" />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-muted" htmlFor="sana">Yetkazish sanasi</label>
+          <input id="sana" name="sana" type="date" defaultValue={sp.sana ?? ""} className="field py-2.5" />
+        </div>
+        <button className="btn-primary btn-sm h-[46px]">Qidirish</button>
       </form>
 
       <p className="mb-3 text-sm text-muted">{count} ta buyurtma</p>
@@ -95,14 +111,14 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
               rows.map((o) => (
                 <tr key={o.id} className="hover:bg-ivory">
                   <td className="px-4 py-3">
-                    <Link href={`/admin/buyurtmalar/${o.id}`} className="font-semibold text-forest hover:underline">{o.number}</Link>
+                    <Link href={`/admin/buyurtmalar/${o.id}`} className="font-semibold text-wine hover:underline">{o.number}</Link>
                     {o.containsDemo ? <span className="ml-1.5 text-[10px] text-muted">demo</span> : null}
                   </td>
                   <td className="px-4 py-3 text-muted">{formatDateTime(o.createdAt)}</td>
                   <td className="px-4 py-3">{o.customerName}<br /><span className="text-xs text-muted">{formatPhone(o.customerPhone)}</span></td>
                   <td className="px-4 py-3">{formatDateISO(o.deliveryDate, false)}<br /><span className="text-xs text-muted">{o.slotLabel} · {o.fulfillment === "pickup" ? "olib ketish" : o.zoneName}</span></td>
                   <td className="px-4 py-3"><span className={`badge ${STATUS_STYLE[o.status]}`}>{ORDER_STATUS_LABEL[o.status]}</span></td>
-                  <td className="px-4 py-3 text-xs">{o.paymentMethod}<br /><span className={o.paymentStatus === "paid" ? "text-success" : "text-muted"}>{PAYMENT_STATUS_LABEL[o.paymentStatus]}</span></td>
+                  <td className="px-4 py-3 text-xs">{PAYMENT_METHOD_LABEL[o.paymentMethod]}<br /><span className={o.paymentStatus === "paid" ? "text-success" : "text-muted"}>{PAYMENT_STATUS_LABEL[o.paymentStatus]}</span></td>
                   <td className="px-4 py-3 text-right font-semibold">{formatUZS(o.total)}</td>
                 </tr>
               ))

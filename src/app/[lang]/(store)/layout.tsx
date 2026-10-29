@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import { RevealObserver } from "@/components/motion";
+import { CartDrawer } from "@/components/store/cart-drawer";
 import { FavoritesSync } from "@/components/store/client-widgets";
 import { DemoBanner, Footer, Header } from "@/components/store/layout-parts";
 import { LocaleProvider } from "@/i18n/client";
@@ -16,7 +18,7 @@ export default async function StoreLayout({ children, params }: { children: Reac
   const [{ store, checkout }, customer] = await Promise.all([getSettings(), getCustomer()]);
   return (
     <LocaleProvider locale={lang}>
-      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-full focus:bg-forest focus:px-4 focus:py-2 focus:text-ivory">
+      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-full focus:bg-wine focus:px-4 focus:py-2 focus:text-ivory">
         {getDict(lang).layout.skipToContent}
       </a>
       {checkout.demoMode ? <DemoBanner locale={lang} /> : null}
@@ -24,6 +26,8 @@ export default async function StoreLayout({ children, params }: { children: Reac
       <main id="main">{children}</main>
       <Footer store={store} locale={lang} />
       <FavoritesSync loggedIn={!!customer} />
+      <CartDrawer />
+      <RevealObserver />
     </LocaleProvider>
   );
 }

@@ -157,7 +157,7 @@ export async function CatalogView({
                 </div>
               </fieldset>
               <label className="flex items-center gap-2.5 text-sm">
-                <input type="checkbox" name="mavjud" value="1" defaultChecked={f.inStock} className="h-4 w-4 accent-forest" />
+                <input type="checkbox" name="mavjud" value="1" defaultChecked={f.inStock} className="h-4 w-4 accent-wine" />
                 {t.inStock}
               </label>
               <div>

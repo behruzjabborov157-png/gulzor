@@ -8,6 +8,7 @@ import { normalizePhone } from "@/lib/format";
 import { availablePaymentMethods } from "@/lib/payments/config";
 import { adjustStock, cartLineSchema, quoteCart, StockError, type Quote } from "@/lib/quote";
 import { getSettings } from "@/lib/settings";
+import { notifyOrderEmail } from "@/lib/email";
 import { notifyOrder } from "@/lib/telegram";
 import { tashkentNow } from "@/lib/time";
 
@@ -78,6 +79,7 @@ export function makeCheckoutSchema(locale: Locale = DEFAULT_LOCALE) {
     cardMessage: text(300),
     paymentMethod: z.enum(["cash", "payme", "click"]),
     saveAddress: z.boolean().default(false),
+    submissionId: z.string().uuid().optional(),
   })
   .superRefine((v, ctx) => {
     if (!v.recipientIsCustomer) {
@@ -95,7 +97,7 @@ export const checkoutSchema = makeCheckoutSchema();
 export type CheckoutInput = z.input<typeof checkoutSchema>;
 
 export type CreateOrderResult =
-  | { ok: true; orderId: string; number: string; accessToken: string; paymentMethod: Order["paymentMethod"] }
+  | { ok: true; orderId: string; number: string; accessToken: string; paymentMethod: Order["paymentMethod"]; duplicate?: boolean }
   | { ok: false; errors: string[]; fieldErrors?: Record<string, string>; quote?: Quote };
 
 function orderNumber() {
@@ -112,6 +114,9 @@ export async function createOrder(raw: unknown, customerId: string | null, local
     return { ok: false, errors: [e.fixFields], fieldErrors };
   }
   const v = parsed.data;
+  // Double-click, retry after a dropped connection or a resubmitted form: same submission id → same order.
+  const previous = v.submissionId ? await orderBySubmission(v.submissionId) : null;
+  if (previous) return previous;
   const { checkout } = await getSettings();
 
   if (!availablePaymentMethods(checkout).some((m) => m.id === v.paymentMethod)) {
@@ -172,6 +177,7 @@ export async function createOrder(raw: unknown, customerId: string | null, local
           .values({
             number: orderNumber(),
             accessToken,
+            idempotencyKey: v.submissionId ?? null,
             customerId,
             paymentMethod: v.paymentMethod,
             fulfillment: v.fulfillment,
@@ -257,12 +263,23 @@ export async function createOrder(raw: unknown, customerId: string | null, local
       if (err instanceof SlotFullError) return { ok: false, errors: [e.slotFull], fieldErrors: { slotId: e.slotFull } };
       if ((err as Error).message === "COUPON_EXHAUSTED") return { ok: false, errors: [getDict(locale).errors.quote.couponExhausted] };
       if (isUniqueViolation(err, "orders_number_idx")) continue; // order number collision — retry
+      if (v.submissionId && isUniqueViolation(err, "orders_idempotency_idx")) {
+        // A parallel request with the same submission id won the race (its transaction kept the stock).
+        const winner = await orderBySubmission(v.submissionId);
+        if (winner) return winner;
+      }
       throw err;
     }
   }
   if (!created) return { ok: false, errors: [e.numberFailed] };
 
   return { ok: true, orderId: created.id, number: created.number, accessToken, paymentMethod: created.paymentMethod };
+}
+
+async function orderBySubmission(key: string): Promise<CreateOrderResult | null> {
+  const db = await getDb();
+  const [o] = await db.select().from(schema.orders).where(eq(schema.orders.idempotencyKey, key));
+  return o ? { ok: true, orderId: o.id, number: o.number, accessToken: o.accessToken, paymentMethod: o.paymentMethod, duplicate: true } : null;
 }
 
 class SlotFullError extends Error {
@@ -289,9 +306,11 @@ export async function notifyNewOrder(orderId: string) {
     const [order] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId));
     if (!order) return;
     const items = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
-    await notifyOrder({ ...order, items });
+    // Both channels run independently; each logs its own outcome on the order.
+    const results = await Promise.allSettled([notifyOrder({ ...order, items }), notifyOrderEmail({ ...order, items })]);
+    for (const r of results) if (r.status === "rejected") console.error("Order notification failed", r.reason);
   } catch (e) {
-    console.error("Telegram notify failed", e);
+    console.error("Order notification failed", e);
   }
 }
 

@@ -47,7 +47,7 @@ export default async function CouponsAdmin() {
         <details key={c.id} className="card">
           <summary className="flex cursor-pointer flex-wrap justify-between gap-2 px-5 py-3 text-sm">
             <span><strong>{c.code}</strong> · {c.type === "percent" ? `${c.value}%` : `${c.value} so‘m`} · ishlatilgan {c.usedCount}{c.usageLimit ? `/${c.usageLimit}` : ""}{c.isActive ? "" : " · o‘chirilgan"}</span>
-            <span className="text-xs text-forest">Tahrirlash</span>
+            <span className="text-xs text-wine">Tahrirlash</span>
           </summary>
           <div className="border-t border-line p-5"><AdminForm action={saveCouponAction.bind(null, c.id)}><Fields c={c} /></AdminForm></div>
         </details>

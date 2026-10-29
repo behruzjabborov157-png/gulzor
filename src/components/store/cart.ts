@@ -32,6 +32,8 @@ export function lineKey(l: Pick<CartLine, "productId" | "variantId" | "stems" | 
   return [l.productId, l.variantId ?? "-", l.stems ?? "-", l.color ?? "-", addons].join("|");
 }
 
+export const CART_ADDED_EVENT = "gulzor:cart-added";
+
 export function addToCart(line: Omit<CartLine, "key">) {
   const key = lineKey(line);
   cartStore.set((prev) => {
@@ -41,6 +43,8 @@ export function addToCart(line: Omit<CartLine, "key">) {
     }
     return [...prev, { ...line, key }];
   });
+  // Opens the cart drawer (components/store/cart-drawer.tsx).
+  window.dispatchEvent(new CustomEvent<CartLine>(CART_ADDED_EVENT, { detail: { ...line, key } }));
 }
 
 export function updateQuantity(key: string, quantity: number) {

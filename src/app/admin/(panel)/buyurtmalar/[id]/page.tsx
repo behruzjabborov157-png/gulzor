@@ -3,7 +3,7 @@ import { SubmitButton } from "@/components/admin/submit-button";
 import { notFound } from "next/navigation";
 import { asc, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import { resendTelegramAction, setOrderStatusAction, setPaymentStatusAction } from "@/app/admin/actions";
+import { resendEmailAction, resendTelegramAction, setOrderStatusAction, setPaymentStatusAction } from "@/app/admin/actions";
 import { DeliveryEditForm } from "@/components/admin/delivery-edit-form";
 import { Alert } from "@/components/ui/primitives";
 import { requireAdmin } from "@/lib/auth";
@@ -40,11 +40,11 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
   return (
     <div className="max-w-5xl space-y-6">
       <div>
-        <Link href="/admin/buyurtmalar" className="text-sm text-muted hover:text-forest">← Buyurtmalar</Link>
+        <Link href="/admin/buyurtmalar" className="text-sm text-muted hover:text-wine">← Buyurtmalar</Link>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <h1 className="text-4xl">{o.number}</h1>
-          <span className="badge bg-forest text-ivory">{ORDER_STATUS_LABEL[o.status]}</span>
-          <span className="badge bg-blush text-charcoal">{PAYMENT_METHOD_LABEL[o.paymentMethod]} · {PAYMENT_STATUS_LABEL[o.paymentStatus]}</span>
+          <span className="badge bg-wine text-ivory">{ORDER_STATUS_LABEL[o.status]}</span>
+          <span className="badge bg-petal text-charcoal">{PAYMENT_METHOD_LABEL[o.paymentMethod]} · {PAYMENT_STATUS_LABEL[o.paymentStatus]}</span>
         </div>
         <p className="mt-1 text-sm text-muted">
           Yaratildi: {formatDateTime(o.createdAt)} · Mijoz tili: {o.locale === "ru" ? "rus tili" : "o‘zbek tili"}
@@ -83,9 +83,9 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="card p-5 text-sm" aria-label="Mijoz">
           <h2 className="mb-3 text-2xl">Mijoz</h2>
-          <p><strong>{o.customerName}</strong> · <a href={`tel:${o.customerPhone}`} className="text-forest">{formatPhone(o.customerPhone)}</a></p>
+          <p><strong>{o.customerName}</strong> · <a href={`tel:${o.customerPhone}`} className="text-wine">{formatPhone(o.customerPhone)}</a></p>
           <p className="mt-2 text-muted">Qabul qiluvchi</p>
-          <p><strong>{o.recipientName}</strong> · <a href={`tel:${o.recipientPhone}`} className="text-forest">{formatPhone(o.recipientPhone)}</a>{o.anonymous ? " · anonim" : ""}</p>
+          <p><strong>{o.recipientName}</strong> · <a href={`tel:${o.recipientPhone}`} className="text-wine">{formatPhone(o.recipientPhone)}</a>{o.anonymous ? " · anonim" : ""}</p>
           <p className="mt-2 text-muted">{o.fulfillment === "pickup" ? "Olib ketish" : "Manzil"}</p>
           <p>{[o.regionName, o.zoneName, o.district, o.neighborhood, o.address, o.apartment && `kv. ${o.apartment}`, o.landmark && `mo‘ljal: ${o.landmark}`].filter(Boolean).join(", ")}</p>
           <p className="mt-2 text-muted">Sana va vaqt</p>
@@ -170,20 +170,26 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
             ))}
           </ul>
         </section>
-        <section className="card p-5 text-sm" aria-label="Telegram">
-          <h2 className="mb-3 text-2xl">Telegram bildirishnomalari</h2>
+        <section className="card p-5 text-sm" aria-label="Bildirishnomalar">
+          <h2 className="mb-3 text-2xl">Bildirishnomalar</h2>
+          <p className="mb-3 text-xs text-muted">Buyurtma bazada saqlangan — xabar yuborilmasa ham u yo‘qolmaydi. Xatoni tuzatib, qayta yuboring.</p>
           {notes.length === 0 ? <p className="text-muted">Yozuv yo‘q.</p> : (
             <ul className="space-y-1">
               {notes.map((n) => (
                 <li key={n.id}>
-                  <span className={n.status === "sent" ? "text-success" : n.status === "failed" ? "text-danger" : "text-muted"}>{n.status === "sent" ? "Yuborildi" : n.status === "failed" ? "Xato" : "O‘tkazib yuborildi"}</span> · {formatDateTime(n.createdAt)} · {n.detail}
+                  <span className="font-semibold">{n.channel === "email" ? "Email" : "Telegram"}</span> · <span className={n.status === "sent" ? "text-success" : n.status === "failed" ? "text-danger" : "text-muted"}>{n.status === "sent" ? "Yuborildi" : n.status === "failed" ? "Xato" : "O‘tkazib yuborildi"}</span> · {formatDateTime(n.createdAt)} · {n.detail}
                 </li>
               ))}
             </ul>
           )}
-          <form action={resendTelegramAction.bind(null, o.id)} className="mt-3">
-            <SubmitButton className="btn-secondary btn-sm" pendingLabel="Yuborilmoqda…">Qayta yuborish</SubmitButton>
-          </form>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <form action={resendTelegramAction.bind(null, o.id)}>
+              <SubmitButton className="btn-secondary btn-sm" pendingLabel="Yuborilmoqda…">Telegram’ga qayta yuborish</SubmitButton>
+            </form>
+            <form action={resendEmailAction.bind(null, o.id)}>
+              <SubmitButton className="btn-secondary btn-sm" pendingLabel="Yuborilmoqda…">Email’ga qayta yuborish</SubmitButton>
+            </form>
+          </div>
         </section>
       </div>
     </div>

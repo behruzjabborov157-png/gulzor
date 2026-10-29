@@ -63,7 +63,7 @@ export default async function CategoriesAdmin() {
               <details key={c.id} className="card">
                 <summary className="flex cursor-pointer items-center justify-between px-5 py-3 text-sm">
                   <span><strong>{c.name}</strong> <span className="text-muted">/{c.slug} · {n} mahsulot{c.isActive ? "" : " · o‘chirilgan"}</span></span>
-                  <span className="text-xs text-forest">Tahrirlash</span>
+                  <span className="text-xs text-wine">Tahrirlash</span>
                 </summary>
                 <div className="border-t border-line p-5">
                   <AdminForm action={saveCategoryAction.bind(null, c.id)}>

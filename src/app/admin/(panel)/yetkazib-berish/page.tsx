@@ -54,7 +54,7 @@ export default async function DeliveryAdmin() {
           <details>
             <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2">
               <span className="text-2xl font-display">{r.name} {r.isActive ? "" : <span className="font-sans text-sm text-muted">(o‘chirilgan)</span>}</span>
-              <span className="text-xs text-forest">Shahar/viloyatni tahrirlash</span>
+              <span className="text-xs text-wine">Shahar/viloyatni tahrirlash</span>
             </summary>
             <div className="mt-3">
               <AdminForm action={saveRegionAction.bind(null, r.id)}>
@@ -74,7 +74,7 @@ export default async function DeliveryAdmin() {
               <details key={z.id} className="rounded-xl border border-line">
                 <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
                   <span><strong>{z.name}</strong> · {formatUZS(z.fee)}{z.freeFrom ? ` · ${formatUZS(z.freeFrom)}dan bepul` : ""}{z.isActive ? "" : " · o‘chirilgan"}</span>
-                  <span className="text-xs text-forest">Tahrirlash</span>
+                  <span className="text-xs text-wine">Tahrirlash</span>
                 </summary>
                 <div className="border-t border-line p-4">
                   <AdminForm action={saveZoneAction.bind(null, z.id)}>
@@ -84,7 +84,7 @@ export default async function DeliveryAdmin() {
               </details>
             ))}
             <details className="rounded-xl border border-dashed border-line">
-              <summary className="cursor-pointer px-4 py-3 text-sm text-forest">+ Hudud qo‘shish</summary>
+              <summary className="cursor-pointer px-4 py-3 text-sm text-wine">+ Hudud qo‘shish</summary>
               <div className="border-t border-line p-4">
                 <AdminForm action={saveZoneAction.bind(null, null)} submitLabel="Qo‘shish" resetOnSuccess>
                   <ZoneFields regionId={r.id} />

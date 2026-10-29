@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["@electric-sql/pglite", "postgres", "sharp", "bcryptjs"],
+  serverExternalPackages: ["@electric-sql/pglite", "postgres", "sharp", "bcryptjs", "nodemailer"],
   poweredByHeader: false,
   // Image uploads (custom bouquet requests, admin product photos) go through Server Actions.
   experimental: { serverActions: { bodySizeLimit: "8mb" } },

@@ -16,7 +16,7 @@ export function AuthForms({ next }: { next: string }) {
 
   return (
     <div className="card mt-8 p-6">
-      <div role="tablist" className="mb-6 grid grid-cols-2 rounded-full bg-ivory-deep p-1 text-sm font-semibold">
+      <div role="tablist" className="mb-6 grid grid-cols-2 rounded-full bg-cream p-1 text-sm font-semibold">
         {(["login", "register"] as const).map((tabName) => (
           <button key={tabName} type="button" role="tab" aria-selected={tab === tabName} onClick={() => setTab(tabName)} className={`rounded-full py-2 ${tab === tabName ? "bg-white shadow-sm" : "text-muted"}`}>
             {tabName === "login" ? t.tabLogin : t.tabRegister}

@@ -116,7 +116,7 @@ export default async function ProductPage({ params }: Props) {
             { label: name },
           ]}
         />
-        <div className="grid gap-10 lg:grid-cols-2 lg:gap-16">
+        <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-16">
           <div className="lg:sticky lg:top-36 lg:self-start">
             <Gallery images={p.images.map((i) => ({ url: i.url, alt: locale === "uz" ? i.alt : name }))} name={name} />
             {p.isDemo ? (
@@ -140,7 +140,7 @@ export default async function ProductPage({ params }: Props) {
                 locale={locale}
                 className="text-xl"
               />
-              <span className={`badge ${orderable ? "bg-sage-light text-forest" : "bg-charcoal/85 text-ivory"}`}>{dict.common.stock[stock]}</span>
+              <span className={`badge ${orderable ? "bg-sage-light text-wine" : "bg-charcoal/85 text-ivory"}`}>{dict.common.stock[stock]}</span>
               {p.stockQuantity != null && p.stockQuantity > 0 && p.stockQuantity <= 5 ? (
                 <span className="text-xs text-muted">{fmt(t.stockLeft, { n: p.stockQuantity })}</span>
               ) : null}
@@ -161,10 +161,10 @@ export default async function ProductPage({ params }: Props) {
 
             <ul className="mt-6 grid gap-3 text-sm sm:grid-cols-2">
               <li className="flex items-center gap-2.5 text-charcoal/80">
-                <ClockIcon size={18} className="text-forest" /> {prepLabel(locale, p.prepTimeMinutes)}
+                <ClockIcon size={18} className="text-wine" /> {prepLabel(locale, p.prepTimeMinutes)}
               </li>
               <li className="flex items-center gap-2.5 text-charcoal/80">
-                <TruckIcon size={18} className="text-forest" />
+                <TruckIcon size={18} className="text-wine" />
                 <Link href={lp("/yetkazib-berish")} className="underline-offset-4 hover:underline">
                   {t.deliveryTerms}
                 </Link>

@@ -32,7 +32,7 @@ export default async function ImportAdmin() {
         </ul>
         <p className="text-xs text-muted">Ustunlar: {PRODUCT_CSV_COLUMNS.join(", ")}</p>
         <AdminForm action={importProductsAction} submitLabel="Import qilish">
-          <input type="file" name="file" accept=".csv,text/csv" required className="block text-sm file:mr-3 file:rounded-full file:border-0 file:bg-forest/10 file:px-4 file:py-2 file:text-forest" aria-label="CSV fayl" />
+          <input type="file" name="file" accept=".csv,text/csv" required className="block text-sm file:mr-3 file:rounded-full file:border-0 file:bg-wine/10 file:px-4 file:py-2 file:text-wine" aria-label="CSV fayl" />
         </AdminForm>
       </section>
     </div>

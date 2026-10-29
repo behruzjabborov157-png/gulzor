@@ -33,10 +33,10 @@ async function featureGraphic(browser, locale) {
     const banner = document.createElement("div");
     document.body.append(banner);
     banner.innerHTML = `
-      <div style="position:fixed;inset:0;z-index:2147483647;background:#2e4a3b;display:flex;align-items:center;gap:56px;padding:0 72px;overflow:hidden">
+      <div style="position:fixed;inset:0;z-index:2147483647;background:#2b0f1f;display:flex;align-items:center;gap:56px;padding:0 72px;overflow:hidden">
         <img src="/icons/maskable-512.png" alt="" style="width:260px;height:260px;border-radius:56px;flex:none">
-        <div style="color:#fbf8f3">
-          <div style="font-family:var(--font-cormorant),serif;font-size:112px;line-height:1;font-weight:500">Gulzor<span style="color:#e2aea2">.</span></div>
+        <div style="color:#fbf6ef">
+          <div style="font-family:var(--font-cormorant),serif;font-size:112px;line-height:1;font-weight:500">Gulzor<span style="color:#eaa7b4">.</span></div>
           <div style="font-family:var(--font-manrope),sans-serif;font-size:34px;font-weight:600;margin-top:20px;max-width:560px;line-height:1.25">${t.tagline}</div>
           <div style="font-family:var(--font-manrope),sans-serif;font-size:24px;margin-top:14px;color:rgba(251,248,243,.75)">${t.note}</div>
         </div>

@@ -54,7 +54,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
         </div>
         <nav className="flex gap-1 rounded-full bg-white p-1 text-sm" aria-label="Davr">
           {PERIODS.map((p) => (
-            <Link key={p} href={`/admin?davr=${p}`} aria-current={p === days ? "true" : undefined} className={`rounded-full px-3 py-1.5 ${p === days ? "bg-forest text-ivory" : "text-muted"}`}>
+            <Link key={p} href={`/admin?davr=${p}`} aria-current={p === days ? "true" : undefined} className={`rounded-full px-3 py-1.5 ${p === days ? "bg-wine text-ivory" : "text-muted"}`}>
               {p} kun
             </Link>
           ))}
@@ -69,9 +69,9 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
           <ul className="space-y-2 text-sm">
             {setup.map((s) => (
               <li key={s.label} className="flex items-start gap-2.5">
-                <span aria-hidden="true" className={s.done ? "text-success" : "text-blush-deep"}>{s.done ? "✓" : "○"}</span>
+                <span aria-hidden="true" className={s.done ? "text-success" : "text-petal-deep"}>{s.done ? "✓" : "○"}</span>
                 <span className="sr-only">{s.done ? "Bajarilgan:" : "Bajarilmagan:"}</span>
-                {s.done ? <span className="text-muted line-through">{s.label}</span> : <Link href={s.href} className="hover:text-forest hover:underline">{s.label}</Link>}
+                {s.done ? <span className="text-muted line-through">{s.label}</span> : <Link href={s.href} className="hover:text-wine hover:underline">{s.label}</Link>}
               </li>
             ))}
           </ul>

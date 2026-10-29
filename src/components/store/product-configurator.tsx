@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { CheckIcon, MinusIcon, PlusIcon } from "@/components/ui/icons";
+import { MinusIcon, PlusIcon } from "@/components/ui/icons";
 import { useT } from "@/i18n/client";
 import { fmt } from "@/i18n/config";
 import { priceErrorText } from "@/i18n/dict";
@@ -51,7 +50,6 @@ export function ProductConfigurator({
   const [color, setColor] = useState<string | null>(colors[0]?.value ?? null);
   const [chosen, setChosen] = useState<Record<number, number>>({});
   const [quantity, setQuantity] = useState(1);
-  const [added, setAdded] = useState(false);
 
   // Editing an existing cart line: once the cart has loaded, preload its options (state adjusted during render).
   const [cart, , cartReady] = cartStore.useStore();
@@ -104,7 +102,6 @@ export function ProductConfigurator({
       return;
     }
     addToCart(line);
-    setAdded(true);
   }
 
   return (
@@ -116,14 +113,14 @@ export function ProductConfigurator({
             {activeVariants.map((v) => (
               <label
                 key={v.id}
-                className={`cursor-pointer rounded-xl border px-3 py-3 text-center transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-forest ${
-                  variantId === v.id ? "border-forest bg-forest/5" : "border-line bg-white hover:border-forest/40"
+                className={`cursor-pointer rounded-xl border px-3 py-3 text-center transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-wine ${
+                  variantId === v.id ? "border-wine bg-wine/5" : "border-line bg-white hover:border-wine/40"
                 }`}
               >
                 <input type="radio" name="variant" value={v.id} checked={variantId === v.id} onChange={() => setVariantId(v.id)} className="sr-only" />
                 <span className="block text-sm font-semibold">{v.name}</span>
                 {v.stemCount ? <span className="block text-xs text-muted">{fmt(dict.common.pieces, { n: v.stemCount })}</span> : null}
-                <span className="mt-1 block text-sm text-forest">{uzs(v.price)}</span>
+                <span className="mt-1 block text-sm text-wine">{uzs(v.price)}</span>
               </label>
             ))}
           </div>
@@ -136,7 +133,7 @@ export function ProductConfigurator({
             {t.stemsLabel} <span className="font-normal text-muted">({fmt(t.perStem, { price: uzs(pricing.stemPrice ?? 0) })})</span>
           </label>
           <div className="flex items-center gap-3">
-            <button type="button" className="flex h-11 w-11 items-center justify-center rounded-full border border-line bg-white hover:border-forest disabled:opacity-40" onClick={() => setStems((s) => Math.max(min, s - step))} disabled={stems <= min} aria-label={t.decrease}>
+            <button type="button" className="flex h-11 w-11 items-center justify-center rounded-full border border-line bg-white hover:border-wine disabled:opacity-40" onClick={() => setStems((s) => Math.max(min, s - step))} disabled={stems <= min} aria-label={t.decrease}>
               <MinusIcon size={18} />
             </button>
             <input
@@ -151,7 +148,7 @@ export function ProductConfigurator({
               className="field w-24 text-center"
               aria-describedby="stems-hint"
             />
-            <button type="button" className="flex h-11 w-11 items-center justify-center rounded-full border border-line bg-white hover:border-forest disabled:opacity-40" onClick={() => setStems((s) => Math.min(max, s + step))} disabled={stems >= max} aria-label={t.increase}>
+            <button type="button" className="flex h-11 w-11 items-center justify-center rounded-full border border-line bg-white hover:border-wine disabled:opacity-40" onClick={() => setStems((s) => Math.min(max, s + step))} disabled={stems >= max} aria-label={t.increase}>
               <PlusIcon size={18} />
             </button>
           </div>
@@ -167,7 +164,7 @@ export function ProductConfigurator({
           <legend className="label">{t.color}</legend>
           <div className="flex flex-wrap gap-2">
             {colors.map((c) => (
-              <label key={c.value} className={`chip cursor-pointer has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-forest ${color === c.value ? "chip-active" : ""}`}>
+              <label key={c.value} className={`chip cursor-pointer has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-wine ${color === c.value ? "chip-active" : ""}`}>
                 <input type="radio" name="color" value={c.value} checked={color === c.value} onChange={() => setColor(c.value)} className="sr-only" />
                 {c.label}
               </label>
@@ -196,7 +193,7 @@ export function ProductConfigurator({
                           return next;
                         })
                       }
-                      className="h-4 w-4 accent-forest"
+                      className="h-4 w-4 accent-wine"
                     />
                     <span>{a.name}</span>
                   </label>
@@ -209,8 +206,8 @@ export function ProductConfigurator({
         </fieldset>
       ) : null}
 
-      <div className="rounded-2xl bg-ivory-deep p-5">
-        <div className="flex items-center justify-between gap-4">
+      <div className="rounded-2xl bg-cream p-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <label htmlFor="qty" className="text-sm font-medium">{t.quantity}</label>
             <div className="mt-1.5 flex items-center gap-2">
@@ -225,7 +222,7 @@ export function ProductConfigurator({
           </div>
           <div className="text-right" aria-live="polite">
             <p className="text-xs text-muted">{t.total}</p>
-            <p className="font-display text-3xl text-forest">{priced.ok ? uzs(priced.lineTotal) : "—"}</p>
+            <p className="font-display text-3xl text-wine">{priced.ok ? uzs(priced.lineTotal) : "—"}</p>
           </div>
         </div>
         {priced.ok && (priced.addonsTotal > 0 || quantity > 1) ? (
@@ -264,21 +261,6 @@ export function ProductConfigurator({
         <p className="rounded-xl border border-line bg-white px-4 py-3 text-sm">{t.unavailable}</p>
       )}
 
-      {added ? (
-        <div role="status" className="flex flex-col gap-3 rounded-xl border border-success/30 bg-success/5 px-4 py-3 text-sm text-success sm:flex-row sm:items-center sm:justify-between">
-          <span className="inline-flex items-center gap-2">
-            <CheckIcon size={18} /> {t.added}
-          </span>
-          <span className="flex gap-2">
-            <Link href={href("/savat")} className="btn-primary btn-sm">
-              {t.goToCart}
-            </Link>
-            <button type="button" onClick={() => setAdded(false)} className="btn-secondary btn-sm">
-              {t.continue}
-            </button>
-          </span>
-        </div>
-      ) : null}
     </div>
   );
 }

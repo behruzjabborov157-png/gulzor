@@ -15,7 +15,7 @@ const ITEMS = [
   { href: "/admin/sozlamalar", label: "Sozlamalar", owner: true },
 ];
 
-export function AdminNav({ owner }: { owner: boolean }) {
+export function AdminNav({ owner, newOrders = 0 }: { owner: boolean; newOrders?: number }) {
   const path = usePathname();
   return (
     <nav aria-label="Admin" className="flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-col lg:pb-0">
@@ -26,9 +26,14 @@ export function AdminNav({ owner }: { owner: boolean }) {
             key={i.href}
             href={i.href}
             aria-current={active ? "page" : undefined}
-            className={`shrink-0 rounded-lg px-3 py-2 text-sm ${active ? "bg-forest text-ivory" : "text-charcoal hover:bg-ivory-deep"}`}
+            className={`flex shrink-0 items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm ${active ? "bg-wine text-ivory" : "text-charcoal hover:bg-cream"}`}
           >
             {i.label}
+            {i.href === "/admin/buyurtmalar" && newOrders > 0 ? (
+              <span className="rounded-full bg-fuchsia px-2 py-0.5 text-[11px] font-bold text-white" aria-label={`${newOrders} ta yangi`}>
+                {newOrders}
+              </span>
+            ) : null}
           </Link>
         );
       })}

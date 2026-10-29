@@ -83,7 +83,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             {orders.map((o) => (
               <li key={o.id} className="card flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <Link href={lp(`/buyurtma/${o.number}`)} className="font-semibold hover:text-forest">
+                  <Link href={lp(`/buyurtma/${o.number}`)} className="font-semibold hover:text-wine">
                     {o.number}
                   </Link>
                   <p className="text-sm text-muted">
@@ -144,7 +144,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       </section>
 
       <p className="mt-12 flex flex-wrap justify-between gap-4 text-sm">
-        <Link href={lp("/sevimlilar")} className="text-forest underline">
+        <Link href={lp("/sevimlilar")} className="text-wine underline">
           {t.favoritesLink}
         </Link>
         <Link href={lp("/hisobni-ochirish")} className="text-muted underline hover:text-danger">

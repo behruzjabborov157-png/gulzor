@@ -45,7 +45,7 @@ export default async function PrivacyPage() {
           <p>Вы можете запросить просмотр, исправление или удаление своих данных. Для этого свяжитесь с магазином{contact}.</p>
           <p>
             Аккаунт можно удалить самостоятельно на странице{" "}
-            <Link href={localePath(locale, "/hisobni-ochirish")} className="text-forest underline">
+            <Link href={localePath(locale, "/hisobni-ochirish")} className="text-wine underline">
               «Удаление аккаунта»
             </Link>
             : аккаунт, сохранённые адреса и избранное удаляются сразу. Оформленные заказы хранятся столько, сколько нужно для их выполнения и
@@ -84,7 +84,7 @@ export default async function PrivacyPage() {
           <p>Siz o‘z ma’lumotlaringizni ko‘rish, tuzatish yoki o‘chirishni so‘rashingiz mumkin. Buning uchun do‘kon bilan bog‘laning{contact}.</p>
           <p>
             Hisobingizni o‘zingiz{" "}
-            <Link href={localePath(locale, "/hisobni-ochirish")} className="text-forest underline">
+            <Link href={localePath(locale, "/hisobni-ochirish")} className="text-wine underline">
               “Hisobni o‘chirish”
             </Link>{" "}
             sahifasida o‘chirishingiz mumkin: hisob, saqlangan manzillar va sevimlilar darhol o‘chiriladi. Berilgan buyurtmalar ularni bajarish va

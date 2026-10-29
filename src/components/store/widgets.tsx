@@ -33,13 +33,13 @@ export function Newsletter() {
           {pending ? t.sending : t.submit}
         </button>
       </div>
-      {state.errors?.phone ? <p id="nl-phone-err" className="mt-1.5 text-sm text-blush">{state.errors.phone}</p> : null}
+      {state.errors?.phone ? <p id="nl-phone-err" className="mt-1.5 text-sm text-petal">{state.errors.phone}</p> : null}
       <label className="mt-3 flex items-start gap-2.5 text-xs leading-relaxed text-ivory/75">
-        <input type="checkbox" name="consent" className="mt-0.5 h-4 w-4 shrink-0 accent-blush" required />
+        <input type="checkbox" name="consent" className="mt-0.5 h-4 w-4 shrink-0 accent-petal" required />
         <span>{t.consent}</span>
       </label>
-      {state.errors?.consent ? <p className="mt-1 text-sm text-blush">{state.errors.consent}</p> : null}
-      {state.message && !state.ok ? <p className="mt-1 text-sm text-blush">{state.message}</p> : null}
+      {state.errors?.consent ? <p className="mt-1 text-sm text-petal">{state.errors.consent}</p> : null}
+      {state.message && !state.ok ? <p className="mt-1 text-sm text-petal">{state.message}</p> : null}
     </form>
   );
 }
@@ -72,7 +72,7 @@ export function RecentlyViewed({ excludeId }: { excludeId?: number }) {
       <div className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
         {cards.slice(0, 6).map((p) => (
           <Link key={p.id} href={href(`/gul/${p.slug}`)} className="w-40 shrink-0 snap-start sm:w-48">
-            <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-ivory-deep">
+            <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-cream">
               <ProductImage src={p.image?.url} alt={p.name} sizes="200px" locale={locale} />
             </div>
             <p className="mt-2 line-clamp-2 text-sm">{p.name}</p>

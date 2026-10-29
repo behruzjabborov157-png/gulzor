@@ -39,7 +39,7 @@ const PAYMENT_STATUS: Record<string, string> = {
   refunded: "Qaytarilgan",
 };
 
-type OrderForMessage = typeof schema.orders.$inferSelect & { items: (typeof schema.orderItems.$inferSelect)[] };
+export type OrderForMessage = typeof schema.orders.$inferSelect & { items: (typeof schema.orderItems.$inferSelect)[] };
 
 export function orderMessage(o: OrderForMessage, heading = "🌸 Yangi buyurtma"): string {
   const items = o.items

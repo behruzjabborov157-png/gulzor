@@ -31,11 +31,15 @@ let orderUrl = "";
 test("homepage renders hero, sections and working navigation", async () => {
   await clearStorage(page);
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Gullar bilan unutilmas lahzalar yarating.");
-  await expect(page.getByText("Har bir munosabat va har bir inson uchun mehr bilan tanlangan guldastalar.").first()).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Gullar so‘zdan ko‘ra ko‘proq aytadi.");
+  await expect(page.getByText(/Biz uni siz tanlagan kun va vaqtga yetkazamiz/).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Gullarni tanlash" })).toBeVisible();
   await expect(page.getByText("Eng ko‘p buyurtma qilinganlar").first()).toBeVisible();
   await expect(page.getByText("Qayerga yetkazamiz?")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ko‘p beriladigan savollar" })).toBeVisible();
+  // FAQ answers come from real settings: the payment answer lists only enabled methods.
+  await page.getByText("Qanday to‘lash mumkin?").click();
+  await expect(page.getByText(/Hozir mavjud usullar: .*Naqd/)).toBeVisible();
 
   // Every header category link resolves to a real page.
   const nav = page.getByRole("navigation", { name: "Kategoriyalar" });
@@ -76,7 +80,7 @@ test("search and price filter narrow the catalog", async () => {
 test("unavailable product cannot be added and shows alternatives", async () => {
   await page.goto("/gul/gortenziya-monobuket");
   await expect(page.getByText("Hozircha mavjud emas").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "Savatga qo‘shish" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Savatga qo‘shish", exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "O‘xshash guldastalar" })).toBeVisible();
 });
 
@@ -90,13 +94,13 @@ test("customize a bouquet: price updates with stems and add-ons, then add to car
   await page.getByText("Pushti", { exact: true }).click();
   await page.getByLabel("Otkritka").check();
   await expect(total).toHaveText(/236\s000/); // + 15 000 card
-  await page.getByRole("button", { name: "Savatga qo‘shish" }).click();
+  await page.getByRole("button", { name: "Savatga qo‘shish", exact: true }).click();
   await expect(page.getByText("Savatga qo‘shildi")).toBeVisible();
 
   // A second, size-based bouquet.
   await page.goto("/gul/qizil-atirgullar-guldastasi");
   await page.getByText("Kichik", { exact: true }).click();
-  await page.getByRole("button", { name: "Savatga qo‘shish" }).click();
+  await page.getByRole("button", { name: "Savatga qo‘shish", exact: true }).click();
   await expect(page.getByRole("link", { name: /Savat, 2 ta mahsulot/ })).toBeVisible();
 });
 

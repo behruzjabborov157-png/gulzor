@@ -12,7 +12,7 @@ export function Gallery({ images, name }: { images: { url: string; alt: string }
   const current = images[active];
   return (
     <div>
-      <div className="relative aspect-[4/5] overflow-hidden rounded-[1.75rem] bg-ivory-deep">
+      <div className="relative aspect-[4/5] overflow-hidden rounded-[1.75rem] bg-cream">
         <ProductImage src={current?.url} alt={current?.alt || name} sizes="(max-width: 1024px) 100vw, 50vw" priority locale={locale} />
       </div>
       {images.length > 1 ? (
@@ -25,7 +25,7 @@ export function Gallery({ images, name }: { images: { url: string; alt: string }
               aria-selected={i === active}
               aria-label={fmt(t.product.galleryItem, { n: i + 1 })}
               onClick={() => setActive(i)}
-              className={`relative h-20 w-16 overflow-hidden rounded-xl border-2 transition ${i === active ? "border-forest" : "border-transparent opacity-70 hover:opacity-100"}`}
+              className={`relative h-20 w-16 overflow-hidden rounded-xl border-2 transition ${i === active ? "border-wine" : "border-transparent opacity-70 hover:opacity-100"}`}
             >
               <Image src={img.url} alt="" fill sizes="64px" className="object-cover" />
             </button>

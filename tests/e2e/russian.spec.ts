@@ -24,7 +24,7 @@ test("routing: /ru is Russian, /uz redirects to clean Uzbek URLs, hreflang is se
 
   await page.goto("/ru");
   await expect(page.locator("html")).toHaveAttribute("lang", "ru");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Создавайте незабываемые моменты с цветами.");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Цветы скажут больше, чем слова.");
   await expect(page.getByRole("navigation", { name: "Категории" }).getByRole("link", { name: "Розы" })).toHaveAttribute("href", "/ru/katalog/atirgullar");
   await expect(page.getByText(/от 85\s000\sсум/).first()).toBeVisible();
 
@@ -65,7 +65,7 @@ test("product page and configurator in Russian", async () => {
   await page.getByLabel("Открытка").check();
   await expect(total).toHaveText(/202\s000\sсум/);
   await expect(page.getByText("только нечётное количество")).toBeVisible();
-  await page.getByRole("button", { name: "В корзину" }).click();
+  await page.getByRole("button", { name: "В корзину", exact: true }).click();
   await expect(page.getByText("Добавлено в корзину")).toBeVisible();
 });
 

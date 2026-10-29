@@ -21,6 +21,7 @@ import type { FormState } from "@/lib/form-state";
 import { changeOrderStatus, type Order } from "@/lib/orders";
 import { DEFAULT_CHECKOUT, DEFAULT_STORE, getSettings, saveSetting } from "@/lib/settings";
 import { saveImage, UploadError } from "@/lib/storage";
+import { notifyOrderEmail, sendOwnerEmail } from "@/lib/email";
 import { notifyOrder, sendTelegram } from "@/lib/telegram";
 import { isISODate } from "@/lib/time";
 import { parseCsv, PRODUCT_CSV_COLUMNS } from "@/lib/csv";
@@ -118,6 +119,16 @@ export async function resendTelegramAction(orderId: string) {
   if (!o) return;
   const items = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
   await notifyOrder({ ...o, items }, "🔁 Buyurtma (qayta yuborildi)");
+  revalidatePath(`/admin/buyurtmalar/${orderId}`);
+}
+
+export async function resendEmailAction(orderId: string) {
+  await requireAdmin();
+  const db = await getDb();
+  const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId));
+  if (!o) return;
+  const items = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
+  await notifyOrderEmail({ ...o, items }, "Buyurtma (qayta yuborildi)");
   revalidatePath(`/admin/buyurtmalar/${orderId}`);
 }
 
@@ -544,6 +555,16 @@ export async function testTelegramAction(): Promise<FormState> {
   const db = await getDb();
   await db.insert(schema.notifications).values({ channel: "telegram", status: r.status, detail: `test: ${r.detail}` });
   return { ok: r.status === "sent", message: r.status === "sent" ? "Test xabar yuborildi — Telegram’ni tekshiring." : `Yuborilmadi: ${r.detail}` };
+}
+
+export async function testEmailAction(): Promise<FormState> {
+  await requireOwner();
+  const { store } = await getSettings();
+  const text = `${store.name}: buyurtma email bildirishnomalari ishlayapti.`;
+  const r = await sendOwnerEmail(`✅ ${store.name}: test email`, `<p>${text}</p>`, text);
+  const db = await getDb();
+  await db.insert(schema.notifications).values({ channel: "email", status: r.status, detail: `test: ${r.detail}` });
+  return { ok: r.status === "sent", message: r.status === "sent" ? "Test email yuborildi — pochtangizni tekshiring." : `Yuborilmadi: ${r.detail}` };
 }
 
 /* ------------------------------------------------------------------ */

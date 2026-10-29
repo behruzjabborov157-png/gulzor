@@ -1,15 +1,17 @@
 import { saveSettingsAction } from "@/app/admin/actions";
 import { AdminForm, C, F } from "@/components/admin/admin-form";
+import { EmailTest } from "@/components/admin/email-test";
 import { TelegramTest } from "@/components/admin/telegram-test";
 import { requireOwner } from "@/lib/auth";
 import { clickCredentials, paymeCredentials } from "@/lib/payments/config";
 import { getSettings, siteUrl } from "@/lib/settings";
+import { emailConfigured } from "@/lib/email";
 import { telegramConfigured } from "@/lib/telegram";
 
 export const metadata = { title: "Sozlamalar" };
 
 function Status({ ok, yes, no }: { ok: boolean; yes: string; no: string }) {
-  return <span className={`badge ${ok ? "bg-sage-light text-forest" : "bg-blush text-charcoal"}`}>{ok ? yes : no}</span>;
+  return <span className={`badge ${ok ? "bg-sage-light text-wine" : "bg-petal text-charcoal"}`}>{ok ? yes : no}</span>;
 }
 
 export default async function SettingsAdmin() {
@@ -77,6 +79,17 @@ export default async function SettingsAdmin() {
               <li>Serverdagi <code>.env.local</code> faylga <code>TELEGRAM_BOT_TOKEN</code> va <code>TELEGRAM_CHAT_ID</code> ni yozing va ilovani qayta ishga tushiring.</li>
               <li>Shu sahifada “Test xabar” tugmasini bosing.</li>
             </ol>
+          ) : null}
+          <div className="flex flex-wrap items-center gap-3">
+            <strong className="w-24">Email</strong>
+            <Status ok={emailConfigured()} yes="Sozlangan" no="Sozlanmagan (ixtiyoriy)" />
+            <EmailTest />
+          </div>
+          {!emailConfigured() ? (
+            <p className="ml-6 text-muted">
+              Ixtiyoriy ikkinchi kanal. Serverdagi <code>.env.local</code> ga <code>SMTP_HOST</code>, <code>SMTP_PORT</code>, <code>SMTP_USER</code>,{" "}
+              <code>SMTP_PASS</code>, <code>SMTP_FROM</code> va buyurtmalar keladigan <code>ORDER_EMAIL_TO</code> ni yozing, ilovani qayta ishga tushiring va “Test email” tugmasini bosing.
+            </p>
           ) : null}
           <div className="flex flex-wrap items-center gap-3">
             <strong className="w-24">Payme</strong>

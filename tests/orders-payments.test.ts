@@ -8,6 +8,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { after, before, test } from "node:test";
@@ -22,6 +23,8 @@ process.env.CLICK_MERCHANT_ID = "222";
 process.env.CLICK_SECRET_KEY = "click-secret";
 delete process.env.TELEGRAM_BOT_TOKEN;
 delete process.env.TELEGRAM_CHAT_ID;
+delete process.env.SMTP_HOST;
+delete process.env.ORDER_EMAIL_TO;
 
 const { closeDb, getDb, schema } = await import("@/db");
 const { eq } = await import("drizzle-orm");
@@ -30,6 +33,7 @@ const { sql } = await import("drizzle-orm");
 const { changeOrderStatus, createOrder, notifyNewOrder } = await import("@/lib/orders");
 const { rateLimit } = await import("@/lib/rate-limit");
 const { deleteCustomerAccount } = await import("@/lib/auth");
+const { notifyOrderEmail } = await import("@/lib/email");
 const { paymeRpc } = await import("@/lib/payments/payme");
 const { clickRequest } = await import("@/lib/payments/click");
 const { saveSetting, DEFAULT_CHECKOUT } = await import("@/lib/settings");
@@ -201,8 +205,8 @@ test("Telegram notification outcome is logged truthfully when not configured", a
   await notifyNewOrder(o.id);
   const db = await getDb();
   const rows = await db.select().from(schema.notifications).where(eq(schema.notifications.orderId, o.id));
-  assert.equal(rows.length, 1);
-  assert.equal(rows[0].status, "skipped");
+  // Both channels log their own outcome; nothing is reported as sent.
+  assert.deepEqual(rows.map((r) => `${r.channel}:${r.status}`).sort(), ["email:skipped", "telegram:skipped"]);
 });
 
 test("slot capacity is enforced at order time", async () => {
@@ -272,4 +276,86 @@ test("account deletion removes the account, addresses, favorites and sessions bu
   const [o] = await db.select().from(schema.orders).where(eq(schema.orders.number, res.number));
   assert.equal(o.customerId, null); // order kept for the shop, no longer linked to the account
   assert.equal(o.customerPhone, "+998907770011");
+});
+
+/** Minimal SMTP server: accepts one message and hands back the raw DATA. */
+function fakeSmtp(): Promise<{ port: number; received: Promise<string>; close: () => void }> {
+  const CRLF = "\r\n";
+  return new Promise((resolve) => {
+    let deliver: (s: string) => void;
+    const received = new Promise<string>((r) => (deliver = r));
+    const server = net.createServer((sock) => {
+      let inData = false;
+      let buf = "";
+      sock.write("220 test ESMTP" + CRLF);
+      sock.on("data", (chunk) => {
+        buf += chunk.toString("utf8");
+        for (;;) {
+          const end = inData ? CRLF + "." + CRLF : CRLF;
+          const i = buf.indexOf(end);
+          if (i < 0) break;
+          const part = buf.slice(0, i);
+          buf = buf.slice(i + end.length);
+          if (inData) {
+            inData = false;
+            deliver(part);
+            sock.write("250 queued" + CRLF);
+            continue;
+          }
+          const cmd = part.slice(0, 4).toUpperCase();
+          if (cmd === "EHLO" || cmd === "HELO") sock.write("250-test" + CRLF + "250 OK" + CRLF);
+          else if (cmd === "DATA") {
+            inData = true;
+            sock.write("354 go" + CRLF);
+          } else if (cmd === "QUIT") sock.end("221 bye" + CRLF);
+          else sock.write("250 OK" + CRLF);
+        }
+      });
+    });
+    server.listen(0, "127.0.0.1", () => resolve({ port: (server.address() as net.AddressInfo).port, received, close: () => server.close() }));
+  });
+}
+
+test("e-mail notification is really delivered over SMTP, and an SMTP failure is logged without losing the order", async () => {
+  const o = await onlineOrder("payme");
+  const db = await getDb();
+  const items = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, o.id));
+  const [order] = await db.select().from(schema.orders).where(eq(schema.orders.id, o.id));
+  const smtp = await fakeSmtp();
+  Object.assign(process.env, { SMTP_HOST: "127.0.0.1", SMTP_PORT: String(smtp.port), SMTP_FROM: "shop@example.com", ORDER_EMAIL_TO: "owner@example.com" });
+  try {
+    const ok = await notifyOrderEmail({ ...order, items });
+    assert.equal(ok.status, "sent", ok.detail);
+    const raw = await smtp.received;
+    assert.match(raw, new RegExp(order.number));
+    assert.match(raw, /owner@example.com/);
+
+    smtp.close();
+    process.env.SMTP_PORT = "1"; // nothing listens there
+    const failed = await notifyOrderEmail({ ...order, items });
+    assert.equal(failed.status, "failed");
+  } finally {
+    smtp.close();
+    delete process.env.SMTP_HOST;
+    delete process.env.ORDER_EMAIL_TO;
+  }
+  const log = await db.select().from(schema.notifications).where(eq(schema.notifications.orderId, o.id));
+  assert.deepEqual(log.filter((r) => r.channel === "email").map((r) => r.status).sort(), ["failed", "sent"]);
+  const [still] = await db.select().from(schema.orders).where(eq(schema.orders.id, o.id));
+  assert.equal(still.number, order.number); // the order is untouched by notification problems
+});
+
+test("repeated submits with the same submission id create exactly one order", async () => {
+  const db = await getDb();
+  await db.update(schema.products).set({ stockQuantity: 5 }).where(eq(schema.products.id, productId));
+  const submissionId = "7d4f2a10-1b2c-4d5e-8f90-123456789abc";
+  const results = await Promise.all([1, 2, 3].map(() => createOrder(checkout({ submissionId }), null)));
+  const again = await createOrder(checkout({ submissionId }), null);
+  const numbers = new Set([...results, again].map((r) => (r.ok ? r.number : JSON.stringify(r))));
+  assert.equal(numbers.size, 1, [...numbers].join(" | "));
+  assert.ok(again.ok && again.duplicate);
+  const rows = await db.select().from(schema.orders).where(eq(schema.orders.idempotencyKey, submissionId));
+  assert.equal(rows.length, 1);
+  const [p] = await db.select().from(schema.products).where(eq(schema.products.id, productId));
+  assert.equal(p.stockQuantity, 4); // stock reserved once
 });

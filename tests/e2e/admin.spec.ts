@@ -123,7 +123,7 @@ test("pages are served with a nonce-based Content-Security-Policy", async ({ pag
   expect(csp).toContain("frame-ancestors 'none'");
   // Interactive parts still work under the policy.
   await page.getByText("Kichik", { exact: true }).click();
-  await page.getByRole("button", { name: "Savatga qo‘shish" }).click();
+  await page.getByRole("button", { name: "Savatga qo‘shish", exact: true }).click();
   await expect(page.getByText("Savatga qo‘shildi")).toBeVisible();
   expect(violations).toEqual([]);
 });

@@ -69,7 +69,8 @@ export async function checkoutAction(input: unknown): Promise<CheckoutResult> {
     const res = await createOrder(input, customer?.id ?? null, locale);
     if (!res.ok) return { ok: false, errors: res.errors, fieldErrors: res.fieldErrors };
     // Owner notification runs after the response; its real outcome is logged on the order.
-    after(() => notifyNewOrder(res.orderId));
+    // A repeated submit of an already created order is not announced twice.
+    if (!res.duplicate) after(() => notifyNewOrder(res.orderId));
 
     const orderUrl = orderPath(locale, res.number, res.accessToken, true);
     if (res.paymentMethod === "cash") return { ok: true, redirectTo: orderUrl };

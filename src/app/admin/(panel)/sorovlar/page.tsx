@@ -26,7 +26,7 @@ export default async function RequestsAdmin() {
               <li key={r.id} className="card p-5 text-sm">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="font-semibold">#{r.id} · {r.name} · <a href={`tel:${r.phone}`} className="text-forest">{formatPhone(r.phone)}</a></p>
+                    <p className="font-semibold">#{r.id} · {r.name} · <a href={`tel:${r.phone}`} className="text-wine">{formatPhone(r.phone)}</a></p>
                     <p className="text-muted">{formatDateTime(r.createdAt)} · {r.occasion || "munosabat ko‘rsatilmagan"}{r.budget ? ` · byudjet ${formatUZS(r.budget)}` : ""}{r.desiredDate ? ` · ${formatDateISO(r.desiredDate)}` : ""}</p>
                   </div>
                   <div className="flex gap-1">

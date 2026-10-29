@@ -5,7 +5,6 @@ import { timingSafeEqual } from "node:crypto";
 import { inArray } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { RetryPayment } from "@/components/store/retry-payment";
-import { CheckIcon } from "@/components/ui/icons";
 import { Alert, ProductImage } from "@/components/ui/primitives";
 import { fmt, localePath, pick, type Locale } from "@/i18n/config";
 import { getDict } from "@/i18n/dict";
@@ -101,10 +100,21 @@ export default async function OrderPage({ params, searchParams }: Props) {
     <div className="container-page max-w-4xl pt-10">
       {isFresh && !closed ? (
         <div className="mb-10 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-forest text-ivory">
-            <CheckIcon size={32} />
+          {/* Success mark: the circle pops in, the tick draws itself and petals scatter (static with reduced motion). */}
+          <div className="relative mx-auto mb-6 h-20 w-20" aria-hidden="true">
+            {Array.from({ length: 8 }, (_, i) => (
+              <span
+                key={i}
+                className="petal-burst absolute top-1/2 left-1/2 h-3 w-2 rounded-full"
+                style={{ "--a": `${i * 45}deg`, background: i % 2 ? "var(--color-fuchsia)" : "var(--color-coral)" } as React.CSSProperties}
+              />
+            ))}
+            <svg viewBox="0 0 80 80" className="animate-pop-in relative h-20 w-20">
+              <circle cx="40" cy="40" r="38" fill="var(--color-wine)" />
+              <path d="M25 41 l10 10 l20 -22" fill="none" stroke="var(--color-ivory)" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" className="animate-draw" />
+            </svg>
           </div>
-          <h1 className="text-4xl sm:text-5xl">{t.receivedTitle}</h1>
+          <h1 className="animate-fade-up text-4xl text-plum sm:text-5xl">{t.receivedTitle}</h1>
           <p className="mt-3 text-muted">
             {t.numberLabel} <strong className="text-charcoal">{o.number}</strong>. {t.saveLink}
           </p>
@@ -130,7 +140,7 @@ export default async function OrderPage({ params, searchParams }: Props) {
       <section className="card p-6 sm:p-8" aria-label={t.statusAria}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-lg font-semibold">{fmt(t.status, { status: t.statuses[o.status] })}</p>
-          <span className={`badge ${o.paymentStatus === "paid" ? "bg-sage-light text-forest" : "bg-blush text-charcoal"}`}>
+          <span className={`badge ${o.paymentStatus === "paid" ? "bg-sage-light text-wine" : "bg-petal text-charcoal"}`}>
             {t.paymentMethod[o.paymentMethod]} · {t.paymentStatus[o.paymentStatus]}
           </span>
         </div>
@@ -143,8 +153,8 @@ export default async function OrderPage({ params, searchParams }: Props) {
           <ol className="mt-6 grid grid-cols-5 gap-1" aria-label={t.steps}>
             {TRACK_STEPS.map((s, i) => (
               <li key={s.status} className="flex flex-col items-center text-center" aria-current={i === stepIndex ? "step" : undefined}>
-                <span className={`h-1.5 w-full rounded-full ${i <= stepIndex ? "bg-forest" : "bg-line"}`} />
-                <span className={`mt-2 text-[11px] sm:text-xs ${i <= stepIndex ? "font-semibold text-forest" : "text-muted"}`}>
+                <span className={`h-1.5 w-full rounded-full ${i <= stepIndex ? "bg-wine" : "bg-line"}`} />
+                <span className={`mt-2 text-[11px] sm:text-xs ${i <= stepIndex ? "font-semibold text-wine" : "text-muted"}`}>
                   {t.trackSteps[s.status as keyof typeof t.trackSteps]}
                 </span>
               </li>
@@ -200,7 +210,7 @@ export default async function OrderPage({ params, searchParams }: Props) {
               const name = productName(i.productId, i.productName);
               return (
                 <li key={i.id} className="flex gap-3 text-sm">
-                  <div className="relative h-14 w-12 shrink-0 overflow-hidden rounded-lg bg-ivory-deep">
+                  <div className="relative h-14 w-12 shrink-0 overflow-hidden rounded-lg bg-cream">
                     <ProductImage src={i.imageUrl} alt={name} sizes="48px" locale={locale} />
                   </div>
                   <div className="flex-1">

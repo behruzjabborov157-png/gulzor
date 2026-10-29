@@ -9,6 +9,7 @@ import "./globals.css";
 const display = Cormorant_Garamond({
   subsets: ["latin", "latin-ext", "cyrillic"],
   weight: ["400", "500", "600"],
+  style: ["normal", "italic"],
   variable: "--font-cormorant",
   display: "swap",
 });
@@ -30,7 +31,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export const viewport: Viewport = {
-  themeColor: "#2e4a3b",
+  themeColor: "#7a1732",
   width: "device-width",
   initialScale: 1,
 };

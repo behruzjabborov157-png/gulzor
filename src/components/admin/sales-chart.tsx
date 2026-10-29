@@ -26,7 +26,7 @@ export function SalesChart({ series }: { series: { date: string; revenue: number
             return (
               <div key={s.date} className="group relative flex h-full items-end justify-center" style={{ width: `${W}%` }}>
                 <div
-                  className="w-[calc(100%-2px)] max-w-6 rounded-t-[4px] bg-forest transition-opacity group-hover:opacity-80"
+                  className="w-[calc(100%-2px)] max-w-6 rounded-t-[4px] bg-wine transition-opacity group-hover:opacity-80"
                   style={{ height: s.revenue > 0 ? `max(${h}%, 2px)` : 0 }}
                 />
                 <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden -translate-x-1/2 rounded-lg bg-charcoal px-2.5 py-1.5 text-[11px] whitespace-nowrap text-ivory shadow group-hover:block">

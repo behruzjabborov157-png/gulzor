@@ -15,7 +15,7 @@ const uz = {
     out_of_stock: "Hozircha mavjud emas",
     out_of_season: "Mavsumda emas",
   },
-  badge: { new: "Yangi", premium: "Premium", madeToOrder: "Buyurtma asosida" },
+  badge: { new: "Yangi", premium: "Premium", madeToOrder: "Buyurtma asosida", sale: "Chegirma" },
   demoProduct: "Namuna mahsulot",
   favoriteAdd: "{name} — sevimlilarga qo‘shish",
   favoriteRemove: "{name} — sevimlilardan olib tashlash",
@@ -32,7 +32,7 @@ const uz = {
   credits: {
     title: "Rasm mualliflari",
     intro:
-      "Namuna katalogdagi fotosuratlar Wikimedia Commons’dan erkin litsenziyalar (CC0, ommaviy mulk, CC BY, CC BY-SA) asosida olingan va saytga moslash uchun qirqilgan/siqilgan. Ular haqiqiy mahsulot fotosuratlari emas. Do‘kon o‘z mahsulotlari rasmlarini yuklaganda ushbu rasmlar almashtiriladi.",
+      "Bosh sahifa va bo‘limlardagi bezak fotosuratlari Unsplash’dan Unsplash litsenziyasi asosida olingan; ular kayfiyat uchun, sotiladigan mahsulot sifatida ko‘rsatilmaydi. Namuna katalogdagi fotosuratlar Wikimedia Commons’dan erkin litsenziyalar (CC0, ommaviy mulk, CC BY, CC BY-SA) asosida olingan va saytga moslash uchun qirqilgan/siqilgan. Ular haqiqiy mahsulot fotosuratlari emas. Do‘kon o‘z mahsulotlari rasmlarini yuklaganda ushbu rasmlar almashtiriladi.",
     author: "Muallif: {author} · Litsenziya: {license}",
     unknown: "noma’lum",
   },
@@ -55,7 +55,7 @@ const ru: typeof uz = {
     out_of_stock: "Нет в наличии",
     out_of_season: "Не сезон",
   },
-  badge: { new: "Новинка", premium: "Премиум", madeToOrder: "Под заказ" },
+  badge: { new: "Новинка", premium: "Премиум", madeToOrder: "Под заказ", sale: "Скидка" },
   demoProduct: "Демо-товар",
   favoriteAdd: "{name} — добавить в избранное",
   favoriteRemove: "{name} — убрать из избранного",
@@ -72,7 +72,7 @@ const ru: typeof uz = {
   credits: {
     title: "Авторы фотографий",
     intro:
-      "Фотографии демо-каталога взяты с Wikimedia Commons по свободным лицензиям (CC0, общественное достояние, CC BY, CC BY-SA) и обрезаны/сжаты для сайта. Это не фотографии реальных товаров. Когда магазин загрузит свои фото, эти изображения будут заменены.",
+      "Оформительские фотографии на главной и в разделах взяты с Unsplash по лицензии Unsplash; они создают настроение и не выдаются за продаваемые товары. Фотографии демо-каталога взяты с Wikimedia Commons по свободным лицензиям (CC0, общественное достояние, CC BY, CC BY-SA) и обрезаны/сжаты для сайта. Это не фотографии реальных товаров. Когда магазин загрузит свои фото, эти изображения будут заменены.",
     author: "Автор: {author} · Лицензия: {license}",
     unknown: "неизвестен",
   },

@@ -69,7 +69,7 @@ function Section({ n, title, children }: { n: number; title: string; children: R
   return (
     <section className="card p-5 sm:p-7" aria-labelledby={`s${n}`}>
       <h2 id={`s${n}`} className="mb-5 flex items-center gap-3 text-2xl">
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-forest font-sans text-sm text-ivory">{n}</span>
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-wine font-sans text-sm text-ivory">{n}</span>
         {title}
       </h2>
       <div className="space-y-4">{children}</div>
@@ -129,11 +129,13 @@ export function CheckoutForm(props: CheckoutProps) {
   const slotId = f.slotId != null && quote?.slots.find((x) => x.id === f.slotId)?.available ? f.slotId : null;
 
   const [submitting, setSubmitting] = useState(false);
+  // One id per checkout visit: the server turns repeated submits (double tap, retry) into the same order.
+  const [submissionId] = useState(newSubmissionId);
   const [errors, setErrors] = useState<string[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [reviewed, setReviewed] = useState(false);
 
-  if (!hydrated) return <div className="h-96 animate-pulse rounded-2xl bg-ivory-deep" />;
+  if (!hydrated) return <div className="h-96 animate-pulse rounded-2xl bg-cream" />;
   if (lines.length === 0) {
     return (
       <EmptyState
@@ -157,6 +159,7 @@ export function CheckoutForm(props: CheckoutProps) {
     setFieldErrors({});
     try {
       const res = await checkoutAction({
+        submissionId,
         lines: toServerLines(lines),
         couponCode: prefs.couponCode || null,
         fulfillment: f.fulfillment,
@@ -237,7 +240,7 @@ export function CheckoutForm(props: CheckoutProps) {
 
         <Section n={2} title={t.recipient}>
           <label className="flex items-center gap-2.5 text-sm">
-            <input type="checkbox" checked={f.recipientIsCustomer} onChange={(e) => set("recipientIsCustomer", e.target.checked)} className="h-4 w-4 accent-forest" />
+            <input type="checkbox" checked={f.recipientIsCustomer} onChange={(e) => set("recipientIsCustomer", e.target.checked)} className="h-4 w-4 accent-wine" />
             {t.selfReceive}
           </label>
           {!f.recipientIsCustomer ? (
@@ -251,7 +254,7 @@ export function CheckoutForm(props: CheckoutProps) {
                 </Field>
               </div>
               <label className="flex items-center gap-2.5 text-sm">
-                <input type="checkbox" checked={f.anonymous} onChange={(e) => set("anonymous", e.target.checked)} className="h-4 w-4 accent-forest" />
+                <input type="checkbox" checked={f.anonymous} onChange={(e) => set("anonymous", e.target.checked)} className="h-4 w-4 accent-wine" />
                 {t.anonymous}
               </label>
             </>
@@ -265,7 +268,7 @@ export function CheckoutForm(props: CheckoutProps) {
               { v: "delivery" as const, title: t.toAddress, d: t.toAddressHint },
               ...(props.pickup.enabled ? [{ v: "pickup" as const, title: t.pickup, d: props.pickup.address || t.pickupFallback }] : []),
             ].map((o) => (
-              <label key={o.v} className={`cursor-pointer rounded-xl border p-4 transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-forest ${f.fulfillment === o.v ? "border-forest bg-forest/5" : "border-line bg-white"}`}>
+              <label key={o.v} className={`cursor-pointer rounded-xl border p-4 transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-wine ${f.fulfillment === o.v ? "border-wine bg-wine/5" : "border-line bg-white"}`}>
                 <input type="radio" name="fulfillment" className="sr-only" checked={f.fulfillment === o.v} onChange={() => set("fulfillment", o.v)} />
                 <span className="block font-semibold">{o.title}</span>
                 <span className="block text-sm text-muted">{o.d}</span>
@@ -370,7 +373,7 @@ export function CheckoutForm(props: CheckoutProps) {
                 </div>
                 {props.customer ? (
                   <label className="flex items-center gap-2.5 text-sm">
-                    <input type="checkbox" checked={f.saveAddress} onChange={(e) => set("saveAddress", e.target.checked)} className="h-4 w-4 accent-forest" />
+                    <input type="checkbox" checked={f.saveAddress} onChange={(e) => set("saveAddress", e.target.checked)} className="h-4 w-4 accent-wine" />
                     {t.saveAddress}
                   </label>
                 ) : null}
@@ -426,8 +429,8 @@ export function CheckoutForm(props: CheckoutProps) {
                 {slots.map((s) => (
                   <label
                     key={s.id}
-                    className={`rounded-xl border px-3 py-3 text-center text-sm transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-forest ${
-                      !s.available ? "cursor-not-allowed border-line bg-ivory-deep text-muted" : slotId === s.id ? "cursor-pointer border-forest bg-forest text-ivory" : "cursor-pointer border-line bg-white hover:border-forest/40"
+                    className={`rounded-xl border px-3 py-3 text-center text-sm transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-wine ${
+                      !s.available ? "cursor-not-allowed border-line bg-cream text-muted" : slotId === s.id ? "cursor-pointer border-wine bg-wine text-ivory" : "cursor-pointer border-line bg-white hover:border-wine/40"
                     }`}
                   >
                     <input type="radio" name="slot" className="sr-only" disabled={!s.available} checked={slotId === s.id} onChange={() => set("slotId", s.id)} />
@@ -462,7 +465,7 @@ export function CheckoutForm(props: CheckoutProps) {
             <fieldset className="grid gap-2">
               <legend className="sr-only">{t.payment}</legend>
               {props.payments.map((p) => (
-                <label key={p.id} className={`cursor-pointer rounded-xl border p-4 transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-forest ${f.paymentMethod === p.id ? "border-forest bg-forest/5" : "border-line bg-white"}`}>
+                <label key={p.id} className={`cursor-pointer rounded-xl border p-4 transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-wine ${f.paymentMethod === p.id ? "border-wine bg-wine/5" : "border-line bg-white"}`}>
                   <input type="radio" name="payment" className="sr-only" checked={f.paymentMethod === p.id} onChange={() => set("paymentMethod", p.id)} />
                   <span className="block font-semibold">{p.label}</span>
                   <span className="block text-sm text-muted">{p.hint}</span>
@@ -480,7 +483,7 @@ export function CheckoutForm(props: CheckoutProps) {
           <ul className="space-y-4">
             {(quote?.lines ?? []).map((l) => (
               <li key={l.index} className="flex gap-3">
-                <div className="relative h-16 w-14 shrink-0 overflow-hidden rounded-xl bg-ivory-deep">
+                <div className="relative h-16 w-14 shrink-0 overflow-hidden rounded-xl bg-cream">
                   <ProductImage src={l.image} alt={l.name} sizes="56px" locale={locale} />
                 </div>
                 <div className="min-w-0 flex-1 text-sm">
@@ -509,7 +512,7 @@ export function CheckoutForm(props: CheckoutProps) {
           ) : null}
 
           {reviewed && quote ? (
-            <div className="space-y-1.5 rounded-xl bg-ivory-deep p-4 text-sm">
+            <div className="space-y-1.5 rounded-xl bg-cream p-4 text-sm">
               <p className="font-semibold">{t.check}</p>
               <p>
                 {f.fulfillment === "pickup"
@@ -543,4 +546,14 @@ export function CheckoutForm(props: CheckoutProps) {
       </aside>
     </form>
   );
+}
+
+/** RFC 4122 v4 id. randomUUID() needs a secure context (HTTPS/localhost), so fall back to getRandomValues. */
+function newSubmissionId(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }

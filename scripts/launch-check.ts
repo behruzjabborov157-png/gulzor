@@ -15,6 +15,7 @@ import { closeDb, databaseKind, getDb, schema } from "@/db";
 import { clickCredentials, paymeCredentials } from "@/lib/payments/config";
 import { getSettings, telegramLink } from "@/lib/settings";
 import { uploadRoot } from "@/lib/storage";
+import { emailConfigured, sendOwnerEmail } from "@/lib/email";
 import { sendTelegram, telegramConfigured } from "@/lib/telegram";
 
 type Level = "OK" | "WARN" | "FAIL" | "INFO";
@@ -114,6 +115,14 @@ async function main() {
     const r = await sendTelegram(`✅ ${store.name}: launch check — Telegram notifications work.`);
     report(r.status === "sent" ? "OK" : "FAIL", `Telegram test message: ${r.detail}`);
   } else report("OK", "Telegram configured (add --send-test to send a real test message)");
+
+  /* ---- E-mail (optional second channel) ---- */
+  if (!emailConfigured()) report("OK", "E-mail notifications not configured (optional: SMTP_HOST, ORDER_EMAIL_TO)");
+  else if (process.argv.includes("--send-test")) {
+    const r = await sendOwnerEmail(`${store.name}: launch check`, "<p>E-mail notifications work.</p>", "E-mail notifications work.");
+    report(r.status === "sent" ? "OK" : "FAIL", `Test e-mail: ${r.detail}`);
+  } else report("OK", "E-mail configured (add --send-test to send a real test e-mail)");
+  if (!telegramConfigured() && !emailConfigured()) report("WARN", "No order notification channel configured — new orders are only visible in the admin panel");
 
   /* ---- Storage ---- */
   try {

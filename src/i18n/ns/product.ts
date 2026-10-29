@@ -35,7 +35,12 @@ const uz = {
   unavailable: "Bu mahsulot hozir buyurtma uchun mavjud emas. Quyidagi o‘xshash guldastalarni ko‘ring.",
   added: "Savatga qo‘shildi",
   goToCart: "Savatga o‘tish",
-  continue: "Davom etish",
+  continue: "Xaridni davom ettirish",
+  close: "Yopish",
+  inCart: "Savatda: {n} ta mahsulot",
+  stemsCount: "{n} dona",
+  quickAdd: "{name} — savatga qo‘shish",
+  quickAddShort: "Savatga",
 };
 
 const ru: typeof uz = {
@@ -75,6 +80,11 @@ const ru: typeof uz = {
   added: "Добавлено в корзину",
   goToCart: "Перейти в корзину",
   continue: "Продолжить покупки",
+  close: "Закрыть",
+  inCart: "В корзине товаров: {n}",
+  stemsCount: "{n} шт.",
+  quickAdd: "{name} — добавить в корзину",
+  quickAddShort: "В корзину",
 };
 
 const ns = { uz, ru };

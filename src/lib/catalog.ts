@@ -61,6 +61,8 @@ export function toCard(prod: Product, variants: Variant[], locale: Locale = DEFA
     price,
     compareAtPrice: cmp && cmp > price ? cmp : null,
     hasOptions: prod.pricingMode !== "fixed",
+    // Can go straight into the cart from a card: fixed price and nothing to choose.
+    quickAdd: prod.pricingMode === "fixed" && prod.colorOptions.length === 0,
     stock: stockState(prod, variants),
     isNew: prod.isNew,
     isPremium: prod.isPremium,
