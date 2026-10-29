@@ -3,12 +3,14 @@ import { SubmitButton } from "@/components/admin/submit-button";
 import { notFound } from "next/navigation";
 import { asc, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import { resendEmailAction, resendTelegramAction, setOrderStatusAction, setPaymentStatusAction } from "@/app/admin/actions";
+import { adminOrderPhotoAction, resendEmailAction, resendTelegramAction, setOrderStatusAction, setPaymentStatusAction } from "@/app/admin/actions";
+import { OrderPhotos } from "@/components/admin/order-photos";
 import { DeliveryEditForm } from "@/components/admin/delivery-edit-form";
 import { Alert } from "@/components/ui/primitives";
 import { requireAdmin } from "@/lib/auth";
 import { formatDateISO, formatDateTime, formatPhone, formatUZS } from "@/lib/format";
 import { mapLinks } from "@/lib/telegram";
+import { DISPUTE_REASON_LABEL, DISPUTE_STATUS_LABEL, orderDisputes, orderPhotos } from "@/lib/trust";
 import { ORDER_STATUS_LABEL, ORDER_TRANSITIONS, PAYMENT_METHOD_LABEL, PAYMENT_STATUS_LABEL, getOrderWithItems } from "@/lib/orders";
 
 export const metadata = { title: "Buyurtma" };
@@ -31,11 +33,13 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
   if (!data) notFound();
   const { order: o, items, events } = data;
   const db = await getDb();
-  const [notes, pays, slots, [shop]] = await Promise.all([
+  const [notes, pays, slots, [shop], photos, disputes] = await Promise.all([
     db.select().from(schema.notifications).where(eq(schema.notifications.orderId, o.id)).orderBy(desc(schema.notifications.createdAt)),
     db.select().from(schema.payments).where(eq(schema.payments.orderId, o.id)).orderBy(desc(schema.payments.createTime)),
     db.select().from(schema.timeSlots).orderBy(asc(schema.timeSlots.sortOrder)),
     db.select({ id: schema.florists.id, name: schema.florists.name }).from(schema.florists).where(eq(schema.florists.id, o.floristId)),
+    orderPhotos(o.id),
+    orderDisputes(o.id),
   ]);
   const next = ORDER_TRANSITIONS[o.status];
 
@@ -149,6 +153,22 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
           </dl>
         </section>
       </div>
+
+      {disputes.length ? (
+        <section className="card p-5 text-sm" aria-label="Murojaatlar">
+          <h2 className="mb-3 text-2xl">Murojaatlar</h2>
+          <ul className="space-y-2">
+            {disputes.map((d) => (
+              <li key={d.id}>
+                <b>{DISPUTE_REASON_LABEL[d.reason]}</b> · {DISPUTE_STATUS_LABEL[d.status]} · {formatDateTime(d.createdAt)} — {d.message}
+              </li>
+            ))}
+          </ul>
+          <Link href="/admin/murojaatlar" className="mt-2 inline-block text-wine hover:underline">Murojaatlar bo‘limi →</Link>
+        </section>
+      ) : null}
+
+      <OrderPhotos photos={photos} action={adminOrderPhotoAction.bind(null, o.id)} canUpload={["confirmed", "preparing", "ready", "dispatched", "delivered"].includes(o.status)} />
 
       <section className="card p-5" aria-label="To‘lov">
         <h2 className="mb-3 text-2xl">To‘lov</h2>

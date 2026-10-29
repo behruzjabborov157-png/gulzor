@@ -890,3 +890,85 @@ test("marketplace money flow: shops take cash only, no Gulzor promo codes, servi
     await saveSetting("checkout", { ...DEFAULT_CHECKOUT, paymeEnabled: true, clickEnabled: true });
   }
 });
+
+test("trust: bouquet photos, verified-purchase reviews with moderation, disputes and shop metrics", async () => {
+  const db = await getDb();
+  const tr = await import("@/lib/trust");
+  const sharp = (await import("sharp")).default;
+  const owner = { id: null, email: "owner@gulzor.uz" };
+  const uploads = fs.mkdtempSync(path.join(os.tmpdir(), "gulzor-uploads-"));
+  process.env.UPLOAD_DIR = uploads;
+  try {
+    await db.update(schema.products).set({ stockQuantity: null }).where(eq(schema.products.id, productId));
+    const res = await createOrder(checkout({ customerName: "Dilnoza Karimova" }), null);
+    assert.ok(res.ok);
+    const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, res.orderId));
+
+    // Access to the order is only by its secret link (or the owner's account).
+    assert.equal(await tr.orderForCustomer(o.number, "wrong-token", null), null);
+    assert.equal((await tr.orderForCustomer(o.number, o.accessToken, null))?.id, o.id);
+
+    // Photos: only after the shop accepted the order, only by that shop, and the file must really be an image.
+    const png = await sharp({ create: { width: 40, height: 50, channels: 3, background: "#c33" } }).png().toBuffer();
+    const photo = () => new File([new Uint8Array(png)], "buket.png", { type: "image/png" });
+    assert.equal((await tr.addOrderPhoto(o.id, photo(), "f@x.uz", floristId)).ok, false, "not accepted yet");
+    assert.ok(await changeOrderStatus(o.id, "confirmed", "t"));
+    assert.equal((await tr.addOrderPhoto(o.id, photo(), "f@x.uz", floristId + 999)).ok, false, "another shop");
+    await assert.rejects(tr.addOrderPhoto(o.id, new File([new Uint8Array([1, 2, 3])], "x.png"), "f@x.uz", floristId));
+    assert.deepEqual(await tr.addOrderPhoto(o.id, photo(), "f@x.uz", floristId), { ok: true });
+    const photos = await tr.orderPhotos(o.id);
+    assert.equal(photos.length, 1);
+    assert.match(photos[0].url, /^\/media\/orders\/[a-z0-9-]+\.webp$/);
+    assert.ok(fs.existsSync(path.join(uploads, "orders", photos[0].url.split("/").pop()!)));
+
+    // Disputes: a real description is required, one open complaint at a time, the shop can only note its own.
+    assert.equal((await tr.openDispute(o, { reason: "late", message: "Guldasta juda kech keldi, 3 soat" })).ok, false, "not accepted yet");
+    Object.assign(o, (await db.select().from(schema.orders).where(eq(schema.orders.id, o.id)))[0]);
+    assert.equal((await tr.openDispute(o, { reason: "late", message: "kech" })).ok, false);
+    assert.equal((await tr.openDispute(o, { reason: "bad", message: "Guldasta juda kech keldi, 3 soat" })).ok, false);
+    const d = await tr.openDispute(o, { reason: "late", message: "Guldasta juda kech keldi, 3 soat" });
+    assert.ok(d.ok && d.disputeId);
+    const twice = await tr.openDispute(o, { reason: "quality", message: "Yana bir muammo bor edi" });
+    assert.ok(!twice.ok && twice.message === "exists");
+    assert.equal((await tr.floristDisputeNote(floristId + 999, d.disputeId!, "begona")).ok, false);
+    assert.deepEqual(await tr.floristDisputeNote(floristId, d.disputeId!, "Tirbandlik bo‘ldi, uzr"), { ok: true });
+    assert.equal((await tr.resolveDispute(owner, d.disputeId!, "resolved", "")).ok, false, "a decision text is required");
+    assert.deepEqual(await tr.resolveDispute(owner, d.disputeId!, "resolved", "Yetkazish puli qaytariladi"), { ok: true });
+    assert.equal((await tr.resolveDispute(owner, d.disputeId!, "rejected", "qayta")).ok, false, "already closed");
+    assert.equal((await tr.orderDisputes(o.id))[0].resolution, "Yetkazish puli qaytariladi");
+    assert.equal(tr.canOpenDispute({ status: "delivered", deliveryDate: "2020-01-01" }), false, "too late");
+
+    // Reviews: only after delivery, once, public only after moderation, first name only.
+    assert.equal((await tr.submitReview(o, { rating: 5, text: "", locale: "uz" })).ok, false, "not delivered yet");
+    for (const to of ["preparing", "ready", "dispatched", "delivered"] as const) assert.ok(await changeOrderStatus(o.id, to, "t"));
+    const [delivered] = await db.select().from(schema.orders).where(eq(schema.orders.id, o.id));
+    assert.equal((await tr.submitReview(delivered, { rating: 7, text: "", locale: "uz" })).ok, false);
+    assert.deepEqual(await tr.submitReview(delivered, { rating: 4, text: "Chiroyli, lekin kechikdi", locale: "uz" }), { ok: true });
+    const dup = await tr.submitReview(delivered, { rating: 5, text: "yana", locale: "uz" });
+    assert.ok(!dup.ok && dup.message === "exists");
+    assert.equal((await tr.publicReviews({ productId })).count, 0, "pending reviews are not public");
+    const review = (await tr.reviewForOrder(o.id))!;
+    assert.equal(review.authorName, "Dilnoza");
+    assert.deepEqual(await tr.moderateReview(owner, review.id, "approved"), { ok: true });
+    assert.equal((await tr.replyToReview(floristId + 999, review.id, "begona javob")).ok, false);
+    assert.deepEqual(await tr.replyToReview(floristId, review.id, "Rahmat, keyingi safar o‘z vaqtida!"), { ok: true });
+    const byProduct = await tr.publicReviews({ productId });
+    assert.equal(byProduct.count, 1);
+    assert.equal(byProduct.average, 4);
+    assert.equal(byProduct.reviews[0].reply, "Rahmat, keyingi safar o‘z vaqtida!");
+    assert.equal((await tr.publicReviews({ floristId })).count, 1);
+
+    // Shop metrics include the confirmation time, the complaint and the rating.
+    const m = (await tr.shopMetrics(30)).find((x) => x.floristId === floristId)!;
+    assert.ok(m.orders >= 1 && m.delivered >= 1);
+    assert.ok(m.medianConfirmMinutes != null && m.medianConfirmMinutes >= 0);
+    assert.ok(m.disputes >= 1);
+    assert.equal(m.rating, 4);
+    const log = await (await import("@/lib/florist-admin")).auditEntries({});
+    assert.ok(log.some((e) => e.action === "dispute.resolved"));
+    assert.ok(log.some((e) => e.action === "review.approved"));
+  } finally {
+    delete process.env.UPLOAD_DIR;
+    fs.rmSync(uploads, { recursive: true, force: true });
+  }
+});

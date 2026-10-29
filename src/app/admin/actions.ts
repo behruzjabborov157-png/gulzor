@@ -31,6 +31,8 @@ import { buildSearchText } from "@/lib/search";
 import { audit, platformFloristId, type FloristStatus } from "@/lib/florists";
 import { setFloristCommission, setFloristStatus } from "@/lib/florist-admin";
 import { issueStatements, setStatementPaid } from "@/lib/commission";
+import { UploadError } from "@/lib/storage";
+import { addOrderPhoto, moderateReview, resolveDispute } from "@/lib/trust";
 import { profileFromForm, updateFloristProfile } from "@/lib/florist-panel";
 import { saveProductForm } from "@/lib/product-save";
 
@@ -598,4 +600,52 @@ export async function setStatementPaidAction(statementId: number, paid: boolean,
   if (!res.ok) return res;
   revalidatePath("/admin/komissiya");
   return { ok: true, message: "Saqlandi" };
+}
+
+/* ------------------------------------------------------------------ */
+/* Trust: bouquet photos, reviews, disputes                            */
+/* ------------------------------------------------------------------ */
+
+export async function adminOrderPhotoAction(orderId: string, _: FormState, form: FormData): Promise<FormState> {
+  const admin = await requireAdmin();
+  const file = form.get("photo");
+  if (!(file instanceof File) || file.size === 0) return { ok: false, message: "Rasmni tanlang" };
+  try {
+    const res = await addOrderPhoto(orderId, file, admin.email, null);
+    if (!res.ok) return res;
+  } catch (e) {
+    if (e instanceof UploadError) return { ok: false, message: e.message };
+    throw e;
+  }
+  revalidatePath(`/admin/buyurtmalar/${orderId}`);
+  return { ok: true, message: "Rasm yuklandi" };
+}
+
+export async function moderateReviewAction(reviewId: number, status: "approved" | "rejected"): Promise<FormState> {
+  const admin = await requireAdmin();
+  if (status !== "approved" && status !== "rejected") return { ok: false, message: "Noto‘g‘ri holat" };
+  const res = await moderateReview(admin, reviewId, status);
+  if (!res.ok) return res;
+  revalidatePath("/admin/sharhlar");
+  return { ok: true, message: status === "approved" ? "E’lon qilindi" : "Rad etildi" };
+}
+
+export async function resolveDisputeAction(disputeId: number, _: FormState, form: FormData): Promise<FormState> {
+  const admin = await requireAdmin();
+  const status = form.get("status") === "rejected" ? "rejected" : "resolved";
+  const resolution = String(form.get("resolution") ?? "");
+  const res = await resolveDispute(admin, disputeId, status, resolution);
+  if (!res.ok) return res;
+  const db = await getDb();
+  const [d] = await db
+    .select({ floristId: schema.disputes.floristId, number: schema.orders.number })
+    .from(schema.disputes)
+    .innerJoin(schema.orders, eq(schema.orders.id, schema.disputes.orderId))
+    .where(eq(schema.disputes.id, disputeId));
+  if (d) {
+    const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    after(() => notifyFloristAccount(d.floristId, `Buyurtma ${d.number}: murojaat yopildi`, `Gulzor qarori: ${esc(resolution.trim().slice(0, 1000))}`));
+  }
+  revalidatePath("/admin/murojaatlar");
+  return { ok: true, message: "Saqlandi — mijoz qarorni buyurtma sahifasida ko‘radi" };
 }

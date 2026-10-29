@@ -638,6 +638,73 @@ export const tgMedia = pgTable("tg_media", {
 /* Audit log                                                           */
 /* ------------------------------------------------------------------ */
 
+/** Photos of the prepared bouquet, taken by the florist before dispatch and shown to the customer. */
+export const orderPhotos = pgTable(
+  "order_photos",
+  {
+    id: serial("id").primaryKey(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    uploadedBy: text("uploaded_by").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("order_photos_order_idx").on(t.orderId)],
+);
+
+/**
+ * Verified-purchase reviews: only the customer of a delivered order can write one (one per order).
+ * Published after moderation; the shop may reply publicly.
+ */
+export const reviews = pgTable(
+  "reviews",
+  {
+    id: serial("id").primaryKey(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    floristId: integer("florist_id")
+      .notNull()
+      .references(() => florists.id, { onDelete: "cascade" }),
+    rating: integer("rating").notNull(),
+    text: text("text").notNull().default(""),
+    /** Shown publicly: first name only. */
+    authorName: text("author_name").notNull(),
+    locale: text("locale").notNull().default("uz"),
+    status: text("status").$type<"pending" | "approved" | "rejected">().notNull().default("pending"),
+    floristReply: text("florist_reply"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    moderatedAt: timestamp("moderated_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("reviews_order_idx").on(t.orderId), index("reviews_florist_status_idx").on(t.floristId, t.status)],
+);
+
+/** A customer's complaint about an order (late, quality, wrong item, …), resolved by Gulzor. */
+export const disputes = pgTable(
+  "disputes",
+  {
+    id: serial("id").primaryKey(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    floristId: integer("florist_id")
+      .notNull()
+      .references(() => florists.id, { onDelete: "cascade" }),
+    reason: text("reason").$type<"late" | "quality" | "wrong_item" | "not_delivered" | "other">().notNull(),
+    message: text("message").notNull(),
+    status: text("status").$type<"open" | "resolved" | "rejected">().notNull().default("open"),
+    /** The shop's explanation (seen by Gulzor). */
+    floristNote: text("florist_note"),
+    /** Gulzor's decision, shown to the customer. */
+    resolution: text("resolution"),
+    resolvedBy: text("resolved_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  },
+  (t) => [index("disputes_order_idx").on(t.orderId), index("disputes_status_idx").on(t.status)],
+);
+
 /**
  * Monthly commission statement: what a florist owes Gulzor for delivered orders. Customers pay the florist directly,
  * so the florist settles this with Gulzor; the admin records the payment.

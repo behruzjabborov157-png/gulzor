@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProductGrid } from "@/components/store/product-card";
+import { Reviews } from "@/components/store/reviews";
 import { CheckIcon, MapPinIcon, PhoneIcon, TelegramIcon } from "@/components/ui/icons";
 import { Breadcrumbs, EmptyState } from "@/components/ui/primitives";
 import { fmt, localePath } from "@/i18n/config";
@@ -118,6 +119,8 @@ export default async function ShopPage({ params, searchParams }: Props) {
           </ul>
         )}
       </section>
+
+      <Reviews by={{ floristId: shop.id }} locale={locale} className="mt-14" />
 
       <section className="mt-14" aria-labelledby="shop-products">
         <h2 id="shop-products" className="mb-6 text-3xl">

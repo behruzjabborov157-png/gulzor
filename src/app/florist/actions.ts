@@ -21,6 +21,8 @@ import type { Order } from "@/lib/orders";
 import { formInt, saveProductForm } from "@/lib/product-save";
 import { notifyFloristApplication } from "@/lib/telegram";
 import { unlinkFloristChat } from "@/lib/florist-notify";
+import { UploadError } from "@/lib/storage";
+import { addOrderPhoto, floristDisputeNote, replyToReview } from "@/lib/trust";
 
 /*
  * Florist panel actions. The florist id always comes from the signed-in session (requireFlorist),
@@ -126,4 +128,36 @@ export async function floristUnlinkTelegramAction() {
   const me = await requireFlorist();
   await unlinkFloristChat(me.floristId);
   revalidatePath("/florist/profil");
+}
+
+/** Photo of the prepared bouquet; the customer sees it on the order page. */
+export async function floristOrderPhotoAction(orderId: string, _: FormState, form: FormData): Promise<FormState> {
+  const me = await requireFlorist();
+  const file = form.get("photo");
+  if (!(file instanceof File) || file.size === 0) return { ok: false, message: "Rasmni tanlang" };
+  try {
+    const res = await addOrderPhoto(orderId, file, me.email, me.floristId);
+    if (!res.ok) return res;
+  } catch (e) {
+    if (e instanceof UploadError) return { ok: false, message: e.message };
+    throw e;
+  }
+  revalidatePath(`/florist/buyurtmalar/${orderId}`);
+  return { ok: true, message: "Rasm yuklandi — mijoz uni buyurtma sahifasida ko‘radi" };
+}
+
+export async function floristDisputeNoteAction(disputeId: number, orderId: string, _: FormState, form: FormData): Promise<FormState> {
+  const me = await requireFlorist();
+  const res = await floristDisputeNote(me.floristId, disputeId, text(form, "note"));
+  if (!res.ok) return res;
+  revalidatePath(`/florist/buyurtmalar/${orderId}`);
+  return { ok: true, message: "Izohingiz Gulzor’ga yuborildi" };
+}
+
+export async function floristReviewReplyAction(reviewId: number, _: FormState, form: FormData): Promise<FormState> {
+  const me = await requireFlorist();
+  const res = await replyToReview(me.floristId, reviewId, text(form, "reply"));
+  if (!res.ok) return res;
+  revalidatePath("/florist/sharhlar");
+  return { ok: true, message: "Javob saqlandi" };
 }

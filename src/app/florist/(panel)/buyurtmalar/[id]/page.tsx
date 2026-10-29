@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { floristCashPaidAction, floristOrderStatusAction } from "@/app/florist/actions";
+import { floristCashPaidAction, floristDisputeNoteAction, floristOrderPhotoAction, floristOrderStatusAction } from "@/app/florist/actions";
 import { AdminForm } from "@/components/admin/admin-form";
+import { OrderPhotos } from "@/components/admin/order-photos";
 import { Alert } from "@/components/ui/primitives";
 import { requireFlorist } from "@/lib/auth";
 import { FLORIST_TRANSITIONS, floristOrder } from "@/lib/florist-panel";
 import { formatDateISO, formatDateTime, formatPhone, formatUZS } from "@/lib/format";
 import { ORDER_STATUS_LABEL, PAYMENT_METHOD_LABEL, PAYMENT_STATUS_LABEL } from "@/lib/orders";
 import { mapLinks } from "@/lib/telegram";
+import { DISPUTE_REASON_LABEL, DISPUTE_STATUS_LABEL, orderDisputes, orderPhotos } from "@/lib/trust";
 
 export const metadata = { title: "Buyurtma" };
 
@@ -29,6 +31,8 @@ export default async function FloristOrderPage({ params }: { params: Promise<{ i
   const { order: o, items, events } = found;
   const next = FLORIST_TRANSITIONS[o.status];
   const forward = next.filter((s) => s !== "rejected");
+  const [photos, disputes] = await Promise.all([orderPhotos(o.id), orderDisputes(o.id)]);
+  const photoAllowed = ["confirmed", "preparing", "ready", "dispatched", "delivered"].includes(o.status);
 
   return (
     <div className="max-w-5xl space-y-6">
@@ -181,6 +185,40 @@ export default async function FloristOrderPage({ params }: { params: Promise<{ i
           </dl>
         </section>
       </div>
+
+      {disputes.length ? (
+        <section className="card border-danger/30 p-5 text-sm" aria-labelledby="disputes-h">
+          <h2 id="disputes-h" className="mb-3 text-2xl">
+            Mijoz murojaatlari
+          </h2>
+          <ul className="space-y-4">
+            {disputes.map((d) => (
+              <li key={d.id} className="rounded-xl border border-line p-4">
+                <p className="flex flex-wrap justify-between gap-2">
+                  <span className="font-semibold">{DISPUTE_REASON_LABEL[d.reason]}</span>
+                  <span className="text-muted">
+                    {formatDateTime(d.createdAt)} · {DISPUTE_STATUS_LABEL[d.status]}
+                  </span>
+                </p>
+                <p className="mt-1 whitespace-pre-line">{d.message}</p>
+                {d.resolution ? <p className="mt-2 text-wine">Gulzor qarori: {d.resolution}</p> : null}
+                {d.status === "open" ? (
+                  <AdminForm action={floristDisputeNoteAction.bind(null, d.id, o.id)} submitLabel="Izohni yuborish" className="mt-3">
+                    <label htmlFor={`note-${d.id}`} className="label">
+                      Sizning izohingiz (Gulzor ko‘radi)
+                    </label>
+                    <textarea id={`note-${d.id}`} name="note" defaultValue={d.floristNote ?? ""} rows={3} maxLength={2000} required className="field" />
+                  </AdminForm>
+                ) : d.floristNote ? (
+                  <p className="mt-2 text-muted">Sizning izohingiz: {d.floristNote}</p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      <OrderPhotos photos={photos} action={floristOrderPhotoAction.bind(null, o.id)} canUpload={photoAllowed} />
 
       <section className="card p-5 text-sm" aria-label="To‘lov">
         <h2 className="mb-3 text-2xl">To‘lov</h2>

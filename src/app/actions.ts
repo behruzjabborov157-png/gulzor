@@ -1,6 +1,7 @@
 "use server";
 
 import { and, eq, inArray } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { z } from "zod";
@@ -31,6 +32,8 @@ import { quoteCart, quoteInputSchema, type Quote } from "@/lib/quote";
 import { siteUrl } from "@/lib/settings";
 import { saveImage, UploadError } from "@/lib/storage";
 import { sendTelegram } from "@/lib/telegram";
+import { notifyFloristAccount } from "@/lib/florist-notify";
+import { DISPUTE_REASON_LABEL, openDispute, orderForCustomer, submitReview, type DisputeReason } from "@/lib/trust";
 import { isISODate } from "@/lib/time";
 
 /* All actions read the storefront language from the request (set by the proxy from the page URL). */
@@ -304,4 +307,56 @@ export async function deleteAddressAction(id: number) {
   if (!customer) return;
   const db = await getDb();
   await db.delete(schema.customerAddresses).where(and(eq(schema.customerAddresses.id, id), eq(schema.customerAddresses.customerId, customer.id)));
+}
+
+/* ------------------------------------------------------------------ */
+/* Reviews and disputes (order page, secret link or account)           */
+/* ------------------------------------------------------------------ */
+
+const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+export async function reviewAction(number: string, token: string, _: FormState, form: FormData): Promise<FormState> {
+  const locale = await getLocale();
+  const t = getDict(locale).order.trust.errors;
+  if (!(await rateLimit(`review:${await clientIp()}`, 10, 3600))) return { ok: false, message: t.tooMany };
+  const o = await orderForCustomer(number, token, (await getCustomer())?.id ?? null);
+  if (!o) return { ok: false, message: t.denied };
+  const res = await submitReview(o, { rating: Number(form.get("rating")), text: String(form.get("text") ?? ""), locale });
+  if (!res.ok) {
+    const code = res.message === "exists" ? "reviewExists" : res.message;
+    return { ok: false, message: t[code as keyof typeof t] ?? t.denied };
+  }
+  after(() => sendTelegram(`⭐ <b>Yangi sharh</b> (${Number(form.get("rating"))}/5), buyurtma ${o.number}
+Tekshirish: ${siteUrl()}/admin/sharhlar`));
+  revalidatePath(localePath(locale, `/buyurtma/${o.number}`));
+  return { ok: true, message: getDict(locale).order.trust.reviewThanks };
+}
+
+export async function disputeAction(number: string, token: string, _: FormState, form: FormData): Promise<FormState> {
+  const locale = await getLocale();
+  const t = getDict(locale).order.trust.errors;
+  if (!(await rateLimit(`dispute:${await clientIp()}`, 10, 3600))) return { ok: false, message: t.tooMany };
+  const o = await orderForCustomer(number, token, (await getCustomer())?.id ?? null);
+  if (!o) return { ok: false, message: t.denied };
+  const reason = String(form.get("reason") ?? "");
+  const message = String(form.get("message") ?? "");
+  const res = await openDispute(o, { reason, message });
+  if (!res.ok) return { ok: false, message: t[res.message as keyof typeof t] ?? t.denied };
+  const label = DISPUTE_REASON_LABEL[reason as DisputeReason];
+  after(() =>
+    Promise.all([
+      sendTelegram(`⚠️ <b>Mijoz murojaati</b>: buyurtma ${o.number} — ${label}
+${escHtml(message.trim().slice(0, 500))}
+${siteUrl()}/admin/murojaatlar`),
+      notifyFloristAccount(
+        o.floristId,
+        `Buyurtma ${o.number} bo‘yicha mijoz murojaati`,
+        `Sabab: ${label}
+${escHtml(message.trim().slice(0, 500))}
+Izohingizni buyurtma sahifasida yozing: ${siteUrl()}/florist/buyurtmalar/${o.id}`,
+      ),
+    ]),
+  );
+  revalidatePath(localePath(locale, `/buyurtma/${o.number}`));
+  return { ok: true, message: getDict(locale).order.trust.disputeSent };
 }

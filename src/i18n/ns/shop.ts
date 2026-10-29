@@ -31,6 +31,11 @@ const uz = {
   removeFilter: "Filtrni olib tashlash",
   openYourShop: "Gul do‘koningiz bormi? Gulzor’da do‘kon oching",
   openShopShort: "Do‘kon ochish",
+  reviewsTitle: "Mijozlar sharhlari",
+  reviewsSummary: "{avg} / 5 · {n} ta sharh",
+  verifiedPurchase: "Tasdiqlangan xarid",
+  shopReply: "Do‘kon javobi",
+  reviewsNote: "Sharhlarni faqat buyurtmasi yetkazilgan mijozlar qoldiradi.",
 };
 
 const ru: typeof uz = {
@@ -63,6 +68,11 @@ const ru: typeof uz = {
   removeFilter: "Убрать фильтр",
   openYourShop: "У вас цветочный магазин? Откройте его на Gulzor",
   openShopShort: "Открыть магазин",
+  reviewsTitle: "Отзывы покупателей",
+  reviewsSummary: "{avg} / 5 · отзывов: {n}",
+  verifiedPurchase: "Подтверждённая покупка",
+  shopReply: "Ответ магазина",
+  reviewsNote: "Отзывы оставляют только покупатели, чей заказ был доставлен.",
 };
 
 const ns = { uz, ru };

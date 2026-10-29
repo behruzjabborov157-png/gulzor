@@ -8,6 +8,7 @@ const ITEMS = [
   { href: "/florist/buyurtmalar", label: "Buyurtmalar" },
   { href: "/florist/mahsulotlar", label: "Mahsulotlar" },
   { href: "/florist/hududlar", label: "Yetkazib berish" },
+  { href: "/florist/sharhlar", label: "Sharhlar" },
   { href: "/florist/hisobot", label: "Savdo va komissiya" },
   { href: "/florist/profil", label: "Do‘kon profili" },
 ];

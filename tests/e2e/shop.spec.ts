@@ -1,3 +1,4 @@
+import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 /**
@@ -228,4 +229,75 @@ test("admin price change is reflected on the storefront", async () => {
   await page.getByLabel("Oq liliyalar narxi").fill("359000");
   await page.getByRole("row", { name: /Oq liliyalar/ }).getByRole("button", { name: "Saqlash" }).click();
   await expect(page.getByLabel("Oq liliyalar narxi")).toHaveValue("359000");
+});
+
+test("trust: bouquet photo, complaint and decision, then a verified review that appears after moderation", async () => {
+  test.skip(!ADMIN_EMAIL || !ADMIN_PASSWORD || !orderNumber, "admin credentials or order missing");
+  // Still signed in as admin (shared page). The order was confirmed in the previous test.
+  await page.goto(`/admin/buyurtmalar?q=${orderNumber}`);
+  await page.getByRole("link", { name: orderNumber }).click();
+  await page.waitForURL(/\/admin\/buyurtmalar\/[0-9a-f-]{36}$/);
+  const adminOrderUrl = page.url();
+  await page.getByLabel("Rasm (JPG, PNG, WEBP, 6 MB gacha)").setInputFiles(path.resolve("public/images/demo/tulips-mix.webp"));
+  await page.getByRole("button", { name: "Rasmni yuklash" }).click();
+  await expect(page.getByText("Rasm yuklandi")).toBeVisible();
+
+  // The customer sees the photo and reports a problem.
+  await page.goto(orderUrl);
+  await expect(page.getByRole("heading", { name: "Tayyor guldastangiz" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Tayyor guldasta, 1-rasm" })).toBeVisible();
+  await page.getByText("Buyurtmada muammo bormi?").click();
+  await page.getByLabel("Sabab").selectOption("late");
+  await page.getByLabel("Nima bo‘ldi?").fill("Kuryer belgilangan vaqtdan kechikdi (e2e sinov)");
+  await page.getByRole("button", { name: "Murojaat yuborish" }).click();
+  // The page refreshes: the form is replaced by the complaint with its status.
+  const mine = page.getByRole("region", { name: "Murojaatlaringiz" });
+  await expect(mine.getByText("Kuryer belgilangan vaqtdan kechikdi (e2e sinov)")).toBeVisible();
+  await expect(mine.getByText(/Ko‘rib chiqilmoqda/)).toBeVisible();
+  await expect(page.getByText("Buyurtmada muammo bormi?")).toHaveCount(0); // one open complaint at a time
+
+  // Gulzor decides; the customer sees the decision.
+  await page.goto("/admin/murojaatlar");
+  const item = page.getByRole("listitem").filter({ hasText: orderNumber });
+  await item.getByLabel("Qaror (mijozga ko‘rinadi) *").fill("Do‘kon ogohlantirildi (e2e)");
+  await item.getByRole("button", { name: "Qarorni saqlash" }).click();
+  await expect(item).toHaveCount(0); // moved from "Ochiq" to "Hal qilingan"
+  await page.goto("/admin/murojaatlar?holat=resolved");
+  await expect(page.getByRole("listitem").filter({ hasText: orderNumber }).getByText(/Qaror: Do‘kon ogohlantirildi/)).toBeVisible();
+  await page.goto(orderUrl);
+  await expect(page.getByText("Gulzor qarori: Do‘kon ogohlantirildi (e2e)")).toBeVisible();
+  await expect(page.getByText(/Hal qilindi/)).toBeVisible();
+
+  // No review form before delivery; deliver the order.
+  await expect(page.getByRole("heading", { name: "Fikringizni qoldiring" })).toHaveCount(0);
+  await page.goto(adminOrderUrl);
+  for (const step of ["Tayyorlashni boshlash", "Tayyor", "Kuryerga berildi", "Yetkazildi / topshirildi"]) {
+    await page.getByRole("button", { name: step, exact: true }).click();
+    await expect(page.getByRole("button", { name: step, exact: true })).toHaveCount(0);
+  }
+
+  // Review: pending until the admin publishes it.
+  await page.goto(orderUrl);
+  await page.getByRole("radio", { name: "5 yulduz" }).check({ force: true });
+  await page.getByLabel("Izoh (ixtiyoriy)").fill("Juda chiroyli guldasta (e2e sinov)");
+  await page.getByRole("button", { name: "Sharh yuborish" }).click();
+  await expect(page.getByText(/Sizning bahoyingiz: 5\/5 · Sharhingiz tekshirilmoqda\./)).toBeVisible();
+  await page.goto("/dokon/gulzor");
+  await expect(page.getByText("Juda chiroyli guldasta (e2e sinov)")).toHaveCount(0);
+
+  await page.goto("/admin/sharhlar");
+  const review = page.getByRole("listitem").filter({ hasText: "Juda chiroyli guldasta (e2e sinov)" });
+  await review.getByRole("button", { name: "E’lon qilish" }).click();
+  await expect(review).toHaveCount(0); // moved to "E’lon qilingan"
+  await page.goto("/admin/sharhlar?holat=approved");
+  await expect(page.getByText("Juda chiroyli guldasta (e2e sinov)")).toBeVisible();
+
+  await page.goto("/dokon/gulzor");
+  await expect(page.getByRole("heading", { name: "Mijozlar sharhlari" })).toBeVisible();
+  await expect(page.getByText("Juda chiroyli guldasta (e2e sinov)")).toBeVisible();
+  await expect(page.getByText(/Tasdiqlangan xarid/).first()).toBeVisible();
+
+  await page.goto("/admin/tahlil");
+  await expect(page.getByRole("heading", { name: "Tahlil" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Gulzor" }).first()).toBeVisible();
 });

@@ -10,6 +10,9 @@ const ITEMS = [
   { href: "/admin/mahsulotlar", label: "Mahsulotlar", owner: false },
   { href: "/admin/kategoriyalar", label: "Kategoriyalar", owner: false },
   { href: "/admin/sorovlar", label: "So‘rovlar", owner: false },
+  { href: "/admin/murojaatlar", label: "Murojaatlar", owner: false },
+  { href: "/admin/sharhlar", label: "Sharhlar", owner: false },
+  { href: "/admin/tahlil", label: "Tahlil", owner: false },
   { href: "/admin/yetkazib-berish", label: "Yetkazib berish", owner: true },
   { href: "/admin/komissiya", label: "Komissiya", owner: true },
   { href: "/admin/kuponlar", label: "Promokodlar", owner: true },
@@ -18,7 +21,15 @@ const ITEMS = [
   { href: "/admin/jurnal", label: "Jurnal", owner: true },
 ];
 
-export function AdminNav({ owner, newOrders = 0, pendingShops = 0 }: { owner: boolean; newOrders?: number; pendingShops?: number }) {
+type Badges = { newOrders?: number; pendingShops?: number; openDisputes?: number; pendingReviews?: number };
+
+export function AdminNav({ owner, newOrders = 0, pendingShops = 0, openDisputes = 0, pendingReviews = 0 }: { owner: boolean } & Badges) {
+  const badges: Record<string, [number, string]> = {
+    "/admin/buyurtmalar": [newOrders, "ta yangi"],
+    "/admin/floristlar": [pendingShops, "ta yangi ariza"],
+    "/admin/murojaatlar": [openDisputes, "ta ochiq murojaat"],
+    "/admin/sharhlar": [pendingReviews, "ta sharh tekshiruvda"],
+  };
   const path = usePathname();
   return (
     <nav aria-label="Admin" className="flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-col lg:pb-0">
@@ -32,14 +43,9 @@ export function AdminNav({ owner, newOrders = 0, pendingShops = 0 }: { owner: bo
             className={`flex shrink-0 items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm ${active ? "bg-wine text-ivory" : "text-charcoal hover:bg-cream"}`}
           >
             {i.label}
-            {i.href === "/admin/buyurtmalar" && newOrders > 0 ? (
-              <span className="rounded-full bg-fuchsia px-2 py-0.5 text-[11px] font-bold text-white" aria-label={`${newOrders} ta yangi`}>
-                {newOrders}
-              </span>
-            ) : null}
-            {i.href === "/admin/floristlar" && pendingShops > 0 ? (
-              <span className="rounded-full bg-fuchsia px-2 py-0.5 text-[11px] font-bold text-white" aria-label={`${pendingShops} ta yangi ariza`}>
-                {pendingShops}
+            {badges[i.href]?.[0] ? (
+              <span className="rounded-full bg-fuchsia px-2 py-0.5 text-[11px] font-bold text-white" aria-label={`${badges[i.href][0]} ${badges[i.href][1]}`}>
+                {badges[i.href][0]}
               </span>
             ) : null}
           </Link>

@@ -6,6 +6,7 @@ import { FavoriteButton, TrackRecent } from "@/components/store/client-widgets";
 import { Gallery } from "@/components/store/gallery";
 import { ProductGrid } from "@/components/store/product-card";
 import { FloristLink } from "@/components/store/florist";
+import { Reviews } from "@/components/store/reviews";
 import { ProductConfigurator } from "@/components/store/product-configurator";
 import { RecentlyViewed } from "@/components/store/widgets";
 import { ClockIcon, InfoIcon, TruckIcon } from "@/components/ui/icons";
@@ -226,6 +227,10 @@ export default async function ProductPage({ params }: Props) {
           </div>
         </div>
       </div>
+
+      <Suspense fallback={null}>
+        <Reviews by={{ productId: p.id }} locale={locale} className="container-page mt-24" />
+      </Suspense>
 
       <Suspense
         fallback={

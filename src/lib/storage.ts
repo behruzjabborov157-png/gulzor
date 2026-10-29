@@ -31,7 +31,7 @@ export class UploadError extends Error {
  * strips metadata (EXIF/GPS), resizes and re-encodes to WebP.
  * Returns the public URL.
  */
-export async function saveImage(file: File, folder: "products" | "requests"): Promise<string> {
+export async function saveImage(file: File, folder: "products" | "requests" | "orders"): Promise<string> {
   if (!file || file.size === 0) throw new UploadError("none", "Fayl tanlanmagan");
   if (file.size > MAX_UPLOAD_BYTES) throw new UploadError("tooBig", "Fayl hajmi 6 MB dan oshmasligi kerak");
   const input = Buffer.from(await file.arrayBuffer());
@@ -54,7 +54,7 @@ export async function saveImage(file: File, folder: "products" | "requests"): Pr
 
 /** Resolves a /media path to a file on disk, refusing path traversal. */
 export function resolveMediaPath(parts: string[]): string | null {
-  if (parts.length !== 2 || !["products", "requests"].includes(parts[0])) return null;
+  if (parts.length !== 2 || !["products", "requests", "orders"].includes(parts[0])) return null;
   if (!/^[a-z0-9-]+\.webp$/.test(parts[1])) return null;
   return path.join(/*turbopackIgnore: true*/ uploadRoot(), parts[0], parts[1]);
 }

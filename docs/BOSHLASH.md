@@ -111,8 +111,10 @@ suratlaringiz bo‘lsa, shu nomlar bilan almashtirish mumkin.
 
 ## 8. Sharhlar haqida
 
-Saytda hozircha **mijoz sharhlari bo‘limi yo‘q** — haqiqiy sharhlar bo‘lmaguncha uni ko‘rsatmaymiz
-(soxta sharh qonun va Google qoidalariga zid). Haqiqiy sharhlar to‘planganda qo‘shish mumkin.
+Sharhni faqat **buyurtmasi yetkazilgan mijoz** o‘z buyurtma sahifasidan qoldira oladi (har buyurtmaga bitta).
+Sharh avval **Admin → Sharhlar** da tekshiriladi, keyin do‘kon va mahsulot sahifasida chiqadi. Sharh bo‘lmasa,
+bo‘lim umuman ko‘rinmaydi. O‘zingiz sharh yozmang va past bahoni yashirmang — soxta sharh qonun va Google
+qoidalariga zid; faqat haqorat, shaxsiy ma’lumot, reklama yoki spamni rad eting.
 
 ## 9. Tekshiruvlar (dasturchi uchun)
 

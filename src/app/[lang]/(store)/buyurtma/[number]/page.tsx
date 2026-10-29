@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { timingSafeEqual } from "node:crypto";
 import { inArray } from "drizzle-orm";
 import { getDb, schema } from "@/db";
+import { DisputeForm, ReviewForm } from "@/components/store/order-trust";
 import { RetryPayment } from "@/components/store/retry-payment";
 import { Alert, ProductImage } from "@/components/ui/primitives";
 import { fmt, localePath, pick, type Locale } from "@/i18n/config";
@@ -13,6 +15,7 @@ import { getCustomer } from "@/lib/auth";
 import { formatDateISO, formatDateTime, formatPhone, formatUZS } from "@/lib/format";
 import { getOrderWithItems, TRACK_STEPS } from "@/lib/orders";
 import { getSettings, telegramLink } from "@/lib/settings";
+import { canOpenDispute, orderDisputes, orderPhotos, reviewForOrder } from "@/lib/trust";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: getDict(await getLocale()).meta.order, robots: { index: false } };
@@ -84,8 +87,10 @@ export default async function OrderPage({ params, searchParams }: Props) {
   const productName = (id: number | null, stored: string) => (ru && id != null ? pick(locale, stored, ru.product.get(id)) : stored);
   const variantName = (id: number | null, stored: string | null) => (ru && id != null && stored ? pick(locale, stored, ru.variant.get(id)) : stored);
 
-  const { store } = await getSettings();
+  const [{ store }, photos, review, disputes] = await Promise.all([getSettings(), orderPhotos(o.id), reviewForOrder(o.id), orderDisputes(o.id)]);
   const tg = telegramLink(store.telegramUsername);
+  const tt = t.trust;
+  const hasOpenDispute = disputes.some((d) => d.status === "open");
   const closed = o.status === "cancelled" || o.status === "rejected";
   const stepIndex = Math.max(
     0,
@@ -175,6 +180,24 @@ export default async function OrderPage({ params, searchParams }: Props) {
         ) : null}
       </section>
 
+      {photos.length ? (
+        <section className="card mt-6 p-6" aria-labelledby="photos-h">
+          <h2 id="photos-h" className="text-2xl">
+            {tt.photosTitle}
+          </h2>
+          <p className="mt-1 text-sm text-muted">{tt.photosNote}</p>
+          <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {photos.map((p, i) => (
+              <li key={p.id} className="relative aspect-[4/5] overflow-hidden rounded-xl bg-cream">
+                <a href={p.url} target="_blank" rel="noopener noreferrer">
+                  <Image src={p.url} alt={fmt(tt.photoAlt, { n: i + 1 })} fill sizes="(min-width: 640px) 25vw, 50vw" className="object-cover" />
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       <div className="mt-6 grid gap-6 md:grid-cols-2">
         <section className="card p-6" aria-label={o.fulfillment === "pickup" ? t.pickup : t.delivery}>
           <h2 className="mb-3 text-2xl">{o.fulfillment === "pickup" ? t.pickup : t.delivery}</h2>
@@ -261,6 +284,55 @@ export default async function OrderPage({ params, searchParams }: Props) {
           </dl>
         </section>
       </div>
+
+      {o.status === "delivered" ? (
+        <section className="card mt-6 p-6" aria-labelledby="review-h">
+          <h2 id="review-h" className="text-2xl">
+            {tt.reviewTitle}
+          </h2>
+          {review ? (
+            <p className="mt-2 text-sm">
+              {fmt(tt.yourReview, { n: review.rating })} ·{" "}
+              {review.status === "approved" ? tt.reviewPublished : review.status === "rejected" ? tt.reviewRejected : tt.reviewPending}
+            </p>
+          ) : (
+            <>
+              <p className="mt-1 mb-4 text-sm text-muted">{tt.reviewIntro}</p>
+              <ReviewForm number={o.number} token={token ?? ""} />
+            </>
+          )}
+        </section>
+      ) : null}
+
+      {disputes.length ? (
+        <section className="card mt-6 p-6" aria-labelledby="disputes-h">
+          <h2 id="disputes-h" className="mb-3 text-2xl">
+            {tt.disputes}
+          </h2>
+          <ul className="space-y-3 text-sm">
+            {disputes.map((d) => (
+              <li key={d.id} className="rounded-xl border border-line p-4">
+                <p className="flex flex-wrap justify-between gap-2">
+                  <span className="font-semibold">{tt.reasons[d.reason]}</span>
+                  <span className="text-muted">
+                    {formatDateTime(d.createdAt)} · {tt.disputeStatus[d.status]}
+                  </span>
+                </p>
+                <p className="mt-1 whitespace-pre-line">{d.message}</p>
+                {d.resolution ? <p className="mt-2 text-wine">{fmt(tt.decision, { text: d.resolution })}</p> : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {canOpenDispute(o) && !hasOpenDispute ? (
+        <details className="card mt-6 p-6">
+          <summary className="cursor-pointer font-display text-2xl text-plum">{tt.disputeTitle}</summary>
+          <p className="mt-2 mb-4 text-sm text-muted">{tt.disputeIntro}</p>
+          <DisputeForm number={o.number} token={token ?? ""} />
+        </details>
+      ) : null}
 
       <div className="mt-8 flex flex-wrap justify-center gap-3">
         {tg ? (

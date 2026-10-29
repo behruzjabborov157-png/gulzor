@@ -47,6 +47,13 @@ Boshqaruv paneli: **https://sizning-domeningiz.uz/admin**
 - Bu amallarni faqat sayt egasi bajaradi. Kim, qachon, nima qilgani **Jurnal** bo‘limida saqlanadi
   (buyurtma va to‘lov holatini qo‘lda o‘zgartirish ham).
 
+## Ishonch: rasm, sharh, murojaat
+- Florist (yoki siz) buyurtma sahifasida **tayyor guldasta rasmini** yuklaydi — mijoz uni o‘z buyurtma sahifasida ko‘radi.
+- **Sharhlar**: yangi sharh kelganda Telegram’ga xabar keladi. “E’lon qilish” yoki “Rad etish”.
+- **Murojaatlar**: mijoz yetkazish sanasidan keyin 7 kungacha muammo haqida yozishi mumkin. Do‘kon o‘z izohini yozadi,
+  siz qaror yozasiz (mijoz uni buyurtma sahifasida ko‘radi, do‘konga xabar boradi). Pul qaytarilsa, buni qarorda aniq yozing.
+- **Tahlil**: har bir do‘kon bo‘yicha buyurtmalar, rad etish ulushi, qabul qilish tezligi, murojaatlar va reyting.
+
 ## Muhim
 - Faqat o‘zingizga tegishli yoki ruxsat olingan rasmlardan foydalaning.
 - Chegirma narxini (“avvalgi narx”) faqat haqiqiy chegirma bo‘lsa kiriting.
