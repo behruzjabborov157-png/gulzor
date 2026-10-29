@@ -4,20 +4,23 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { CheckIcon, CloseIcon } from "@/components/ui/icons";
+import { CheckIcon, CloseIcon, InfoIcon } from "@/components/ui/icons";
 import { useT } from "@/i18n/client";
 import { fmt } from "@/i18n/config";
 import { formatUZS } from "@/lib/format";
-import { CART_ADDED_EVENT, cartStore, type CartLine } from "./cart";
+import { CART_ADDED_EVENT, CART_CONFLICT_EVENT, cartFlorist, cartStore, replaceCartWith, type CartLine } from "./cart";
 
 /**
  * Slide-in confirmation after "add to cart": shows what was added and the cart size,
  * with the way to the cart or back to shopping. Esc, the backdrop and navigation close it.
+ * When the item comes from another shop than the cart (one shop per order) it asks instead.
  */
 export function CartDrawer() {
   const { t, locale, href } = useT();
   const tp = t.product;
+  const ts = t.shop;
   const [line, setLine] = useState<CartLine | null>(null);
+  const [conflict, setConflict] = useState<Omit<CartLine, "key"> | null>(null);
   const [open, setOpen] = useState(false);
   const [lines] = cartStore.useStore();
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -28,11 +31,21 @@ export function CartDrawer() {
   useEffect(() => {
     const onAdded = (e: Event) => {
       lastFocus.current = document.activeElement as HTMLElement | null;
+      setConflict(null);
       setLine((e as CustomEvent<CartLine>).detail);
       setOpen(true);
     };
+    const onConflict = (e: Event) => {
+      lastFocus.current = document.activeElement as HTMLElement | null;
+      setConflict((e as CustomEvent<Omit<CartLine, "key">>).detail);
+      setOpen(true);
+    };
     window.addEventListener(CART_ADDED_EVENT, onAdded);
-    return () => window.removeEventListener(CART_ADDED_EVENT, onAdded);
+    window.addEventListener(CART_CONFLICT_EVENT, onConflict);
+    return () => {
+      window.removeEventListener(CART_ADDED_EVENT, onAdded);
+      window.removeEventListener(CART_CONFLICT_EVENT, onConflict);
+    };
   }, []);
 
   // Close when the route changes (e.g. after "Go to cart").
@@ -74,17 +87,47 @@ export function CartDrawer() {
         }`}
       >
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
-          <p id="cart-drawer-title" className="inline-flex items-center gap-2 font-semibold text-success">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-success/10">
-              <CheckIcon size={16} />
-            </span>
-            {tp.added}
-          </p>
+          {conflict ? (
+            <p id="cart-drawer-title" className="inline-flex items-center gap-2 font-semibold text-wine">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-wine/10">
+                <InfoIcon size={16} />
+              </span>
+              {ts.conflictTitle}
+            </p>
+          ) : (
+            <p id="cart-drawer-title" className="inline-flex items-center gap-2 font-semibold text-success">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-success/10">
+                <CheckIcon size={16} />
+              </span>
+              {tp.added}
+            </p>
+          )}
           <button ref={closeRef} type="button" onClick={close} className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-wine/5" aria-label={tp.close}>
             <CloseIcon size={20} />
           </button>
         </div>
-        {line ? (
+        {conflict ? (
+          <div className="flex flex-1 flex-col">
+            <p className="px-5 py-5 text-sm leading-relaxed text-charcoal">{fmt(ts.conflictText, { current: cartFlorist(lines)?.name || "—" })}</p>
+            <div className="mt-auto space-y-2 border-t border-line p-5">
+              <button
+                type="button"
+                className="btn-primary w-full py-3.5"
+                onClick={() => {
+                  const next = conflict;
+                  setConflict(null);
+                  replaceCartWith(next);
+                }}
+              >
+                {ts.conflictReplace}
+              </button>
+              <button type="button" onClick={close} className="btn-secondary w-full py-3.5">
+                {ts.conflictKeep}
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {!conflict && line ? (
           <div className="flex gap-4 px-5 py-5">
             <div className="relative h-28 w-22 shrink-0 overflow-hidden rounded-xl bg-cream">
               {line.image ? <Image src={line.image} alt="" fill sizes="88px" className="object-cover" /> : null}
@@ -92,6 +135,7 @@ export function CartDrawer() {
             <div className="min-w-0">
               <p className="font-display text-xl leading-tight text-plum">{line.name}</p>
               {details ? <p className="mt-1 text-sm text-muted">{details}</p> : null}
+              {line.floristName ? <p className="mt-1 text-xs text-muted">{fmt(ts.cartFrom, { name: line.floristName })}</p> : null}
               <p className="mt-2 font-semibold text-wine">
                 {line.quantity > 1 ? `${line.quantity} × ` : ""}
                 {formatUZS(line.unitPrice, locale)}
@@ -99,6 +143,8 @@ export function CartDrawer() {
             </div>
           </div>
         ) : null}
+        {conflict ? null : (
+          <>
         <p className="px-5 text-sm text-muted">{fmt(tp.inCart, { n: count })}</p>
         <div className="mt-auto space-y-2 border-t border-line p-5">
           <Link href={href("/savat")} className="btn-primary w-full py-3.5">
@@ -108,6 +154,8 @@ export function CartDrawer() {
             {tp.continue}
           </button>
         </div>
+          </>
+        )}
       </aside>
     </div>
   );

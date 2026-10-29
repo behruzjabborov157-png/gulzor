@@ -9,11 +9,11 @@ import { Alert, EmptyState, ProductImage } from "@/components/ui/primitives";
 import { useT } from "@/i18n/client";
 import { fmt } from "@/i18n/config";
 import { formatDateISO, formatUZS } from "@/lib/format";
-import { cartStore, clearCart, toServerLines } from "./cart";
+import { cartFlorist, cartStore, clearCart, toServerLines } from "./cart";
 import { Summary } from "./cart-view";
 import { prefsStore, useQuote } from "./use-quote";
 
-type Region = { id: number; name: string; zones: { id: number; name: string; description: string; fee: number }[] };
+type Region = { id: number; name: string; zones: { id: number; floristId: number; name: string; description: string; fee: number }[] };
 type SavedAddress = {
   id: number;
   label: string;
@@ -126,9 +126,18 @@ export function CheckoutForm(props: CheckoutProps) {
     } else setTgPhoneState("denied");
   }
 
+  // Each shop delivers itself: only the cart's shop's cities and zones are offered (the server re-checks).
+  const shop = cartFlorist(lines);
+  const regions = shop
+    ? props.regions.map((r) => ({ ...r, zones: r.zones.filter((z) => z.floristId === shop.id) })).filter((r) => r.zones.length)
+    : props.regions;
   // Region and zone are derived: an explicit choice wins, then the zone remembered from the cart, then the first one.
-  const regionId = f.regionId ?? props.regions.find((r) => r.zones.some((z) => z.id === prefs.zoneId))?.id ?? props.regions[0]?.id ?? null;
-  const region = props.regions.find((r) => r.id === regionId) ?? null;
+  const regionId =
+    (f.regionId != null && regions.some((r) => r.id === f.regionId) ? f.regionId : null) ??
+    regions.find((r) => r.zones.some((z) => z.id === prefs.zoneId))?.id ??
+    regions[0]?.id ??
+    null;
+  const region = regions.find((r) => r.id === regionId) ?? null;
   const zoneId = region?.zones.some((z) => z.id === prefs.zoneId) ? prefs.zoneId : (region?.zones[0]?.id ?? null);
 
   // useQuote re-requests only when the serialized input changes, so no memoization is needed here.
@@ -307,7 +316,7 @@ export function CheckoutForm(props: CheckoutProps) {
           </fieldset>
 
           {f.fulfillment === "delivery" ? (
-            props.regions.length === 0 ? (
+            regions.length === 0 ? (
               <Alert tone="warning">
                 {t.noZones}{" "}
                 {props.contactHref ? (
@@ -339,7 +348,7 @@ export function CheckoutForm(props: CheckoutProps) {
                           address: a.address,
                           apartment: a.apartment,
                           landmark: a.landmark,
-                          regionId: props.regions.find((r) => r.zones.some((z) => z.id === a.zoneId))?.id ?? p.regionId,
+                          regionId: regions.find((r) => r.zones.some((z) => z.id === a.zoneId))?.id ?? p.regionId,
                         }));
                         if (a.zoneId) setPrefs((p) => ({ ...p, zoneId: a.zoneId }));
                       }}
@@ -359,10 +368,10 @@ export function CheckoutForm(props: CheckoutProps) {
                       onChange={(e) => {
                         const id = Number(e.target.value);
                         set("regionId", id);
-                        setPrefs((p) => ({ ...p, zoneId: props.regions.find((r) => r.id === id)?.zones[0]?.id ?? null }));
+                        setPrefs((p) => ({ ...p, zoneId: regions.find((r) => r.id === id)?.zones[0]?.id ?? null }));
                       }}
                     >
-                      {props.regions.map((r) => (
+                      {regions.map((r) => (
                         <option key={r.id} value={r.id}>
                           {r.name}
                         </option>

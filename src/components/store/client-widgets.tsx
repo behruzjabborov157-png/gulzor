@@ -223,13 +223,13 @@ export function TrackRecent({ id }: { id: number }) {
 }
 
 /** One-tap add for products with nothing to choose (fixed price, no colours). The server re-prices at checkout. */
-export function QuickAddButton({ p }: { p: { id: number; slug: string; name: string; price: number; image: string | null } }) {
+export function QuickAddButton({ p }: { p: { id: number; slug: string; name: string; price: number; image: string | null; floristId: number | null; floristName: string | null } }) {
   const { t } = useT();
   return (
     <button
       type="button"
       onClick={() =>
-        addToCart({ productId: p.id, slug: p.slug, name: p.name, image: p.image, variantId: null, variantName: null, stems: null, color: null, addons: [], quantity: 1, unitPrice: p.price })
+        addToCart({ productId: p.id, slug: p.slug, name: p.name, image: p.image, variantId: null, variantName: null, stems: null, color: null, addons: [], quantity: 1, unitPrice: p.price, floristId: p.floristId, floristName: p.floristName })
       }
       aria-label={fmt(t.product.quickAdd, { name: p.name })}
       className="absolute right-3 bottom-3 flex h-11 items-center gap-2 rounded-full bg-ivory/95 px-3.5 text-sm font-semibold text-wine shadow-[var(--shadow-soft)] backdrop-blur transition duration-300 hover:bg-wine hover:text-ivory focus-visible:opacity-100 lg:translate-y-2 lg:opacity-0 lg:group-hover:translate-y-0 lg:group-hover:opacity-100"

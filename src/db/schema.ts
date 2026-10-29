@@ -40,6 +40,48 @@ export const fulfillment = pgEnum("fulfillment", ["delivery", "pickup"]);
 export const couponType = pgEnum("coupon_type", ["percent", "fixed"]);
 
 /* ------------------------------------------------------------------ */
+/* Marketplace: florists (sellers)                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A florist shop selling on Gulzor. Only "approved" florists' products are visible and orderable.
+ * The florist delivers its own orders (its own delivery zones) and is paid by the customer directly;
+ * Gulzor records a commission on every order (rate copied onto the order when it is placed).
+ */
+export const florists = pgTable(
+  "florists",
+  {
+    id: serial("id").primaryKey(),
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    nameRu: text("name_ru"),
+    description: text("description").notNull().default(""),
+    descriptionRu: text("description_ru"),
+    status: text("status").$type<"pending" | "approved" | "suspended" | "rejected">().notNull().default("pending"),
+    /** Why the florist was rejected or suspended (shown to the florist). */
+    statusReason: text("status_reason"),
+    /** The platform's own shop (holds the original catalogue). */
+    isPlatform: boolean("is_platform").notNull().default(false),
+    phone: text("phone").notNull().default(""),
+    telegramUsername: text("telegram_username").notNull().default(""),
+    address: text("address").notNull().default(""),
+    addressRu: text("address_ru"),
+    /** City (a delivery region) the shop works in. */
+    regionId: integer("region_id").references(() => deliveryRegions.id, { onDelete: "set null" }),
+    /** Verification data submitted by the florist. */
+    legalName: text("legal_name").notNull().default(""),
+    taxId: text("tax_id").notNull().default(""),
+    /** Commission in basis points (1000 = 10%). */
+    commissionRate: integer("commission_rate").notNull().default(1000),
+    logoUrl: text("logo_url"),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("florists_slug_idx").on(t.slug), index("florists_status_idx").on(t.status)],
+);
+
+/* ------------------------------------------------------------------ */
 /* Catalog                                                             */
 /* ------------------------------------------------------------------ */
 
@@ -76,6 +118,10 @@ export const products = pgTable(
   "products",
   {
     id: serial("id").primaryKey(),
+    /** The florist that sells (and delivers) this product. */
+    floristId: integer("florist_id")
+      .notNull()
+      .references(() => florists.id, { onDelete: "restrict" }),
     slug: text("slug").notNull(),
     name: text("name").notNull(),
     shortDescription: text("short_description").notNull().default(""),
@@ -134,6 +180,7 @@ export const products = pgTable(
   (t) => [
     uniqueIndex("products_slug_idx").on(t.slug),
     index("products_status_idx").on(t.status),
+    index("products_florist_idx").on(t.floristId),
     index("products_price_idx").on(t.price),
   ],
 );
@@ -191,6 +238,10 @@ export const deliveryRegions = pgTable(
 
 export const deliveryZones = pgTable("delivery_zones", {
   id: serial("id").primaryKey(),
+  /** Each florist delivers itself, so delivery areas and fees belong to a florist. */
+  floristId: integer("florist_id")
+    .notNull()
+    .references(() => florists.id, { onDelete: "cascade" }),
   regionId: integer("region_id")
     .notNull()
     .references(() => deliveryRegions.id, { onDelete: "cascade" }),
@@ -262,7 +313,9 @@ export const adminUsers = pgTable(
     email: text("email").notNull(),
     name: text("name").notNull(),
     passwordHash: text("password_hash").notNull(),
-    role: text("role").$type<"owner" | "staff">().notNull().default("staff"),
+    role: text("role").$type<"owner" | "staff" | "florist">().notNull().default("staff"),
+    /** Set for role "florist": the only shop this user may see and manage. */
+    floristId: integer("florist_id").references(() => florists.id, { onDelete: "cascade" }),
     isActive: boolean("is_active").notNull().default(true),
     lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -347,6 +400,13 @@ export const orders = pgTable(
     /** Random token that allows the customer to view their order without an account. */
     accessToken: text("access_token").notNull(),
     customerId: uuid("customer_id").references(() => customers.id, { onDelete: "set null" }),
+    /** One florist per order (the cart may only hold one florist's products). */
+    floristId: integer("florist_id")
+      .notNull()
+      .references(() => florists.id, { onDelete: "restrict" }),
+    /** Commission agreed when the order was placed: rate in basis points and amount in so'm (on goods after discount). */
+    commissionRate: integer("commission_rate").notNull().default(0),
+    commissionAmount: integer("commission_amount").notNull().default(0),
     status: orderStatus("status").notNull().default("new"),
     paymentMethod: paymentMethod("payment_method").notNull(),
     paymentStatus: paymentStatus("payment_status").notNull().default("pending"),
@@ -398,6 +458,7 @@ export const orders = pgTable(
     index("orders_phone_idx").on(t.customerPhone),
     index("orders_created_idx").on(t.createdAt),
     index("orders_customer_idx").on(t.customerId),
+    index("orders_florist_idx").on(t.floristId),
   ],
 );
 
@@ -567,3 +628,22 @@ export const tgMedia = pgTable("tg_media", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/* ------------------------------------------------------------------ */
+/* Audit log                                                           */
+/* ------------------------------------------------------------------ */
+
+/** Important administrative actions (florist approval, commission changes, …). Append-only. */
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    id: serial("id").primaryKey(),
+    actorId: uuid("actor_id"),
+    actorEmail: text("actor_email").notNull().default(""),
+    action: text("action").notNull(),
+    entity: text("entity").notNull(),
+    entityId: text("entity_id").notNull(),
+    data: jsonb("data").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("audit_entity_idx").on(t.entity, t.entityId), index("audit_created_idx").on(t.createdAt)],
+);

@@ -28,7 +28,7 @@ export function ProductConfigurator({
   addons,
   orderable,
 }: {
-  product: { id: number; slug: string; name: string; image: string | null };
+  product: { id: number; slug: string; name: string; image: string | null; floristId: number; floristName: string };
   pricing: PricingProduct;
   /** value = Uzbek option stored on the order, label = shown in the current language. */
   colors: { value: string; label: string }[];
@@ -95,6 +95,8 @@ export function ProductConfigurator({
       addons: priced.addons.map((a) => ({ productId: a.productId, quantity: a.quantity, name: a.name, price: a.unitPrice })),
       quantity,
       unitPrice: priced.unitPrice,
+      floristId: product.floristId,
+      floristName: product.floristName,
     };
     if (editKey) {
       replaceLine(editKey, line);

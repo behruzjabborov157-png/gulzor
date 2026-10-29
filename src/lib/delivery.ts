@@ -2,13 +2,14 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { DEFAULT_LOCALE, pick, type Locale } from "@/i18n/config";
 import { addDaysISO, hhmmToMinutes, tashkentNow } from "@/lib/time";
+import { floristApproved } from "@/lib/florists";
 
 export type Zone = typeof schema.deliveryZones.$inferSelect;
 export type Region = typeof schema.deliveryRegions.$inferSelect;
 export type Slot = typeof schema.timeSlots.$inferSelect;
 
-/** Active regions with their zones (names in the requested language) and active time slots. */
-export async function getDeliveryConfig(locale: Locale = DEFAULT_LOCALE) {
+/** Active cities with their delivery zones. Pass floristId to get only that florist's zones (each florist delivers itself). */
+export async function getDeliveryConfig(locale: Locale = DEFAULT_LOCALE, floristId?: number) {
   const db = await getDb();
   const regions = await db
     .select()
@@ -19,7 +20,13 @@ export async function getDeliveryConfig(locale: Locale = DEFAULT_LOCALE) {
     ? await db
         .select()
         .from(schema.deliveryZones)
-        .where(and(eq(schema.deliveryZones.isActive, true), inArray(schema.deliveryZones.regionId, regions.map((r) => r.id))))
+        .where(
+          and(
+            eq(schema.deliveryZones.isActive, true),
+            inArray(schema.deliveryZones.regionId, regions.map((r) => r.id)),
+            floristId ? eq(schema.deliveryZones.floristId, floristId) : floristApproved(schema.deliveryZones.floristId),
+          ),
+        )
         .orderBy(asc(schema.deliveryZones.sortOrder), asc(schema.deliveryZones.fee))
     : [];
   const slots = await db
@@ -79,7 +86,8 @@ export function computeSlots(opts: {
   });
 }
 
-export async function bookedSlotCounts(date: string): Promise<Map<number, number>> {
+/** Booked orders per time slot on a date — per florist, since every florist has its own capacity. */
+export async function bookedSlotCounts(date: string, floristId?: number | null): Promise<Map<number, number>> {
   const db = await getDb();
   const rows = await db
     .select({ slotId: schema.orders.slotId, n: sql<number>`count(*)::int` })
@@ -87,6 +95,7 @@ export async function bookedSlotCounts(date: string): Promise<Map<number, number
     .where(
       and(
         eq(schema.orders.deliveryDate, date),
+        floristId ? eq(schema.orders.floristId, floristId) : undefined,
         sql`${schema.orders.status} NOT IN ('cancelled', 'rejected')`,
       ),
     )

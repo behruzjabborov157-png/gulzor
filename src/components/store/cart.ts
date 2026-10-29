@@ -18,6 +18,9 @@ export type CartLine = {
   quantity: number;
   /** Price shown when the item was added. The server recalculates on every quote. */
   unitPrice: number;
+  /** Shop selling the item (one shop per order). Missing on lines saved before the marketplace. */
+  floristId?: number | null;
+  floristName?: string | null;
 };
 
 function isLine(x: unknown): x is CartLine {
@@ -33,8 +36,35 @@ export function lineKey(l: Pick<CartLine, "productId" | "variantId" | "stems" | 
 }
 
 export const CART_ADDED_EVENT = "gulzor:cart-added";
+export const CART_CONFLICT_EVENT = "gulzor:cart-conflict";
 
-export function addToCart(line: Omit<CartLine, "key">) {
+/** The shop the cart currently belongs to (from any line that knows it). */
+export function cartFlorist(lines: CartLine[]): { id: number; name: string } | null {
+  const l = lines.find((x) => x.floristId != null);
+  return l ? { id: l.floristId!, name: l.floristName ?? "" } : null;
+}
+
+/** True when adding this line would mix two shops in one order. */
+export function conflictsWithCart(lines: CartLine[], line: Pick<CartLine, "floristId">) {
+  const current = cartFlorist(lines);
+  return current != null && line.floristId != null && current.id !== line.floristId;
+}
+
+/** Empties the cart and adds the line (the customer chose to switch shops). */
+export function replaceCartWith(line: Omit<CartLine, "key">) {
+  cartStore.set([]);
+  addToCart(line);
+}
+
+/**
+ * Adds a line, merging it with an identical one. One shop per order: if the cart holds another shop's
+ * products nothing is added and the cart drawer asks the customer what to do. Returns whether it was added.
+ */
+export function addToCart(line: Omit<CartLine, "key">): boolean {
+  if (conflictsWithCart(cartStore.get(), line)) {
+    window.dispatchEvent(new CustomEvent<Omit<CartLine, "key">>(CART_CONFLICT_EVENT, { detail: line }));
+    return false;
+  }
   const key = lineKey(line);
   cartStore.set((prev) => {
     const existing = prev.find((x) => x.key === key);
@@ -45,6 +75,7 @@ export function addToCart(line: Omit<CartLine, "key">) {
   });
   // Opens the cart drawer (components/store/cart-drawer.tsx).
   window.dispatchEvent(new CustomEvent<CartLine>(CART_ADDED_EVENT, { detail: { ...line, key } }));
+  return true;
 }
 
 export function updateQuantity(key: string, quantity: number) {

@@ -12,6 +12,7 @@ const uz = {
     delivery: "Yetkazib berish",
   },
   extra: {
+    shops: "Do‘konlar",
     custom: "Maxsus guldasta buyurtma qilish",
     track: "Buyurtmani kuzatish",
     favorites: "Sevimlilar",
@@ -72,6 +73,7 @@ const ru: typeof uz = {
     delivery: "Доставка",
   },
   extra: {
+    shops: "Магазины",
     custom: "Заказать индивидуальный букет",
     track: "Отследить заказ",
     favorites: "Избранное",

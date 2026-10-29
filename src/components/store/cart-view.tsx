@@ -9,10 +9,10 @@ import { fmt } from "@/i18n/config";
 import { formatUZS } from "@/lib/format";
 import { MAX_LINE_QUANTITY } from "@/lib/pricing";
 import type { Quote } from "@/lib/quote";
-import { cartStore, removeLine, toServerLines, updateQuantity } from "./cart";
+import { cartFlorist, cartStore, removeLine, toServerLines, updateQuantity } from "./cart";
 import { prefsStore, useQuote } from "./use-quote";
 
-export type ZoneOption = { id: number; label: string; fee: number; freeFrom: number | null; minOrder: number | null };
+export type ZoneOption = { id: number; floristId: number; label: string; fee: number; freeFrom: number | null; minOrder: number | null };
 
 export function Summary({ quote, loading, showDeliveryHint }: { quote: Quote | null; loading: boolean; showDeliveryHint?: boolean }) {
   const { locale, t: dict } = useT();
@@ -67,8 +67,11 @@ export function Summary({ quote, loading, showDeliveryHint }: { quote: Quote | n
   );
 }
 
-export function CartView({ zones }: { zones: ZoneOption[] }) {
+export function CartView({ zones: allZones }: { zones: ZoneOption[] }) {
   const [lines, , hydrated] = cartStore.useStore();
+  // Each shop delivers itself: only the cart's shop's zones (older carts that don't know their shop see all; the server checks).
+  const shop = cartFlorist(lines);
+  const zones = shop ? allZones.filter((z) => z.floristId === shop.id) : allZones;
   const [prefs, setPrefs, prefsReady] = prefsStore.useStore();
   const [couponInput, setCouponInput] = useState("");
   const { locale, t: dict, href } = useT();
@@ -102,6 +105,16 @@ export function CartView({ zones }: { zones: ZoneOption[] }) {
 
   return (
     <div className="grid gap-10 lg:grid-cols-[1fr_380px]">
+      <div className="lg:col-span-2 -mb-4">
+        {quote?.florist ? (
+          <p className="text-sm text-muted">
+            {dict.shop.soldBy}{" "}
+            <Link href={href(`/dokon/${quote.florist.slug}`)} className="font-semibold text-wine underline-offset-4 hover:underline">
+              {quote.florist.name}
+            </Link>
+          </p>
+        ) : null}
+      </div>
       <ul className="divide-y divide-line border-y border-line" aria-label={t.items}>
         {lines.map((l, i) => {
           const ql = qLine(i);

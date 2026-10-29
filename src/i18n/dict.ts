@@ -15,9 +15,10 @@ import layout from "./ns/layout";
 import meta from "./ns/meta";
 import order from "./ns/order";
 import product from "./ns/product";
+import shop from "./ns/shop";
 import { fmt, type Locale } from "./config";
 
-const namespaces = { account, cart, catalog, checkout, common, custom, delivery, errors, home, layout, meta, order, product };
+const namespaces = { account, cart, catalog, checkout, common, custom, delivery, errors, home, layout, meta, order, product, shop };
 
 type Namespaces = typeof namespaces;
 export type Dict = { [K in keyof Namespaces]: Namespaces[K]["uz"] };

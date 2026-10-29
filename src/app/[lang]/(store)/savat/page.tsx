@@ -12,7 +12,7 @@ export default async function CartPage() {
   const locale = await getLocale();
   const { regions } = await getDeliveryConfig(locale);
   const zones = regions.flatMap((r) =>
-    r.zones.map((z) => ({ id: z.id, label: `${r.name}, ${z.name}`, fee: z.fee, freeFrom: z.freeFrom, minOrder: z.minOrder })),
+    r.zones.map((z) => ({ id: z.id, floristId: z.floristId, label: `${r.name}, ${z.name}`, fee: z.fee, freeFrom: z.freeFrom, minOrder: z.minOrder })),
   );
   return (
     <div className="container-page pt-10">

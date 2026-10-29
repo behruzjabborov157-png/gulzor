@@ -28,7 +28,7 @@ export default async function CheckoutPage() {
     <div className="container-page pt-10">
       <h1 className="mb-8 text-4xl sm:text-5xl">{getDict(locale).checkout.title}</h1>
       <CheckoutForm
-        regions={regions.map((r) => ({ id: r.id, name: r.name, zones: r.zones.map((z) => ({ id: z.id, name: z.name, description: z.description, fee: z.fee })) }))}
+        regions={regions.map((r) => ({ id: r.id, name: r.name, zones: r.zones.map((z) => ({ id: z.id, floristId: z.floristId, name: z.name, description: z.description, fee: z.fee })) }))}
         pickup={{ enabled: checkout.pickupEnabled, address: pick(locale, checkout.pickupAddress, checkout.pickupAddressRu) }}
         payments={availablePaymentMethods(checkout, locale)}
         dates={{ min: win.min, max: win.max, today: win.min, tomorrow: addDaysISO(win.min, 1) }}

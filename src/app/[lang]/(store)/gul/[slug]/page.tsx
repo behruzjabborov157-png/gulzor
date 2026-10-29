@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { FavoriteButton, TrackRecent } from "@/components/store/client-widgets";
 import { Gallery } from "@/components/store/gallery";
 import { ProductGrid } from "@/components/store/product-card";
+import { FloristLink } from "@/components/store/florist";
 import { ProductConfigurator } from "@/components/store/product-configurator";
 import { RecentlyViewed } from "@/components/store/widgets";
 import { ClockIcon, InfoIcon, TruckIcon } from "@/components/ui/icons";
@@ -15,6 +16,7 @@ import { getDict } from "@/i18n/dict";
 import { alternates } from "@/i18n/seo";
 import { getLocale } from "@/i18n/server";
 import { getAddons, getProductBySlug, getRelated, isOrderable, toPricing } from "@/lib/catalog";
+import { getFloristById } from "@/lib/florists";
 import { formatDateTime } from "@/lib/format";
 import { fromPrice } from "@/lib/pricing";
 import { siteUrl } from "@/lib/settings";
@@ -72,7 +74,8 @@ export default async function ProductPage({ params }: Props) {
   const { product: p, variants, categories, stock } = data;
   const orderable = isOrderable(stock);
   const pricing = toPricing(p, variants, locale);
-  const addons = p.isAddon ? [] : await getAddons(locale);
+  const [addons, florist] = await Promise.all([p.isAddon ? [] : getAddons(locale, p.floristId), getFloristById(p.floristId, locale)]);
+  if (!florist) notFound();
   const primary = categories.find((c) => c.id === p.primaryCategoryId) ?? categories[0];
   const price = fromPrice(pricing);
 
@@ -150,7 +153,7 @@ export default async function ProductPage({ params }: Props) {
             <div className="mt-8">
               <Suspense>
                 <ProductConfigurator
-                  product={{ id: p.id, slug: p.slug, name, image: p.images[0]?.url ?? null }}
+                  product={{ id: p.id, slug: p.slug, name, image: p.images[0]?.url ?? null, floristId: florist.id, floristName: florist.name }}
                   pricing={pricing}
                   colors={colors}
                   addons={addons.filter((a) => a.productId !== p.id)}
@@ -159,7 +162,11 @@ export default async function ProductPage({ params }: Props) {
               </Suspense>
             </div>
 
-            <ul className="mt-6 grid gap-3 text-sm sm:grid-cols-2">
+            <p className="mt-6">
+              <FloristLink florist={florist} locale={locale} />
+            </p>
+
+            <ul className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
               <li className="flex items-center gap-2.5 text-charcoal/80">
                 <ClockIcon size={18} className="text-wine" /> {prepLabel(locale, p.prepTimeMinutes)}
               </li>

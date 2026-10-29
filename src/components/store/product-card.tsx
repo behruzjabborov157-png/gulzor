@@ -4,6 +4,7 @@ import { localePath, type Locale } from "@/i18n/config";
 import { getDict } from "@/i18n/dict";
 import { isOrderable, type ProductCard as Card } from "@/lib/catalog-shared";
 import { FavoriteButton, QuickAddButton } from "./client-widgets";
+import { FloristLink } from "./florist";
 
 export function ProductCard({
   p,
@@ -46,7 +47,7 @@ export function ProductCard({
           </div>
         </Link>
         <FavoriteButton productId={p.id} name={p.name} className="absolute top-3 right-3" />
-        {orderable && p.quickAdd ? <QuickAddButton p={{ id: p.id, slug: p.slug, name: p.name, price: p.price, image: p.image?.url ?? null }} /> : null}
+        {orderable && p.quickAdd ? <QuickAddButton p={{ id: p.id, slug: p.slug, name: p.name, price: p.price, image: p.image?.url ?? null, floristId: p.florist?.id ?? null, floristName: p.florist?.name ?? null }} /> : null}
       </div>
       <div className="mt-3.5 flex flex-1 flex-col px-0.5">
         <h3 className={`font-display text-[1.3rem] leading-[1.15] sm:text-[1.4rem] ${dark ? "text-ivory" : "text-plum"}`}>
@@ -54,6 +55,11 @@ export function ProductCard({
             {p.name}
           </Link>
         </h3>
+        {p.florist && !dark ? (
+          <p className="mt-1">
+            <FloristLink florist={p.florist} locale={locale} compact />
+          </p>
+        ) : null}
         {p.isDemo ? <p className={`mt-1 text-[11px] tracking-wide ${dark ? "text-ivory/60" : "text-muted"}`}>{t.demoProduct}</p> : null}
         <Price value={p.price} compareAt={p.compareAtPrice} from={p.hasOptions} locale={locale} dark={dark} className="mt-1.5 text-[15px]" />
       </div>

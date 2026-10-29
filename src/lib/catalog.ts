@@ -2,6 +2,7 @@ import { and, asc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { DEFAULT_LOCALE, pick, type Locale } from "@/i18n/config";
 import { isOrderable, type ProductCard, type StockState } from "@/lib/catalog-shared";
+import { floristApproved } from "@/lib/florists";
 import { fromPrice, type PricingProduct } from "@/lib/pricing";
 import { normalizeSearch } from "@/lib/search";
 import { tashkentNow } from "@/lib/time";
@@ -47,7 +48,9 @@ function compareFor(prod: Product, variants: Variant[]): number | null {
   return prod.compareAtPrice;
 }
 
-export function toCard(prod: Product, variants: Variant[], locale: Locale = DEFAULT_LOCALE): ProductCard {
+export type CardFlorist = { id: number; slug: string; name: string };
+
+export function toCard(prod: Product, variants: Variant[], locale: Locale = DEFAULT_LOCALE, florist: CardFlorist | null = null): ProductCard {
   const price = fromPrice(toPricing(prod, variants));
   const cmp = compareFor(prod, variants);
   const name = pick(locale, prod.name, prod.nameRu);
@@ -68,6 +71,7 @@ export function toCard(prod: Product, variants: Variant[], locale: Locale = DEFA
     isPremium: prod.isPremium,
     isDemo: prod.isDemo,
     isAddon: prod.isAddon,
+    florist,
   };
 }
 
@@ -94,6 +98,10 @@ export type CatalogQuery = {
   includeAddons?: boolean;
   excludeIds?: number[];
   locale?: Locale;
+  /** Only this florist's products (shop page, ?dokon= filter). */
+  floristId?: number;
+  /** Only products whose florist delivers in this city (delivery region). */
+  regionId?: number;
 };
 
 /** Sort options; labels come from the dictionary (t.catalog.sorts). */
@@ -103,9 +111,14 @@ export async function listProducts(query: CatalogQuery) {
   const db = await getDb();
   const perPage = Math.min(Math.max(query.perPage ?? 12, 1), 48);
   const page = Math.max(query.page ?? 1, 1);
-  const where: SQL[] = [eq(p.status, "active")];
+  // Only products of approved florists are ever listed.
+  const where: SQL[] = [eq(p.status, "active"), floristApproved(p.floristId)];
 
   if (!query.includeAddons) where.push(eq(p.isAddon, false));
+  if (query.floristId) where.push(eq(p.floristId, query.floristId));
+  if (query.regionId) {
+    where.push(sql`EXISTS (SELECT 1 FROM ${schema.deliveryZones} dz WHERE dz.florist_id = ${p.floristId} AND dz.region_id = ${query.regionId} AND dz.is_active)`);
+  }
   for (const slug of query.categories ?? []) where.push(inCategory(slug));
   if (query.q) {
     // search_text holds both languages, normalised in JS (lib/search.ts) so Cyrillic works on any DB locale.
@@ -149,20 +162,26 @@ export async function withVariants(rows: Product[], locale: Locale = DEFAULT_LOC
   if (!rows.length) return [];
   const db = await getDb();
   const vs = await db.select().from(pv).where(inArray(pv.productId, rows.map((r) => r.id)));
-  return rows.map((r) => toCard(r, vs.filter((v) => v.productId === r.id), locale));
+  const fIds = [...new Set(rows.map((r) => r.floristId))];
+  const fs = await db.select().from(schema.florists).where(inArray(schema.florists.id, fIds));
+  const florist = (id: number): CardFlorist | null => {
+    const f = fs.find((x) => x.id === id);
+    return f ? { id: f.id, slug: f.slug, name: pick(locale, f.name, f.nameRu) } : null;
+  };
+  return rows.map((r) => toCard(r, vs.filter((v) => v.productId === r.id), locale, florist(r.floristId)));
 }
 
 export async function getProductsByIds(ids: number[], locale: Locale = DEFAULT_LOCALE): Promise<ProductCard[]> {
   if (!ids.length) return [];
   const db = await getDb();
-  const rows = await db.select().from(p).where(and(inArray(p.id, ids), eq(p.status, "active")));
+  const rows = await db.select().from(p).where(and(inArray(p.id, ids), eq(p.status, "active"), floristApproved(p.floristId)));
   const cards = await withVariants(rows, locale);
   return ids.map((id) => cards.find((x) => x.id === id)).filter((x): x is ProductCard => !!x);
 }
 
 export async function getProductBySlug(slug: string, locale: Locale = DEFAULT_LOCALE) {
   const db = await getDb();
-  const [prod] = await db.select().from(p).where(and(eq(p.slug, slug), eq(p.status, "active")));
+  const [prod] = await db.select().from(p).where(and(eq(p.slug, slug), eq(p.status, "active"), floristApproved(p.floristId)));
   if (!prod) return null;
   const variants = await db.select().from(pv).where(eq(pv.productId, prod.id)).orderBy(asc(pv.sortOrder), asc(pv.price));
   const cats = await db
@@ -178,13 +197,13 @@ export async function getProductBySlug(slug: string, locale: Locale = DEFAULT_LO
   };
 }
 
-/** Add-ons that can be attached to bouquets (cards, sweets, toys, vases). */
-export async function getAddons(locale: Locale = DEFAULT_LOCALE) {
+/** Add-ons that can be attached to bouquets (cards, sweets, toys, vases) — only the same florist's, since one florist fulfils an order. */
+export async function getAddons(locale: Locale = DEFAULT_LOCALE, floristId?: number) {
   const db = await getDb();
   const rows = await db
     .select()
     .from(p)
-    .where(and(eq(p.status, "active"), eq(p.isAddon, true)))
+    .where(and(eq(p.status, "active"), eq(p.isAddon, true), floristApproved(p.floristId), floristId ? eq(p.floristId, floristId) : undefined))
     .orderBy(asc(p.price));
   return rows
     .filter((r) => isOrderable(stockState(r, [])))
@@ -201,6 +220,7 @@ export async function getRelated(productId: number, categoryIds: number[], limit
     .where(
       and(
         eq(p.status, "active"),
+        floristApproved(p.floristId),
         eq(p.isAddon, false),
         sql`${p.id} <> ${productId}`,
         sql`EXISTS (SELECT 1 FROM ${pc} WHERE ${pc.productId} = ${p.id} AND ${pc.categoryId} IN (${sql.join(

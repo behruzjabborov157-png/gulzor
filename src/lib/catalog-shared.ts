@@ -21,4 +21,6 @@ export type ProductCard = {
   isPremium: boolean;
   isDemo: boolean;
   isAddon: boolean;
+  /** The shop that sells and delivers it (marketplace). */
+  florist: { id: number; slug: string; name: string } | null;
 };

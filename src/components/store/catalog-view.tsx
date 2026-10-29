@@ -5,6 +5,8 @@ import { Breadcrumbs, EmptyState } from "@/components/ui/primitives";
 import { fmt, localePath, type Locale } from "@/i18n/config";
 import { getDict } from "@/i18n/dict";
 import { getCategories, listProducts, SORTS, type Category, type CatalogQuery } from "@/lib/catalog";
+import { getDeliveryConfig } from "@/lib/delivery";
+import { listApprovedFlorists } from "@/lib/florists";
 import { formatUZS } from "@/lib/format";
 import { AutoSubmit } from "./auto-submit";
 
@@ -23,6 +25,9 @@ export function parseCatalogParams(sp: SearchParams) {
     flower: one(sp.gul),
     occasion: one(sp.munosabat),
     type: one(sp.turi),
+    /** Marketplace filters: shop (florist slug) and city (delivery region slug). */
+    shop: one(sp.dokon).slice(0, 80),
+    city: one(sp.shahar).slice(0, 80),
     minPrice: num(one(sp.narx_min)),
     maxPrice: num(one(sp.narx_max)),
     inStock: one(sp.mavjud) === "1",
@@ -48,6 +53,9 @@ export async function CatalogView({
   const lp = (p: string) => localePath(locale, p);
   const f = parseCatalogParams(searchParams);
   const cats = [base?.slug, f.flower, f.occasion, f.type].filter((x): x is string => !!x);
+  const [shops, { regions: cities }] = await Promise.all([listApprovedFlorists(locale), getDeliveryConfig(locale)]);
+  const shop = f.shop ? shops.find((x) => x.slug === f.shop) : undefined;
+  const city = f.city ? cities.find((x) => x.slug === f.city) : undefined;
   const [result, flowers, occasions, types] = await Promise.all([
     listProducts({
       q: f.q || undefined,
@@ -59,6 +67,9 @@ export async function CatalogView({
       page: f.page,
       perPage: 12,
       includeAddons: base?.slug === "sovgalar" || f.type === "sovgalar",
+      // An unknown shop/city in the URL shows nothing rather than everything.
+      floristId: f.shop ? (shop?.id ?? -1) : undefined,
+      regionId: f.city ? (city?.id ?? -1) : undefined,
       locale,
     }),
     getCategories("flower", locale),
@@ -93,6 +104,8 @@ export async function CatalogView({
   if (f.minPrice != null) active.push({ key: "narx_min", label: fmt(t.fromChip, { amount: formatUZS(f.minPrice, locale) }) });
   if (f.maxPrice != null) active.push({ key: "narx_max", label: fmt(t.toChip, { amount: formatUZS(f.maxPrice, locale) }) });
   if (f.inStock) active.push({ key: "mavjud", label: t.inStockChip });
+  if (f.shop) active.push({ key: "dokon", label: fmt(dict.shop.filterShop, { name: shop?.name ?? f.shop }) });
+  if (f.city) active.push({ key: "shahar", label: fmt(dict.shop.filterCity, { name: city?.name ?? f.city }) });
 
   const title = f.q && !base ? fmt(t.searchTitle, { q: f.q }) : (base?.name ?? t.allTitle);
 
@@ -149,6 +162,37 @@ export async function CatalogView({
               {select(t.flower, "gul", f.flower, flowers, base?.kind === "flower")}
               {select(t.occasion, "munosabat", f.occasion, occasions, base?.kind === "occasion")}
               {select(t.type, "turi", f.type, types, base?.kind === "bouquet_type")}
+              {/* Shop and city choices only appear once there is more than one to choose from. */}
+              {shops.length > 1 ? (
+                <div>
+                  <label htmlFor="f-dokon" className="label">
+                    {dict.shop.listTitle}
+                  </label>
+                  <select id="f-dokon" name="dokon" defaultValue={f.shop} className="field py-2.5">
+                    <option value="">{t.all}</option>
+                    {shops.map((x) => (
+                      <option key={x.id} value={x.slug}>
+                        {x.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
+              {cities.length > 1 ? (
+                <div>
+                  <label htmlFor="f-shahar" className="label">
+                    {dict.shop.cityLabel}
+                  </label>
+                  <select id="f-shahar" name="shahar" defaultValue={f.city} className="field py-2.5">
+                    <option value="">{dict.shop.allCities}</option>
+                    {cities.map((x) => (
+                      <option key={x.id} value={x.slug}>
+                        {x.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
               <fieldset>
                 <legend className="label">{t.price}</legend>
                 <div className="grid grid-cols-2 gap-2">

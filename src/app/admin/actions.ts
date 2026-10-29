@@ -28,6 +28,7 @@ import { notifyOrder, sendTelegram } from "@/lib/telegram";
 import { isISODate } from "@/lib/time";
 import { parseCsv, PRODUCT_CSV_COLUMNS } from "@/lib/csv";
 import { buildSearchText } from "@/lib/search";
+import { platformFloristId } from "@/lib/florists";
 
 /* ------------------------------------------------------------------ */
 /* Auth                                                                */
@@ -279,6 +280,8 @@ export async function saveProductAction(productId: number | null, _: FormState, 
     updatedAt: new Date(),
   };
 
+  // Looked up before the transaction: a query on another connection inside it would deadlock a single-connection database.
+  const ownFloristId = await platformFloristId();
   const id = await db.transaction(async (tx) => {
     let pid = productId;
     if (pid) {
@@ -295,7 +298,8 @@ export async function saveProductAction(productId: number | null, _: FormState, 
         .set({ ...values, ...(priceChanged ? { priceUpdatedAt: new Date() } : {}) })
         .where(eq(schema.products.id, pid));
     } else {
-      const [row] = await tx.insert(schema.products).values({ ...values, priceUpdatedAt: new Date() }).returning({ id: schema.products.id });
+      // Products created by Gulzor staff belong to the platform's own shop (florists add theirs in the florist panel).
+      const [row] = await tx.insert(schema.products).values({ ...values, floristId: ownFloristId, priceUpdatedAt: new Date() }).returning({ id: schema.products.id });
       pid = row.id;
     }
     // Variants: update existing, insert new, remove deleted.
@@ -427,7 +431,7 @@ export async function saveZoneAction(zoneId: number | null, _: FormState, form: 
     sortOrder: int(form.get("sortOrder")) || 0,
   };
   if (zoneId) await db.update(schema.deliveryZones).set(values).where(eq(schema.deliveryZones.id, zoneId));
-  else await db.insert(schema.deliveryZones).values(values);
+  else await db.insert(schema.deliveryZones).values({ ...values, floristId: await platformFloristId() });
   revalidatePath("/admin/yetkazib-berish");
   return { ok: true, message: "Saqlandi" };
 }
@@ -645,6 +649,7 @@ export async function importProductsAction(_: FormState, form: FormData): Promis
       updatedAt: new Date(),
     };
     let searchText = buildSearchText(values);
+    const ownFloristId = await platformFloristId(); // before the transaction (see saveProductAction)
     await db.transaction(async (tx) => {
       const [existing] = await tx.select().from(schema.products).where(eq(schema.products.slug, slug));
       let pid: number;
@@ -657,7 +662,7 @@ export async function importProductsAction(_: FormState, form: FormData): Promis
         pid = existing.id;
         updated++;
       } else {
-        const [row2] = await tx.insert(schema.products).values({ ...values, searchText, priceUpdatedAt: new Date() }).returning({ id: schema.products.id });
+        const [row2] = await tx.insert(schema.products).values({ ...values, floristId: ownFloristId, searchText, priceUpdatedAt: new Date() }).returning({ id: schema.products.id });
         pid = row2.id;
         created++;
       }

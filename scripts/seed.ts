@@ -6,6 +6,7 @@ import { sql } from "drizzle-orm";
 import { closeDb, getDb, schema } from "@/db";
 import { DEFAULT_CHECKOUT, DEFAULT_STORE } from "@/lib/settings";
 import { buildSearchText } from "@/lib/search";
+import { platformFloristId } from "@/lib/florists";
 import { CARE_BOX, CARE_CUT, CARE_DEFAULT, CARE_PLANT, CATEGORIES, PRODUCTS } from "./seed-data";
 import { CARE_RU, CATEGORIES_RU, PRODUCTS_RU, VARIANT_RU } from "./seed-data-ru";
 
@@ -23,6 +24,8 @@ async function main() {
   // created switched OFF (enter your real fees first) and no demo products or coupon are added.
   const noDemo = process.argv.includes("--no-demo");
   const db = await getDb();
+  // The original catalogue and delivery zones belong to the platform's own shop "Gulzor".
+  const floristId = await platformFloristId();
 
   const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.categories);
   if (n > 0 && !reset) {
@@ -77,6 +80,7 @@ async function main() {
       const [row] = await tx
         .insert(schema.products)
         .values({
+          floristId,
           slug: p.slug,
           name: p.name,
           shortDescription: p.short,
@@ -147,6 +151,7 @@ async function main() {
     });
     await tx.insert(schema.deliveryZones).values([
       {
+        floristId,
         regionId: tashkent.id,
         isActive: !noDemo,
         name: "Markaziy tumanlar",
@@ -162,6 +167,7 @@ async function main() {
         sortOrder: 0,
       },
       {
+        floristId,
         regionId: tashkent.id,
         isActive: !noDemo,
         name: "Chekka tumanlar",

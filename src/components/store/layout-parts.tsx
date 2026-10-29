@@ -34,6 +34,7 @@ export function Header({ customerName, locale }: { customerName: string | null; 
   const t = getDict(locale).layout;
   const nav = navItems(locale);
   const extra: NavItem[] = [
+    { href: localePath(locale, "/dokonlar"), label: t.extra.shops },
     { href: localePath(locale, "/maxsus-guldasta"), label: t.extra.custom },
     { href: localePath(locale, "/kuzatish"), label: t.extra.track },
     { href: localePath(locale, "/sevimlilar"), label: t.extra.favorites },
@@ -126,6 +127,7 @@ export function Footer({ store, locale }: { store: StoreSettings; locale: Locale
           <ul className="space-y-2.5 text-sm">
             <li><Link href={lp("/yetkazib-berish")} className="hover:text-ivory">{t.deliveryPayment}</Link></li>
             <li><Link href={lp("/kuzatish")} className="hover:text-ivory">{t.track}</Link></li>
+            <li><Link href={lp("/dokonlar")} className="hover:text-ivory">{getDict(locale).layout.extra.shops}</Link></li>
             <li><Link href={lp("/maxsus-guldasta")} className="hover:text-ivory">{t.custom}</Link></li>
             <li><Link href={lp("/oferta")} className="hover:text-ivory">{t.offer}</Link></li>
             <li><Link href={lp("/maxfiylik")} className="hover:text-ivory">{t.privacy}</Link></li>

@@ -11,6 +11,7 @@ import { getSettings } from "@/lib/settings";
 import { notifyOrderEmail } from "@/lib/email";
 import { notifyOrder } from "@/lib/telegram";
 import { telegramUserFromInitData } from "@/lib/telegram-miniapp";
+import { commissionFor } from "@/lib/florists";
 import { tashkentNow } from "@/lib/time";
 
 export type Order = typeof schema.orders.$inferSelect;
@@ -146,6 +147,12 @@ export async function createOrder(
     { forCheckout: true, locale },
   );
   if (quote.errors.length) return { ok: false, errors: quote.errors, quote };
+  // quoteCart guarantees exactly one approved florist when there are no errors.
+  const floristId = quote.florist!.id;
+  const db0 = await getDb();
+  const [floristRow] = await db0.select({ rate: schema.florists.commissionRate }).from(schema.florists).where(eq(schema.florists.id, floristId));
+  const commissionRate = floristRow?.rate ?? 0;
+  const commissionAmount = commissionFor(commissionRate, quote.subtotal - quote.discount);
 
   const slot = quote.slots.find((s) => s.id === v.slotId)!;
   const recipientName = v.recipientIsCustomer ? v.customerName : v.recipientName;
@@ -169,6 +176,7 @@ export async function createOrder(
               and(
                 eq(schema.orders.deliveryDate, v.date),
                 eq(schema.orders.slotId, slot.id),
+                eq(schema.orders.floristId, floristId),
                 sql`${schema.orders.status} NOT IN ('cancelled', 'rejected')`,
               ),
             );
@@ -196,6 +204,9 @@ export async function createOrder(
           .values({
             number: orderNumber(),
             accessToken,
+            floristId,
+            commissionRate,
+            commissionAmount,
             idempotencyKey: v.submissionId ?? null,
             telegramUserId: tgUser ? String(tgUser.id) : null,
             telegramUsername: tgUser?.username ?? null,

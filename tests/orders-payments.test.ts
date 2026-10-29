@@ -37,12 +37,15 @@ const { deleteCustomerAccount } = await import("@/lib/auth");
 const { notifyOrderEmail } = await import("@/lib/email");
 const { handleUpdate } = await import("@/lib/bot/handler");
 const { setBotTransport } = await import("@/lib/bot/api");
+const { platformFloristId, commissionFor } = await import("@/lib/florists");
 const { paymeRpc } = await import("@/lib/payments/payme");
 const { clickRequest } = await import("@/lib/payments/click");
 const { saveSetting, DEFAULT_CHECKOUT } = await import("@/lib/settings");
 const { addDaysISO, tashkentNow } = await import("@/lib/time");
 
 let productId = 0;
+let floristId = 0;
+let regionId = 0;
 let zoneId = 0;
 let slotId = 0;
 const tomorrow = addDaysISO(tashkentNow().date, 1);
@@ -53,12 +56,14 @@ before(async () => {
     await db.execute(sql`DROP SCHEMA IF EXISTS public CASCADE; DROP SCHEMA IF EXISTS drizzle CASCADE; CREATE SCHEMA public;`);
   }
   await migrate(db as never, { migrationsFolder: path.resolve("drizzle") });
+  floristId = await platformFloristId(); // created by the marketplace migration
   const [r] = await db.insert(schema.deliveryRegions).values({ slug: "t", name: "Toshkent" }).returning();
-  const [z] = await db.insert(schema.deliveryZones).values({ regionId: r.id, name: "Markaz", fee: 30_000, freeFrom: 700_000, minOrder: 100_000 }).returning();
+  regionId = r.id;
+  const [z] = await db.insert(schema.deliveryZones).values({ floristId, regionId: r.id, name: "Markaz", fee: 30_000, freeFrom: 700_000, minOrder: 100_000 }).returning();
   const [s] = await db.insert(schema.timeSlots).values({ label: "12–15", startTime: "12:00", endTime: "15:00" }).returning();
   const [p] = await db
     .insert(schema.products)
-    .values({ slug: "test-roses", name: "Test atirgullar", price: 200_000, status: "active", stockQuantity: 3 })
+    .values({ floristId, slug: "test-roses", name: "Test atirgullar", price: 200_000, status: "active", stockQuantity: 3 })
     .returning();
   await saveSetting("checkout", { ...DEFAULT_CHECKOUT, paymeEnabled: true, clickEnabled: true });
   productId = p.id;
@@ -453,6 +458,116 @@ test("ordering bot: full chat from /start to a saved order, with prices and slot
     assert.equal(again, null);
     const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(schema.orders).where(eq(schema.orders.telegramUserId, "900001"));
     assert.equal(count, 1);
+  } finally {
+    setBotTransport(null);
+  }
+});
+
+test("marketplace: one florist per order, only approved florists, florist's own zones, commission and per-florist slot capacity", async () => {
+  const db = await getDb();
+  await db.update(schema.products).set({ stockQuantity: null }).where(eq(schema.products.id, productId));
+  // A second florist with its own product and its own delivery zone.
+  const [f2] = await db.insert(schema.florists).values({ slug: "lola-gullari", name: "Lola gullari", status: "approved", commissionRate: 1200 }).returning();
+  const [p2] = await db.insert(schema.products).values({ floristId: f2.id, slug: "f2-tulips", name: "Lolalar", price: 150_000, status: "active" }).returning();
+  const [z2] = await db.insert(schema.deliveryZones).values({ floristId: f2.id, regionId, name: "Chilonzor", fee: 25_000 }).returning();
+  const line = (id: number) => ({ productId: id, quantity: 1, addons: [] });
+
+  // Mixing two florists in one order is refused.
+  const mixed = await createOrder(checkout({ lines: [line(productId), line(p2.id)] }), null);
+  assert.equal(mixed.ok, false);
+  assert.match(JSON.stringify(mixed), /bitta do‘kondan/);
+
+  // Florist 2's product cannot be delivered with florist 1's zone.
+  const wrongZone = await createOrder(checkout({ lines: [line(p2.id)], zoneId }), null);
+  assert.equal(wrongZone.ok, false);
+  assert.match(JSON.stringify(wrongZone), /yetkazib bermaydi/);
+
+  // With its own zone it works; the order belongs to florist 2 and carries its 12% commission on the goods.
+  const ok = await createOrder(checkout({ lines: [line(p2.id)], zoneId: z2.id }), null);
+  assert.ok(ok.ok, JSON.stringify(ok));
+  const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, ok.orderId));
+  assert.equal(o.floristId, f2.id);
+  assert.equal(o.commissionRate, 1200);
+  assert.equal(o.commissionAmount, commissionFor(1200, 150_000));
+  assert.equal(o.commissionAmount, 18_000);
+  assert.equal(o.deliveryFee, 25_000);
+
+  // Slot capacity is per florist: florist 2 filling the window does not block another florist.
+  const [f3] = await db.insert(schema.florists).values({ slug: "atirgul-uyi", name: "Atirgul uyi", status: "approved" }).returning();
+  const [p3] = await db.insert(schema.products).values({ floristId: f3.id, slug: "f3-roses", name: "Atirgul", price: 120_000, status: "active" }).returning();
+  const [z3] = await db.insert(schema.deliveryZones).values({ floristId: f3.id, regionId, name: "Yunusobod", fee: 20_000 }).returning();
+  await db.update(schema.timeSlots).set({ capacity: 1 }).where(eq(schema.timeSlots.id, slotId));
+  try {
+    const f2Again = await createOrder(checkout({ lines: [line(p2.id)], zoneId: z2.id }), null);
+    assert.equal(f2Again.ok, false); // florist 2's single place in this window is taken
+    const f3Order = await createOrder(checkout({ lines: [line(p3.id)], zoneId: z3.id }), null);
+    assert.ok(f3Order.ok, JSON.stringify(f3Order)); // florist 3 still has its own place
+  } finally {
+    await db.update(schema.timeSlots).set({ capacity: null }).where(eq(schema.timeSlots.id, slotId));
+  }
+
+  // A suspended florist's products disappear from sale immediately.
+  await db.update(schema.florists).set({ status: "suspended" }).where(eq(schema.florists.id, f2.id));
+  const suspended = await createOrder(checkout({ lines: [line(p2.id)], zoneId: z2.id }), null);
+  assert.equal(suspended.ok, false);
+  assert.match(JSON.stringify(suspended), /sotuvda emas/);
+});
+
+
+test("marketplace storefront: shop and city filters, hidden unapproved shops, shop zones, bot refuses to mix shops", async () => {
+  const db = await getDb();
+  const { listProducts } = await import("@/lib/catalog");
+  const { getDeliveryConfig } = await import("@/lib/delivery");
+  const { getFloristBySlug, listApprovedFlorists } = await import("@/lib/florists");
+  const [shopA] = await db.insert(schema.florists).values({ slug: "shop-a", name: "Shop A", status: "approved" }).returning();
+  const [shopB] = await db.insert(schema.florists).values({ slug: "shop-b", name: "Shop B", status: "pending" }).returning();
+  const [cityB] = await db.insert(schema.deliveryRegions).values({ slug: "samarqand", name: "Samarqand" }).returning();
+  const [pa] = await db.insert(schema.products).values({ floristId: shopA.id, slug: "a-rose", name: "A rose", price: 90_000, status: "active" }).returning();
+  await db.insert(schema.products).values({ floristId: shopB.id, slug: "b-rose", name: "B rose", price: 90_000, status: "active" });
+  await db.insert(schema.deliveryZones).values({ floristId: shopA.id, regionId: cityB.id, name: "Markaz", fee: 15_000 });
+
+  // Pending shops are invisible everywhere.
+  assert.equal(await getFloristBySlug("shop-b", "uz"), null);
+  assert.ok(!(await listApprovedFlorists("uz")).some((f) => f.slug === "shop-b"));
+  const all = await listProducts({ perPage: 48 });
+  assert.ok(all.items.some((p) => p.slug === "a-rose"));
+  assert.ok(!all.items.some((p) => p.slug === "b-rose"));
+  // Cards carry their shop.
+  assert.equal(all.items.find((p) => p.slug === "a-rose")?.florist?.slug, "shop-a");
+
+  // Shop filter and city filter (a city = shops that deliver there).
+  const onlyA = await listProducts({ floristId: shopA.id, perPage: 48 });
+  assert.deepEqual(onlyA.items.map((p) => p.slug), ["a-rose"]);
+  const inCityB = await listProducts({ regionId: cityB.id, perPage: 48 });
+  assert.deepEqual(inCityB.items.map((p) => p.slug), ["a-rose"]);
+
+  // Zones per shop.
+  const zonesA = (await getDeliveryConfig("uz", shopA.id)).regions.flatMap((r) => r.zones);
+  assert.ok(zonesA.length > 0 && zonesA.every((z) => z.floristId === shopA.id));
+
+  // Bot: a product from another shop is not mixed into the cart; "replace" swaps the cart.
+  const calls: { method: string; body: Record<string, unknown> }[] = [];
+  setBotTransport(async (method, body) => {
+    calls.push({ method, body });
+    return { ok: true, result: { message_id: 1 } };
+  });
+  const chat = { id: 900002, type: "private" };
+  const from = { id: 900002, first_name: "Aralash" };
+  const tap = (data: string) => handleUpdate({ callback_query: { id: "c", from, data, message: { message_id: 1, chat } } });
+  try {
+    await handleUpdate({ message: { message_id: 1, chat, from, text: "/start" } });
+    await tap("L:uz");
+    await tap(`P:${productId}`);
+    await tap(`A:${productId}`); // platform shop
+    await tap(`P:${pa.id}`);
+    await tap(`A:${pa.id}`); // shop A → conflict
+    const lastText = String([...calls].reverse().find((c) => c.method === "sendMessage")?.body.text ?? "");
+    assert.match(lastText, /bitta do‘kondan/);
+    const [sess1] = await db.select().from(schema.tgSessions).where(eq(schema.tgSessions.chatId, "900002"));
+    assert.deepEqual(sess1.cart.map((l) => l.productId), [productId]);
+    await tap(`AR:${pa.id}`);
+    const [sess2] = await db.select().from(schema.tgSessions).where(eq(schema.tgSessions.chatId, "900002"));
+    assert.deepEqual(sess2.cart.map((l) => l.productId), [pa.id]);
   } finally {
     setBotTransport(null);
   }

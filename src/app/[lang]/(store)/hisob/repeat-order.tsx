@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { addToCart } from "@/components/store/cart";
+import { addToCart, cartStore, conflictsWithCart } from "@/components/store/cart";
 import { useT } from "@/i18n/client";
 
 type Item = {
@@ -19,7 +19,7 @@ type Item = {
 };
 
 /** Puts the same items back in the cart. The cart re-checks current prices and availability on the server. */
-export function RepeatOrder({ items }: { items: Item[] }) {
+export function RepeatOrder({ items, floristId, floristName }: { items: Item[]; floristId: number; floristName: string }) {
   const router = useRouter();
   const { t, href } = useT();
   return (
@@ -27,8 +27,12 @@ export function RepeatOrder({ items }: { items: Item[] }) {
       type="button"
       className="btn-secondary btn-sm"
       onClick={() => {
+        // Repeating an order means that shop's items: a cart from another shop is replaced (one shop per order).
+        if (conflictsWithCart(cartStore.get(), { floristId })) cartStore.set([]);
         for (const i of items) {
           addToCart({
+            floristId,
+            floristName,
             productId: i.productId,
             slug: i.slug,
             name: i.name,

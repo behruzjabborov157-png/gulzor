@@ -51,6 +51,14 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         .where(inArray(schema.products.id, productIds))
     : [];
   const productOf = new Map(productRows.map((r) => [r.id, r]));
+  const floristIds = [...new Set(orders.map((o) => o.floristId))];
+  const floristRows = floristIds.length
+    ? await db.select({ id: schema.florists.id, name: schema.florists.name, nameRu: schema.florists.nameRu }).from(schema.florists).where(inArray(schema.florists.id, floristIds))
+    : [];
+  const floristName = (id: number) => {
+    const f = floristRows.find((x) => x.id === id);
+    return f ? pick(locale, f.name, f.nameRu) : "";
+  };
   const itemsOf = (orderId: string) => items.filter((i) => i.orderId === orderId && i.productId);
 
   return (
@@ -98,6 +106,8 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                   <span className="font-semibold">{formatUZS(o.total, locale)}</span>
                   {itemsOf(o.id).length ? (
                     <RepeatOrder
+                      floristId={o.floristId}
+                      floristName={floristName(o.floristId)}
                       items={itemsOf(o.id).map((i) => ({
                         productId: i.productId!,
                         slug: productOf.get(i.productId!)?.slug ?? "",

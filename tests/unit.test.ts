@@ -5,6 +5,7 @@ import { computeSlots } from "@/lib/delivery";
 import { formatPhoneInput } from "@/components/ui/phone-input";
 import { formatUZS, maskPhone, normalizePhone } from "@/lib/format";
 import { buildAssetLinks } from "@/lib/twa";
+import { cartFlorist, conflictsWithCart, type CartLine } from "@/components/store/cart";
 import { verifyTelegramData } from "@/lib/telegram-miniapp";
 import { createHmac } from "node:crypto";
 import { couponDiscount, deliveryFeeFor, fromPrice, priceLine, type PricingProduct } from "@/lib/pricing";
@@ -151,4 +152,29 @@ test("Telegram Mini App data: signature, tampering, staleness and wrong bot are 
   // A shared contact (requestContact response) uses the same signature scheme.
   const contact = signTelegram({ auth_date: String(now / 1000), contact: JSON.stringify({ user_id: 42, phone_number: "998901234567" }) }, token);
   assert.ok(verifyTelegramData(contact, token, 86400, now));
+});
+
+test("cart: one shop per order", () => {
+  const line = (floristId: number | null | undefined, floristName = "Gulzor"): CartLine => ({
+    key: String(Math.random()),
+    productId: 1,
+    slug: "x",
+    name: "x",
+    image: null,
+    variantId: null,
+    variantName: null,
+    stems: null,
+    color: null,
+    addons: [],
+    quantity: 1,
+    unitPrice: 1,
+    floristId,
+    floristName,
+  });
+  assert.equal(cartFlorist([]), null);
+  assert.deepEqual(cartFlorist([line(undefined), line(2, "Lola")]), { id: 2, name: "Lola" }); // old lines without a shop are skipped
+  assert.equal(conflictsWithCart([], { floristId: 1 }), false); // empty cart: anything goes
+  assert.equal(conflictsWithCart([line(1)], { floristId: 1 }), false); // same shop
+  assert.equal(conflictsWithCart([line(1)], { floristId: 2 }), true); // another shop
+  assert.equal(conflictsWithCart([line(undefined)], { floristId: 2 }), false); // unknown shop: the server decides
 });

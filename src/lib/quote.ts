@@ -80,6 +80,8 @@ export type Quote = {
     freeFrom: number | null;
     minOrder: number | null;
   } | null;
+  /** The (single) florist fulfilling this order, or null when the cart is empty or mixes florists. */
+  florist: { id: number; slug: string; name: string } | null;
   slots: SlotOption[];
   prepMinutes: number;
   containsDemo: boolean;
@@ -107,9 +109,14 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
     : [];
 
   const prodById = new Map(prods.map((x) => [x.id, x]));
-  const orderableAddons = prods.filter((x) => x.isAddon && x.status === "active" && isOrderable(stockState(x, [])));
-  const addonCatalog = orderableAddons.map((x) => ({ productId: x.id, name: pick(locale, x.name, x.nameRu), price: x.price }));
-  const addonCatalogUz = orderableAddons.map((x) => ({ productId: x.id, name: x.name, price: x.price }));
+  // Marketplace: a product is only for sale while its florist is approved.
+  const floristIds = [...new Set(prods.map((x) => x.floristId))];
+  const floristRows = floristIds.length ? await db.select().from(schema.florists).where(inArray(schema.florists.id, floristIds)) : [];
+  const approved = new Set(floristRows.filter((f) => f.status === "approved").map((f) => f.id));
+  const orderableAddons = prods.filter((x) => x.isAddon && x.status === "active" && approved.has(x.floristId) && isOrderable(stockState(x, [])));
+  // Add-ons only from the same florist as the bouquet (one florist fulfils the order).
+  const addonCatalogFor = (floristId: number, uz = false) =>
+    orderableAddons.filter((x) => x.floristId === floristId).map((x) => ({ productId: x.id, name: uz ? x.name : pick(locale, x.name, x.nameRu), price: x.price }));
 
   /* ---- Price every line ---- */
   const demand = new Map<string, number>(); // stock key -> requested quantity
@@ -138,7 +145,7 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
       stock: "missing",
       error: null,
     };
-    if (!prod || prod.status !== "active") return { ...base, error: t.notForSale };
+    if (!prod || prod.status !== "active" || !approved.has(prod.floristId)) return { ...base, error: t.notForSale };
 
     const pvs = vars.filter((v) => v.productId === prod.id);
     const stock = stockState(prod, pvs);
@@ -152,10 +159,10 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
     if (l.color && locale === "ru") base.colorLabel = prod.colorOptionsRu[prod.colorOptions.indexOf(l.color)] || l.color;
 
     const others = <T extends { productId: number }>(c: T[]) => c.filter((a) => a.productId !== prod.id);
-    const priced = priceLine(toPricing(prod, pvs, locale), l, others(addonCatalog));
+    const priced = priceLine(toPricing(prod, pvs, locale), l, others(addonCatalogFor(prod.floristId)));
     if (!priced.ok) return { ...base, error: priceErrorText(locale, priced.error) };
     // Same calculation with Uzbek names, for what gets stored on the order.
-    const pricedUz = priceLine(toPricing(prod, pvs), l, others(addonCatalogUz));
+    const pricedUz = priceLine(toPricing(prod, pvs), l, others(addonCatalogFor(prod.floristId, true)));
 
     if (prod.pricingMode === "variants" && l.variantId) {
       const k = `v:${l.variantId}`;
@@ -197,6 +204,12 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
   if (opts.forCheckout && lines.length === 0) errors.push(t.emptyCart);
 
   const valid = lines.filter((l) => !l.error);
+  // One florist per order.
+  const cartFlorists = [...new Set(valid.map((l) => prodById.get(l.productId)!.floristId))];
+  if (cartFlorists.length > 1) errors.push(t.multiFlorist);
+  const floristId = cartFlorists.length === 1 ? cartFlorists[0] : null;
+  const floristRow = floristId ? floristRows.find((f) => f.id === floristId) : undefined;
+  const florist = floristRow ? { id: floristRow.id, slug: floristRow.slug, name: pick(locale, floristRow.name, floristRow.nameRu) } : null;
   const subtotal = valid.reduce((s, l) => s + l.lineTotal, 0);
   const prepMinutes = valid.reduce((m, l) => Math.max(m, l.prepTimeMinutes), 0);
 
@@ -236,6 +249,8 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
       .where(and(eq(schema.deliveryZones.id, input.zoneId), eq(schema.deliveryZones.isActive, true), eq(schema.deliveryRegions.isActive, true)));
     if (!row) {
       errors.push(t.zoneUnavailable);
+    } else if (floristId && row.z.floristId !== floristId) {
+      errors.push(t.zoneWrongFlorist);
     } else {
       zone = {
         id: row.z.id,
@@ -276,7 +291,7 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
         zone: input.fulfillment === "pickup" ? null : (zoneRow ?? null),
         pickupPrepMinutes: checkout.pickupPrepMinutes,
         prepMinutes,
-        booked: await bookedSlotCounts(input.date),
+        booked: await bookedSlotCounts(input.date, floristId),
       });
       if (input.fulfillment === "delivery" && !zoneRow) slots = slots.map((s) => ({ ...s, available: false, reason: "pickZone" as const }));
     }
@@ -302,6 +317,7 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
     serviceFeeLabel: pick(locale, checkout.serviceFeeLabel, checkout.serviceFeeLabelRu),
     total,
     zone,
+    florist,
     slots,
     prepMinutes,
     containsDemo: valid.some((l) => l.isDemo),

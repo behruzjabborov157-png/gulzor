@@ -15,6 +15,13 @@ async function clearStorage(page: Page) {
 
 const digits = (s: string) => Number(s.replace(/\D/g, ""));
 
+/** The catalog's "N ta mahsulot" line once rendered — not the hidden cart drawer's "Savatda: N ta mahsulot". */
+async function resultCount(p: Page) {
+  const el = p.locator("main").getByText(/^\d+ ta mahsulot$/).first();
+  await el.waitFor();
+  return el.textContent();
+}
+
 test.describe.configure({ mode: "serial" });
 
 let page: Page;
@@ -54,7 +61,7 @@ test("homepage renders hero, sections and working navigation", async () => {
 
 test("search and price filter narrow the catalog", async () => {
   await page.goto("/katalog?q=lola");
-  const countText = await page.getByText(/ta mahsulot$/).first().textContent();
+  const countText = await resultCount(page);
   const all = digits(countText!);
   expect(all).toBeGreaterThan(2);
   for (const name of await page.locator("article h3").allTextContents()) expect(name.toLowerCase()).toContain("lola");
@@ -62,13 +69,13 @@ test("search and price filter narrow the catalog", async () => {
   await page.getByLabel("Maksimal narx").fill("200000");
   await page.getByRole("button", { name: "Qo‘llash" }).click();
   await expect(page).toHaveURL(/narx_max=200000/);
-  const filtered = digits((await page.getByText(/ta mahsulot$/).first().textContent())!);
+  const filtered = digits((await resultCount(page))!);
   expect(filtered).toBeLessThan(all);
   expect(filtered).toBeGreaterThan(0);
 
   // Apostrophe-insensitive search ("o'zingiz" matches "o‘zingiz").
   await page.goto("/katalog?q=o'zingiz");
-  expect(digits((await page.getByText(/ta mahsulot$/).first().textContent())!)).toBeGreaterThan(0);
+  expect(digits((await resultCount(page))!)).toBeGreaterThan(0);
 
   // Out-of-season peonies disappear with the availability filter.
   await page.goto("/katalog?gul=pionlar");

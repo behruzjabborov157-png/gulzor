@@ -78,21 +78,30 @@ export async function deleteCustomerAccount(customerId: string) {
   });
 }
 
-export type AdminUser ={ id: string; email: string; name: string; role: "owner" | "staff" };
+export type AdminUser = { id: string; email: string; name: string; role: "owner" | "staff" | "florist"; floristId: number | null };
 
 export async function getAdmin(): Promise<AdminUser | null> {
   const id = await sessionUserId("admin");
   if (!id) return null;
   const db = await getDb();
   const [a] = await db.select().from(schema.adminUsers).where(and(eq(schema.adminUsers.id, id), eq(schema.adminUsers.isActive, true)));
-  return a ? { id: a.id, email: a.email, name: a.name, role: a.role } : null;
+  return a ? { id: a.id, email: a.email, name: a.name, role: a.role, floristId: a.floristId } : null;
 }
 
-/** Server-side authorization guard for every admin page and action. */
+/** Server-side authorization guard for every admin page and action. Florist accounts never get into the admin area. */
 export async function requireAdmin(): Promise<AdminUser> {
   const a = await getAdmin();
   if (!a) redirect("/admin/kirish");
+  if (a.role === "florist") redirect("/florist");
   return a;
+}
+
+/** Guard for the florist panel: a florist user bound to a shop. Returns the user and the only florist id it may act for. */
+export async function requireFlorist(): Promise<AdminUser & { floristId: number }> {
+  const a = await getAdmin();
+  if (!a) redirect("/admin/kirish");
+  if (a.role !== "florist" || a.floristId == null) redirect("/admin");
+  return { ...a, floristId: a.floristId };
 }
 
 export async function requireOwner(): Promise<AdminUser> {

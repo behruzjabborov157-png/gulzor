@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
+import { floristApproved } from "@/lib/florists";
 import { LOCALES, localePath } from "@/i18n/config";
 import { siteUrl } from "@/lib/settings";
 
@@ -11,9 +12,10 @@ type Entry = MetadataRoute.Sitemap[number];
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = siteUrl();
   const db = await getDb();
-  const [products, categories] = await Promise.all([
-    db.select({ slug: schema.products.slug, updatedAt: schema.products.updatedAt }).from(schema.products).where(eq(schema.products.status, "active")),
+  const [products, categories, shops] = await Promise.all([
+    db.select({ slug: schema.products.slug, updatedAt: schema.products.updatedAt }).from(schema.products).where(and(eq(schema.products.status, "active"), floristApproved(schema.products.floristId))),
     db.select({ slug: schema.categories.slug }).from(schema.categories).where(eq(schema.categories.isActive, true)),
+    db.select({ slug: schema.florists.slug, updatedAt: schema.florists.updatedAt }).from(schema.florists).where(eq(schema.florists.status, "approved")),
   ]);
 
   // One entry per language, each listing its translations (hreflang).
@@ -29,6 +31,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...both("/katalog", { changeFrequency: "daily", priority: 0.9 }),
     ...both("/yetkazib-berish", { changeFrequency: "monthly", priority: 0.6 }),
     ...both("/maxsus-guldasta", { changeFrequency: "monthly", priority: 0.5 }),
+    ...both("/dokonlar", { changeFrequency: "weekly", priority: 0.7 }),
+    ...shops.flatMap((s) => both(`/dokon/${s.slug}`, { lastModified: s.updatedAt, changeFrequency: "weekly", priority: 0.7 })),
     ...categories.flatMap((c) => both(`/katalog/${c.slug}`, { changeFrequency: "weekly", priority: 0.8 })),
     ...products.flatMap((p) => both(`/gul/${p.slug}`, { lastModified: p.updatedAt, changeFrequency: "weekly", priority: 0.7 })),
   ];

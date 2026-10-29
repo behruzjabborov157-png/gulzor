@@ -5,6 +5,7 @@ import { fmt, localePath, pick, type Locale } from "@/i18n/config";
 import { getDict } from "@/i18n/dict";
 import { getCategories, listProducts, stockState, toPricing } from "@/lib/catalog";
 import { isOrderable } from "@/lib/catalog-shared";
+import { floristApproved } from "@/lib/florists";
 import { dateWindow, getDeliveryConfig } from "@/lib/delivery";
 import { formatDateISO, formatPhone, formatUZS, normalizePhone } from "@/lib/format";
 import { createOrder } from "@/lib/orders";
@@ -136,7 +137,7 @@ async function loadProduct(productId: number, locale: Locale) {
   const [prod] = await db
     .select()
     .from(schema.products)
-    .where(and(eq(schema.products.id, productId), eq(schema.products.status, "active")));
+    .where(and(eq(schema.products.id, productId), eq(schema.products.status, "active"), floristApproved(schema.products.floristId)));
   if (!prod) return null;
   const variants = await db
     .select()
@@ -151,9 +152,24 @@ async function loadProduct(productId: number, locale: Locale) {
     short: pick(locale, prod.shortDescription, prod.shortDescriptionRu),
     colors: prod.colorOptions.map((value, i) => ({ value, label: locale === "ru" ? prod.colorOptionsRu[i] || value : value })),
     image: prod.images[0]?.url ?? null,
+    florist: await shopOf(prod.floristId, locale),
   };
 }
 type LoadedProduct = NonNullable<Awaited<ReturnType<typeof loadProduct>>>;
+
+async function shopOf(floristId: number, locale: Locale) {
+  const db = await getDb();
+  const [f] = await db.select().from(schema.florists).where(eq(schema.florists.id, floristId));
+  return f ? { id: f.id, name: pick(locale, f.name, f.nameRu) } : null;
+}
+
+/** The shop the bot cart belongs to (one shop per order). */
+async function cartShop(s: Session) {
+  if (!s.cart.length) return null;
+  const db = await getDb();
+  const [p] = await db.select({ floristId: schema.products.floristId }).from(schema.products).where(eq(schema.products.id, s.cart[0].productId));
+  return p ? shopOf(p.floristId, s.locale!) : null;
+}
 
 function defaultStems(p: PricingProduct) {
   if (p.pricingMode !== "per_stem") return null;
@@ -186,6 +202,7 @@ function productCard(lp: LoadedProduct, c: Line, locale: Locale): { caption: str
   const caption = [
     `🌸 ${lp.name}`,
     lp.short || null,
+    lp.florist ? fmt(t.shop, { name: lp.florist.name }) : null,
     total != null ? `\n💰 ${uzs(total)}` : null,
     p.pricingMode === "per_stem"
       ? `${fmt(t.stems, { n: c.stems ?? 0 })} ${fmt(t.stemsHint, { min: p.minStems ?? 1, max: p.maxStems ?? 101, odd: p.stemStep === 2 && (p.minStems ?? 1) % 2 === 1 ? t.odd : "" })}`
@@ -369,7 +386,9 @@ async function askFulfillment(s: Session, t: BotTexts) {
 
 async function askZone(s: Session, t: BotTexts) {
   const locale = s.locale!;
-  const { regions } = await getDeliveryConfig(locale);
+  // Each shop delivers itself: only the zones of the shop this cart belongs to.
+  const shop = await cartShop(s);
+  const { regions } = await getDeliveryConfig(locale, shop?.id);
   const zones = regions.flatMap((r) => r.zones.map((z) => ({ id: z.id, label: `${r.name} — ${z.name}`, fee: z.fee })));
   if (!zones.length) return send(s.chatId, t.noZones, mainMenu(t));
   await send(s.chatId, t.askZone, {
@@ -708,6 +727,13 @@ async function onCallback(cb: Callback): Promise<AfterTask | null> {
             toast = t.unavailable;
             break;
           }
+          const current = await cartShop(s);
+          if (current && lp.florist && current.id !== lp.florist.id) {
+            await send(s.chatId, fmt(t.otherShop, { current: current.name }), {
+              inline_keyboard: [[{ text: t.replaceCart, callback_data: `AR:${lp.prod.id}` }], [{ text: t.keepCart, callback_data: "N" }]],
+            });
+            break;
+          }
           const same = s.cart.find(
             (l) => l.productId === c.productId && l.variantId === c.variantId && l.stems === c.stems && l.color === c.color,
           );
@@ -724,6 +750,21 @@ async function onCallback(cb: Callback): Promise<AfterTask | null> {
           ? await api("editMessageCaption", { chat_id: s.chatId, message_id: msg.message_id, caption: card.caption, reply_markup: card.keyboard })
           : await api("editMessageText", { chat_id: s.chatId, message_id: msg.message_id, text: card.caption, reply_markup: card.keyboard });
         if (!r.ok && !/not modified/i.test(r.description ?? "")) await sendPhoto(s.chatId, lp.image, card.caption, card.keyboard);
+        break;
+      }
+      case "AR": {
+        // "Clear the cart and add this" after a shop conflict: the product's current configuration replaces the cart.
+        const lp = await loadProduct(num(a), locale);
+        const c = lp ? (s.draft.config?.productId === lp.prod.id ? s.draft.config : defaultConfig(lp)) : null;
+        if (!lp || !c || !lp.orderable || linePrice(lp, c) == null) {
+          toast = t.stale;
+          break;
+        }
+        s.cart = [{ ...c }];
+        toast = t.added;
+        await send(s.chatId, `${t.added}: ${lp.name}`, {
+          inline_keyboard: [[{ text: t.menu.cart, callback_data: "CART" }, { text: t.checkout, callback_data: "O" }]],
+        });
         break;
       }
       case "CART":
