@@ -6,16 +6,19 @@ import { usePathname } from "next/navigation";
 const ITEMS = [
   { href: "/admin", label: "Bosh sahifa", owner: false },
   { href: "/admin/buyurtmalar", label: "Buyurtmalar", owner: false },
+  { href: "/admin/floristlar", label: "Do‘konlar", owner: false },
   { href: "/admin/mahsulotlar", label: "Mahsulotlar", owner: false },
   { href: "/admin/kategoriyalar", label: "Kategoriyalar", owner: false },
   { href: "/admin/sorovlar", label: "So‘rovlar", owner: false },
   { href: "/admin/yetkazib-berish", label: "Yetkazib berish", owner: true },
+  { href: "/admin/komissiya", label: "Komissiya", owner: true },
   { href: "/admin/kuponlar", label: "Promokodlar", owner: true },
   { href: "/admin/import", label: "Import / eksport", owner: true },
   { href: "/admin/sozlamalar", label: "Sozlamalar", owner: true },
+  { href: "/admin/jurnal", label: "Jurnal", owner: true },
 ];
 
-export function AdminNav({ owner, newOrders = 0 }: { owner: boolean; newOrders?: number }) {
+export function AdminNav({ owner, newOrders = 0, pendingShops = 0 }: { owner: boolean; newOrders?: number; pendingShops?: number }) {
   const path = usePathname();
   return (
     <nav aria-label="Admin" className="flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-col lg:pb-0">
@@ -32,6 +35,11 @@ export function AdminNav({ owner, newOrders = 0 }: { owner: boolean; newOrders?:
             {i.href === "/admin/buyurtmalar" && newOrders > 0 ? (
               <span className="rounded-full bg-fuchsia px-2 py-0.5 text-[11px] font-bold text-white" aria-label={`${newOrders} ta yangi`}>
                 {newOrders}
+              </span>
+            ) : null}
+            {i.href === "/admin/floristlar" && pendingShops > 0 ? (
+              <span className="rounded-full bg-fuchsia px-2 py-0.5 text-[11px] font-bold text-white" aria-label={`${pendingShops} ta yangi ariza`}>
+                {pendingShops}
               </span>
             ) : null}
           </Link>

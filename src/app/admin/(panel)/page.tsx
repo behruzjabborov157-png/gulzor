@@ -19,7 +19,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
   const sp = await searchParams;
   const days = PERIODS.includes(Number(sp.davr)) ? Number(sp.davr) : 30;
   const db = await getDb();
-  const [stats, { store, checkout }, [{ demoCount }], failed] = await Promise.all([
+  const [stats, { store, checkout }, [{ demoCount }], failed, [{ pendingShops }]] = await Promise.all([
     dashboardStats(days),
     getSettings(),
     db
@@ -27,6 +27,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
       .from(schema.products)
       .where(and(eq(schema.products.isDemo, true), eq(schema.products.status, "active"))),
     db.select().from(schema.notifications).where(eq(schema.notifications.status, "failed")).orderBy(desc(schema.notifications.createdAt)).limit(3),
+    db.select({ pendingShops: sql<number>`count(*)::int` }).from(schema.florists).where(eq(schema.florists.status, "pending")),
   ]);
 
   const setup = [
@@ -62,6 +63,15 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
       </div>
 
       {sp.xato === "ruxsat" ? <Alert tone="error">Bu bo‘lim faqat do‘kon egasi uchun.</Alert> : null}
+
+      {pendingShops > 0 ? (
+        <Alert tone="warning">
+          {pendingShops} ta yangi do‘kon arizasi ko‘rib chiqilishini kutmoqda.{" "}
+          <Link href="/admin/floristlar?holat=pending" className="font-semibold underline">
+            Ko‘rish
+          </Link>
+        </Alert>
+      ) : null}
 
       {setup.some((s) => !s.done) ? (
         <section className="card p-6" aria-labelledby="setup-h">

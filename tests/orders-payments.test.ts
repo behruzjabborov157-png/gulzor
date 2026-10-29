@@ -663,3 +663,230 @@ test("florist panel: registration, and a florist can only touch its own products
   assert.equal(Number(report[0].goods), 180_000);
   assert.equal(Number(report[0].commission), 18_000);
 });
+
+test("admin moderation: approve/suspend/reject rules, commission for new orders only, audit log", async () => {
+  const db = await getDb();
+  const fp = await import("@/lib/florist-panel");
+  const fa = await import("@/lib/florist-admin");
+  const { saveProductForm } = await import("@/lib/product-save");
+  const owner = { id: null, email: "owner@gulzor.uz" };
+  const reg = await fp.registerFlorist({
+    shopName: "Lola bog‘i",
+    contactName: "Aziza",
+    email: "lola@example.uz",
+    password: "juda-uzun-parol-456",
+    phone: "90 555 33 44",
+    telegramUsername: "",
+    regionId,
+    address: "Yunusobod 4",
+    legalName: "YaTT Aziza",
+    taxId: "987654321",
+    description: "",
+    acceptTerms: true,
+  });
+  assert.ok(reg.ok);
+  const id = reg.floristId;
+  const zoneInput = { regionId, name: "Yunusobod", nameRu: null, description: "", fee: 15_000, freeFrom: null, minOrder: null, sameDayEnabled: true, sameDayCutoff: "17:00", minLeadMinutes: 120, isActive: true };
+  assert.deepEqual(await fp.saveFloristZone(id, null, zoneInput), { ok: true });
+  const form = new FormData();
+  for (const [k, v] of Object.entries({ name: "Lola guldastasi", price: "200000", pricingMode: "fixed", status: "active", deliveryEligible: "on" })) form.set(k, v);
+  const product = await saveProductForm({ kind: "florist", floristId: id }, null, form);
+  assert.ok(product.state.ok && product.id);
+  const [zone] = await db.select().from(schema.deliveryZones).where(eq(schema.deliveryZones.floristId, id));
+  const order = () => createOrder(checkout({ lines: [{ productId: product.id!, quantity: 1, addons: [] }], zoneId: zone.id }), null);
+
+  // Pending: not orderable; suspending a pending shop is not a valid step; rejecting needs a reason.
+  assert.equal((await order()).ok, false);
+  assert.equal((await fa.setFloristStatus(owner, id, "suspended", "sabab")).ok, false);
+  assert.equal((await fa.setFloristStatus(owner, id, "rejected", "")).ok, false);
+  const platform = await platformFloristId();
+  assert.equal((await fa.setFloristStatus(owner, platform, "suspended", "sinov")).ok, false, "the platform shop cannot be moderated");
+
+  // Approve → orderable with the default 10%.
+  assert.deepEqual(await fa.setFloristStatus(owner, id, "approved"), { ok: true });
+  const [approved] = await db.select().from(schema.florists).where(eq(schema.florists.id, id));
+  assert.ok(approved.approvedAt);
+  assert.equal(approved.statusReason, null);
+  const first = await order();
+  assert.ok(first.ok, JSON.stringify(first));
+
+  // Commission: validated, and only new orders get the new rate.
+  assert.equal((await fa.setFloristCommission(owner, id, "abc")).ok, false);
+  assert.equal((await fa.setFloristCommission(owner, id, "60")).ok, false);
+  assert.deepEqual(await fa.setFloristCommission(owner, id, "12,5"), { ok: true });
+  const second = await order();
+  assert.ok(second.ok);
+  const [o1] = await db.select().from(schema.orders).where(eq(schema.orders.id, first.orderId));
+  const [o2] = await db.select().from(schema.orders).where(eq(schema.orders.id, second.orderId));
+  assert.equal(o1.commissionRate, 1000);
+  assert.equal(o1.commissionAmount, 20_000);
+  assert.equal(o2.commissionRate, 1250);
+  assert.equal(o2.commissionAmount, 25_000);
+
+  // Suspend (with a reason) → hidden again; the reason is stored for the florist; reinstating clears it.
+  assert.deepEqual(await fa.setFloristStatus(owner, id, "suspended", "Shikoyatlar tekshirilmoqda"), { ok: true });
+  const [suspended] = await db.select().from(schema.florists).where(eq(schema.florists.id, id));
+  assert.equal(suspended.statusReason, "Shikoyatlar tekshirilmoqda");
+  assert.equal((await order()).ok, false);
+  assert.equal((await fa.setFloristStatus(owner, id, "suspended", "yana")).ok, false, "already suspended");
+  assert.deepEqual(await fa.setFloristStatus(owner, id, "approved"), { ok: true });
+  assert.equal((await db.select().from(schema.florists).where(eq(schema.florists.id, id)))[0].statusReason, null);
+
+  // Everything above is in the audit log, newest first, with readable descriptions.
+  const log = await fa.auditEntries({ entity: "florist", entityId: String(id) });
+  assert.deepEqual(
+    log.map((e) => e.action),
+    ["florist.approved", "florist.suspended", "florist.commission", "florist.approved"],
+  );
+  assert.equal(fa.describeAudit(log[2]), "Komissiya: 10% → 12,5%");
+  assert.ok(log.every((e) => e.actorEmail === "owner@gulzor.uz"));
+
+  const detail = await fa.floristAdminDetail(id);
+  assert.equal(detail?.stats.orders.all, 2);
+  assert.equal(detail?.stats.products.active, 1);
+  assert.equal(detail?.users[0].email, "lola@example.uz");
+  const counts = await fa.floristStatusCounts();
+  assert.ok(counts.approved >= 2);
+});
+
+test("marketplace money flow: shops take cash only, no Gulzor promo codes, service fee or pickup; florists get Telegram notifications; monthly statements", async () => {
+  const db = await getDb();
+  const fp = await import("@/lib/florist-panel");
+  const fa = await import("@/lib/florist-admin");
+  const fnotify = await import("@/lib/florist-notify");
+  const cm = await import("@/lib/commission");
+  const { quoteCart } = await import("@/lib/quote");
+  const { saveProductForm } = await import("@/lib/product-save");
+  const owner = { id: null, email: "owner@gulzor.uz" };
+
+  const reg = await fp.registerFlorist({
+    shopName: "Nargiz gullari",
+    contactName: "Nargiza",
+    email: "nargiz@example.uz",
+    password: "juda-uzun-parol-789",
+    phone: "90 555 66 77",
+    telegramUsername: "",
+    regionId,
+    address: "Mirobod 3",
+    legalName: "YaTT Nargiza",
+    taxId: "111222333",
+    description: "",
+    acceptTerms: true,
+  });
+  assert.ok(reg.ok);
+  const id = reg.floristId;
+  await fp.saveFloristZone(id, null, { regionId, name: "Mirobod", nameRu: null, description: "", fee: 20_000, freeFrom: null, minOrder: null, sameDayEnabled: true, sameDayCutoff: "17:00", minLeadMinutes: 120, isActive: true });
+  const form = new FormData();
+  for (const [k, v] of Object.entries({ name: "Nargiz guldastasi", price: "300000", pricingMode: "fixed", status: "active", deliveryEligible: "on", pickupEligible: "on" })) form.set(k, v);
+  const product = await saveProductForm({ kind: "florist", floristId: id }, null, form);
+  assert.ok(product.state.ok && product.id);
+  assert.deepEqual(await fa.setFloristStatus(owner, id, "approved"), { ok: true });
+  const [zone] = await db.select().from(schema.deliveryZones).where(eq(schema.deliveryZones.floristId, id));
+  const lines = [{ productId: product.id!, quantity: 1, addons: [] }];
+  await db.insert(schema.coupons).values({ code: "GULZOR10", type: "percent", value: 10 });
+  await saveSetting("checkout", { ...DEFAULT_CHECKOUT, paymeEnabled: true, clickEnabled: true, pickupEnabled: true, serviceFee: 5_000 });
+
+  try {
+    // Gulzor's coupon, service fee and pickup do not apply to a marketplace shop; the platform shop keeps them.
+    const q = await quoteCart({ lines, couponCode: "GULZOR10", fulfillment: "delivery", zoneId: zone.id, date: tomorrow, slotId }, { forCheckout: false });
+    assert.equal(q.florist?.isPlatform, false);
+    assert.equal(q.discount, 0);
+    assert.equal(q.coupon?.applied, false);
+    assert.equal(q.serviceFee, 0);
+    assert.equal(q.total, 300_000 + 20_000);
+    const platformQ = await quoteCart(
+      { lines: [{ productId, quantity: 1, addons: [] }], couponCode: "GULZOR10", fulfillment: "delivery", zoneId, date: tomorrow, slotId },
+      { forCheckout: false },
+    );
+    assert.equal(platformQ.coupon?.applied, true);
+    assert.equal(platformQ.serviceFee, 5_000);
+    const pickup = await quoteCart({ lines, fulfillment: "pickup", date: tomorrow, slotId }, { forCheckout: false });
+    assert.ok(pickup.errors.some((e) => e.includes("olib ketish faqat Gulzor")));
+    const coupon = await createOrder(checkout({ lines, zoneId: zone.id, couponCode: "GULZOR10" }), null);
+    assert.equal(coupon.ok, false);
+
+    // Online payment would land in Gulzor's merchant account, so it is refused for a marketplace shop.
+    for (const m of ["payme", "click"]) {
+      const res = await createOrder(checkout({ lines, zoneId: zone.id, paymentMethod: m }), null);
+      assert.ok(!res.ok && res.fieldErrors?.paymentMethod, m);
+    }
+
+    // The florist links Telegram through the shop bot: one-time deep link, then new orders arrive in that chat.
+    const calls: { method: string; body: Record<string, unknown> }[] = [];
+    setBotTransport(async (method, body) => {
+      calls.push({ method, body });
+      return method === "getMe" ? { ok: true, result: { username: "gulzor_test_bot" } } : { ok: true, result: { message_id: 1 } };
+    });
+    const link = await fnotify.floristTelegramLink(id);
+    assert.match(link ?? "", /^https:\/\/t\.me\/gulzor_test_bot\?start=fl_[\w-]+$/);
+    const code = link!.split("start=")[1];
+    const chat = { id: 700700, type: "private" };
+    const from = { id: 700700, first_name: "Nargiza" };
+    await handleUpdate({ message: { message_id: 1, chat, from, text: "/start fl_wrong-code-123" } });
+    assert.match(String(calls.at(-1)?.body.text), /Havola eskirgan/);
+    await handleUpdate({ message: { message_id: 2, chat, from, text: `/start ${code}` } });
+    assert.match(String(calls.at(-1)?.body.text), /«Nargiz gullari» do‘koni ulandi/);
+    const [linked] = await db.select().from(schema.florists).where(eq(schema.florists.id, id));
+    assert.equal(linked.telegramChatId, "700700");
+    assert.equal(linked.telegramLinkToken, null, "the code is single-use");
+
+    const order = await createOrder(checkout({ lines, zoneId: zone.id }), null);
+    assert.ok(order.ok, JSON.stringify(order));
+    await notifyNewOrder(order.orderId);
+    const toFlorist = calls.find((c) => c.method === "sendMessage" && c.body.chat_id === "700700" && String(c.body.text).includes(order.number));
+    assert.ok(toFlorist, "the florist got the order in Telegram");
+    assert.match(String(toFlorist!.body.text), /florist\/buyurtmalar\//);
+    assert.doesNotMatch(String(toFlorist!.body.text), /admin\/buyurtmalar/);
+    const logs = await db.select().from(schema.notifications).where(eq(schema.notifications.orderId, order.orderId));
+    const byChannel = Object.fromEntries(logs.map((l) => [l.channel, l.status]));
+    assert.equal(byChannel.florist_telegram, "sent");
+    assert.equal(byChannel.florist_email, "skipped"); // no SMTP in tests, logged truthfully
+    assert.equal(byChannel.telegram, "skipped"); // owner bot not configured here
+
+    // A platform order does not go to any florist chat.
+    const before = calls.length;
+    const platformOrder = await createOrder(checkout(), null);
+    assert.ok(platformOrder.ok);
+    await notifyNewOrder(platformOrder.orderId);
+    assert.ok(!calls.slice(before).some((c) => c.body.chat_id === "700700"));
+
+    // Statements: deliver two orders, one of them late (next month), then bill the month.
+    const second = await createOrder(checkout({ lines, zoneId: zone.id }), null);
+    assert.ok(second.ok);
+    for (const oid of [order.orderId, second.orderId]) {
+      for (const to of ["confirmed", "preparing", "ready", "dispatched", "delivered"] as const) assert.ok(await changeOrderStatus(oid, to, "t"));
+    }
+    const period = tomorrow.slice(0, 7);
+    const nextMonth = cm.addMonths(period, 1);
+    await db.update(schema.orders).set({ deliveryDate: `${nextMonth}-02` }).where(eq(schema.orders.id, second.orderId));
+
+    assert.equal((await cm.issueStatements(owner, cm.currentPeriod())).ok, false, "the running month cannot be billed");
+    const afterMonth = new Date(`${cm.addMonths(period, 2)}-10T00:00:00Z`);
+    const issued = await cm.issueStatements(owner, period, afterMonth);
+    assert.ok(issued.ok);
+    const mine = issued.issued.filter((s) => s.floristId === id);
+    assert.equal(mine.length, 1);
+    assert.equal(mine[0].orderCount, 1);
+    assert.equal(mine[0].commissionTotal, 30_000); // 10% of 300 000
+    assert.ok(!issued.issued.some((s) => s.floristId === floristId), "Gulzor's own shop is never billed");
+    const again = await cm.issueStatements(owner, period, afterMonth);
+    assert.ok(again.ok && again.issued.length === 0, "issuing twice bills nothing twice");
+    assert.equal((await cm.unbilledByFlorist(id))[0].orders, 1, "the late order waits for the next statement");
+    const next = await cm.issueStatements(owner, nextMonth, afterMonth);
+    assert.ok(next.ok && next.issued.some((s) => s.floristId === id && s.orderCount === 1));
+    assert.equal((await cm.unbilledByFlorist(id)).length, 0);
+
+    const billed = await cm.statementOrders(mine[0].id, id);
+    assert.deepEqual(billed.map((o) => o.number), [order.number]);
+    assert.equal((await cm.statementOrders(mine[0].id, floristId)).length, 0, "another shop cannot read it");
+    assert.deepEqual(await cm.setStatementPaid(owner, mine[0].id, true, "Click 123"), { ok: true });
+    const [paid] = await cm.listStatements({ floristId: id, status: "paid" });
+    assert.equal(paid.s.paidNote, "Click 123");
+    const log = await fa.auditEntries({ entity: "florist", entityId: String(id) });
+    assert.ok(log.some((e) => e.action === "commission.paid"));
+    assert.ok(log.some((e) => e.action === "commission.issued"));
+  } finally {
+    setBotTransport(null);
+    await saveSetting("checkout", { ...DEFAULT_CHECKOUT, paymeEnabled: true, clickEnabled: true });
+  }
+});

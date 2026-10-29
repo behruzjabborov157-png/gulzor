@@ -1,9 +1,10 @@
 import { eq } from "drizzle-orm";
-import { floristSaveProfileAction } from "@/app/florist/actions";
+import { floristSaveProfileAction, floristUnlinkTelegramAction } from "@/app/florist/actions";
 import { AdminForm } from "@/components/admin/admin-form";
+import { ProfileFields } from "@/components/florist/profile-fields";
 import { getDb, schema } from "@/db";
 import { requireFlorist } from "@/lib/auth";
-import { formatPhone } from "@/lib/format";
+import { floristTelegramLink } from "@/lib/florist-notify";
 
 export const metadata = { title: "Do‘kon profili" };
 
@@ -11,14 +12,7 @@ export default async function FloristProfilePage() {
   const me = await requireFlorist();
   const db = await getDb();
   const [shop] = await db.select().from(schema.florists).where(eq(schema.florists.id, me.floristId));
-  const field = (name: string, label: string, value: string | null, extra: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
-    <div>
-      <label htmlFor={`p-${name}`} className="label">
-        {label}
-      </label>
-      <input id={`p-${name}`} name={name} defaultValue={value ?? ""} className="field py-2.5" {...extra} />
-    </div>
-  );
+  const tgLink = shop.telegramChatId ? null : await floristTelegramLink(me.floristId);
   return (
     <div className="max-w-3xl space-y-6">
       <h1 className="text-4xl">Do‘kon profili</h1>
@@ -26,28 +20,41 @@ export default async function FloristProfilePage() {
         Bu ma’lumotlar do‘kon sahifangizda (/dokon/{shop.slug}) mijozlarga ko‘rinadi. Yuridik nom va STIR’ni o‘zgartirish uchun Gulzor bilan bog‘laning.
       </p>
       <section className="card p-6">
-        <AdminForm action={floristSaveProfileAction} className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            {field("name", "Do‘kon nomi *", shop.name, { required: true, minLength: 2, maxLength: 80 })}
-            {field("nameRu", "Nomi (rus.)", shop.nameRu, { maxLength: 80 })}
-            {field("phone", "Telefon *", formatPhone(shop.phone), { required: true, inputMode: "tel" })}
-            {field("telegramUsername", "Telegram username", shop.telegramUsername, { placeholder: "dokon_nomi" })}
-            {field("address", "Manzil", shop.address, { maxLength: 200 })}
-            {field("addressRu", "Manzil (rus.)", shop.addressRu, { maxLength: 200 })}
-          </div>
-          <div>
-            <label htmlFor="p-description" className="label">
-              Do‘kon haqida
-            </label>
-            <textarea id="p-description" name="description" defaultValue={shop.description} rows={4} maxLength={1000} className="field" />
-          </div>
-          <div>
-            <label htmlFor="p-descriptionRu" className="label">
-              Do‘kon haqida (rus.)
-            </label>
-            <textarea id="p-descriptionRu" name="descriptionRu" defaultValue={shop.descriptionRu ?? ""} rows={4} maxLength={1000} className="field" />
-          </div>
+        <AdminForm action={floristSaveProfileAction}>
+          <ProfileFields shop={shop} />
         </AdminForm>
+      </section>
+      <section id="bildirishnomalar" className="card scroll-mt-6 p-6 text-sm" aria-labelledby="notify-h">
+        <h2 id="notify-h" className="mb-2 text-2xl">
+          Bildirishnomalar
+        </h2>
+        <p className="text-muted">Yangi buyurtmalar, Gulzor buyurtmangizga kiritgan o‘zgarishlar va komissiya hisoblari shu yerga keladi.</p>
+        <div className="mt-4 space-y-3">
+          <div>
+            <p className="font-semibold">Telegram</p>
+            {shop.telegramChatId ? (
+              <form action={floristUnlinkTelegramAction} className="mt-1 flex flex-wrap items-center gap-3">
+                <span className="text-success">Ulangan</span>
+                <button className="text-danger hover:underline">Uzish</button>
+              </form>
+            ) : tgLink ? (
+              <p className="mt-1">
+                <a href={tgLink} target="_blank" rel="noopener noreferrer" className="btn-primary btn-sm">
+                  Telegram’ni ulash
+                </a>
+                <span className="mt-2 block text-muted">Bot ochilgach «Start»ni bosing. Havola bir martalik — boshqalarga bermang.</span>
+              </p>
+            ) : (
+              <p className="mt-1 text-muted">Gulzor Telegram botini hali sozlamagan.</p>
+            )}
+          </div>
+          <div>
+            <p className="font-semibold">Email</p>
+            <p className="mt-1 text-muted">
+              {process.env.SMTP_HOST ? `Panelga kirish emailingizga (${me.email}) yuboriladi.` : "Email yuborish hali sozlanmagan."}
+            </p>
+          </div>
+        </div>
       </section>
       <section className="card p-6 text-sm">
         <h2 className="mb-2 text-2xl">Tekshiruv ma’lumotlari</h2>

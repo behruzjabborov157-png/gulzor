@@ -46,7 +46,14 @@ const PAYMENT_STATUS: Record<string, string> = {
 
 export type OrderForMessage = typeof schema.orders.$inferSelect & { items: (typeof schema.orderItems.$inferSelect)[] };
 
-export function orderMessage(o: OrderForMessage, heading = "🌸 Yangi buyurtma"): string {
+export type OrderMessageOptions = {
+  /** Link under the message; the admin order page by default. */
+  link?: string;
+  /** Shop line for marketplace orders. */
+  shop?: string;
+};
+
+export function orderMessage(o: OrderForMessage, heading = "🌸 Yangi buyurtma", opts: OrderMessageOptions = {}): string {
   const items = o.items
     .map((i) => {
       const opts = [i.variantName, i.stems ? `${i.stems} dona` : null, i.color].filter(Boolean).join(", ");
@@ -63,6 +70,7 @@ export function orderMessage(o: OrderForMessage, heading = "🌸 Yangi buyurtma"
           .join(", ");
   return [
     `<b>${heading}: ${o.number}</b>${o.containsDemo ? " ⚠️ DEMO mahsulot bor" : ""}`,
+    opts.shop ? `<b>Do‘kon:</b> ${esc(opts.shop)}` : null,
     "",
     `<b>Mijoz:</b> ${esc(o.customerName)}, ${formatPhone(o.customerPhone)}`,
     o.locale === "ru" ? "<b>Mijoz tili:</b> rus tili" : null,
@@ -86,16 +94,21 @@ export function orderMessage(o: OrderForMessage, heading = "🌸 Yangi buyurtma"
     o.serviceFee ? `<b>Xizmat haqi:</b> ${formatUZS(o.serviceFee)}` : null,
     `<b>JAMI: ${formatUZS(o.total)}</b>`,
     "",
-    `${siteUrl()}/admin/buyurtmalar/${o.id}`,
+    opts.link ?? `${siteUrl()}/admin/buyurtmalar/${o.id}`,
   ]
     .filter((x) => x !== null)
     .join("\n");
 }
 
 /** Sends and logs the result against the order. */
-export async function notifyOrder(o: OrderForMessage, heading?: string): Promise<SendResult> {
-  const result = await sendTelegram(orderMessage(o, heading));
+export async function notifyOrder(o: OrderForMessage, heading?: string, opts: OrderMessageOptions = {}): Promise<SendResult> {
+  const result = await sendTelegram(orderMessage(o, heading, opts));
   const db = await getDb();
   await db.insert(schema.notifications).values({ orderId: o.id, channel: "telegram", status: result.status, detail: result.detail });
   return result;
+}
+
+/** Tells the owner that a shop applied to sell on Gulzor (contact details stay in the admin panel). */
+export async function notifyFloristApplication(floristId: number, shopName: string): Promise<SendResult> {
+  return sendTelegram(`🏪 <b>Yangi do‘kon arizasi</b>\n${esc(shopName)}\nKo‘rib chiqish: ${siteUrl()}/admin/floristlar/${floristId}`);
 }

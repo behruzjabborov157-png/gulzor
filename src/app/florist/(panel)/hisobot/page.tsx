@@ -1,12 +1,18 @@
 import { requireFlorist } from "@/lib/auth";
+import { listStatements, statementOrders, unbilledByFlorist } from "@/lib/commission";
 import { floristSalesReport } from "@/lib/florist-panel";
-import { formatUZS } from "@/lib/format";
+import { formatDateISO, formatDateTime, formatUZS } from "@/lib/format";
 
 export const metadata = { title: "Savdo va komissiya" };
 
 export default async function FloristReportPage() {
   const me = await requireFlorist();
-  const rows = await floristSalesReport(me.floristId);
+  const [rows, statements, [unbilled]] = await Promise.all([
+    floristSalesReport(me.floristId),
+    listStatements({ floristId: me.floristId }),
+    unbilledByFlorist(me.floristId),
+  ]);
+  const details = await Promise.all(statements.map(({ s }) => statementOrders(s.id, me.floristId)));
   const total = rows.reduce((s, r) => ({ goods: s.goods + Number(r.goods), commission: s.commission + Number(r.commission) }), { goods: 0, commission: 0 });
   return (
     <div className="max-w-4xl space-y-6">
@@ -50,7 +56,60 @@ export default async function FloristReportPage() {
           </table>
         </div>
       )}
-      <p className="text-xs text-muted">Komissiya to‘lovlari tarixi keyingi bosqichda qo‘shiladi.</p>
+
+      <section aria-labelledby="statements-h" className="space-y-3">
+        <h2 id="statements-h" className="text-3xl">
+          Komissiya hisoblari
+        </h2>
+        <p className="text-sm text-muted">
+          Har oy tugagach Gulzor hisob chiqaradi va sizga xabar beradi. To‘lov qilganingizdan keyin Gulzor uni «To‘langan» deb belgilaydi.
+          {unbilled ? ` Hali hisobga kirmagan: ${unbilled.orders} ta buyurtma, ${formatUZS(unbilled.commission)} komissiya.` : ""}
+        </p>
+        {statements.length === 0 ? (
+          <p className="card p-6 text-center text-sm text-muted">Hali hisob chiqarilmagan.</p>
+        ) : (
+          <ul className="space-y-3">
+            {statements.map(({ s }, i) => (
+              <li key={s.id} className="card p-5 text-sm">
+                <details>
+                  <summary className="flex cursor-pointer flex-wrap items-center gap-x-4 gap-y-1">
+                    <span className="font-display text-xl text-plum">{s.period}</span>
+                    <span>{s.orderCount} ta buyurtma</span>
+                    <span className="font-semibold">{formatUZS(s.commissionTotal)}</span>
+                    {s.status === "paid" ? (
+                      <span className="badge bg-sage-light text-wine">To‘langan{s.paidAt ? ` · ${formatDateTime(s.paidAt)}` : ""}</span>
+                    ) : (
+                      <span className="badge bg-petal text-charcoal">To‘lanmagan</span>
+                    )}
+                  </summary>
+                  <table className="mt-3 w-full text-left">
+                    <thead className="text-xs text-muted">
+                      <tr>
+                        <th className="py-1 font-medium">Buyurtma</th>
+                        <th className="py-1 font-medium">Yetkazish sanasi</th>
+                        <th className="py-1 text-right font-medium">Mahsulotlar</th>
+                        <th className="py-1 text-right font-medium">Komissiya</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {details[i].map((o) => (
+                        <tr key={o.id}>
+                          <td className="py-1">{o.number}</td>
+                          <td className="py-1">{formatDateISO(o.deliveryDate, false)}</td>
+                          <td className="py-1 text-right">{formatUZS(Number(o.goods))}</td>
+                          <td className="py-1 text-right">
+                            {formatUZS(o.commissionAmount)} <span className="text-muted">({(o.commissionRate / 100).toLocaleString("uz-UZ")}%)</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </details>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

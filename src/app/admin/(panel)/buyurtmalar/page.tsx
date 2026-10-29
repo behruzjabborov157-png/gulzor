@@ -3,6 +3,7 @@ import { and, desc, eq, gte, ilike, lt, or, sql, type SQL } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireAdmin } from "@/lib/auth";
 import { formatDateISO, formatDateTime, formatPhone, formatUZS, normalizePhone } from "@/lib/format";
+import { floristOptions } from "@/lib/florist-admin";
 import { ORDER_STATUS_LABEL, PAYMENT_METHOD_LABEL, PAYMENT_STATUS_LABEL, type Order } from "@/lib/orders";
 
 export const metadata = { title: "Buyurtmalar" };
@@ -18,7 +19,7 @@ const STATUS_STYLE: Record<Order["status"], string> = {
   rejected: "bg-charcoal/10 text-muted",
 };
 
-export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ q?: string; holat?: string; sana?: string; yaratilgan?: string; sahifa?: string }> }) {
+export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ q?: string; holat?: string; sana?: string; yaratilgan?: string; dokon?: string; sahifa?: string }> }) {
   await requireAdmin();
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
@@ -35,6 +36,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   }
   if (sp.holat && sp.holat in ORDER_STATUS_LABEL) where.push(eq(schema.orders.status, sp.holat as Order["status"]));
   if (sp.sana && /^\d{4}-\d{2}-\d{2}$/.test(sp.sana)) where.push(eq(schema.orders.deliveryDate, sp.sana));
+  const shopId = Number(sp.dokon) || 0;
+  if (shopId > 0) where.push(eq(schema.orders.floristId, shopId));
   // Order (creation) date as a Tashkent calendar day.
   if (sp.yaratilgan && /^\d{4}-\d{2}-\d{2}$/.test(sp.yaratilgan)) {
     const from = new Date(`${sp.yaratilgan}T00:00:00+05:00`);
@@ -44,13 +47,18 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const db = await getDb();
   const cond = where.length ? and(...where) : undefined;
   const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(schema.orders).where(cond);
-  const rows = await db
-    .select()
-    .from(schema.orders)
-    .where(cond)
-    .orderBy(desc(schema.orders.createdAt))
-    .limit(perPage)
-    .offset((page - 1) * perPage);
+  const [list, shops] = await Promise.all([
+    db
+      .select({ o: schema.orders, shop: schema.florists.name })
+      .from(schema.orders)
+      .leftJoin(schema.florists, eq(schema.florists.id, schema.orders.floristId))
+      .where(cond)
+      .orderBy(desc(schema.orders.createdAt))
+      .limit(perPage)
+      .offset((page - 1) * perPage),
+    floristOptions(),
+  ]);
+  const rows = list.map((r) => ({ ...r.o, shop: r.shop }));
   const pages = Math.max(1, Math.ceil(count / perPage));
   const qs = (p: number) => {
     const u = new URLSearchParams();
@@ -58,6 +66,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     if (sp.holat) u.set("holat", sp.holat);
     if (sp.sana) u.set("sana", sp.sana);
     if (sp.yaratilgan) u.set("yaratilgan", sp.yaratilgan);
+    if (shopId > 0) u.set("dokon", String(shopId));
     if (p > 1) u.set("sahifa", String(p));
     return `/admin/buyurtmalar?${u}`;
   };
@@ -65,7 +74,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   return (
     <div>
       <h1 className="mb-6 text-4xl">Buyurtmalar</h1>
-      <form className="card mb-6 grid items-end gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[1fr_190px_165px_165px_auto]" role="search">
+      <form className="card mb-6 grid items-end gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[1fr_190px_190px_165px_165px_auto]" role="search">
         <div>
           <label className="mb-1 block text-xs text-muted" htmlFor="q">Qidiruv</label>
           <input id="q" name="q" defaultValue={q} placeholder="Buyurtma raqami, telefon yoki ism" className="field py-2.5" />
@@ -76,6 +85,15 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             <option value="">Barcha holatlar</option>
             {Object.entries(ORDER_STATUS_LABEL).map(([k, v]) => (
               <option key={k} value={k}>{v}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-muted" htmlFor="dokon">Do‘kon</label>
+          <select id="dokon" name="dokon" defaultValue={shopId > 0 ? String(shopId) : ""} className="field py-2.5">
+            <option value="">Barcha do‘konlar</option>
+            {shops.map((f) => (
+              <option key={f.id} value={f.id}>{f.name}</option>
             ))}
           </select>
         </div>
@@ -92,11 +110,12 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
 
       <p className="mb-3 text-sm text-muted">{count} ta buyurtma</p>
       <div className="card overflow-x-auto">
-        <table className="w-full min-w-[860px] text-left text-sm">
+        <table className="w-full min-w-[980px] text-left text-sm">
           <thead className="border-b border-line bg-ivory text-xs text-muted">
             <tr>
               <th className="px-4 py-3 font-medium">Raqam</th>
               <th className="px-4 py-3 font-medium">Yaratildi</th>
+              <th className="px-4 py-3 font-medium">Do‘kon</th>
               <th className="px-4 py-3 font-medium">Mijoz</th>
               <th className="px-4 py-3 font-medium">Yetkazish</th>
               <th className="px-4 py-3 font-medium">Holat</th>
@@ -106,7 +125,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           </thead>
           <tbody className="divide-y divide-line">
             {rows.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-10 text-center text-muted">Buyurtmalar topilmadi</td></tr>
+              <tr><td colSpan={8} className="px-4 py-10 text-center text-muted">Buyurtmalar topilmadi</td></tr>
             ) : (
               rows.map((o) => (
                 <tr key={o.id} className="hover:bg-ivory">
@@ -115,6 +134,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                     {o.containsDemo ? <span className="ml-1.5 text-[10px] text-muted">demo</span> : null}
                   </td>
                   <td className="px-4 py-3 text-muted">{formatDateTime(o.createdAt)}</td>
+                  <td className="px-4 py-3">{o.shop ?? "—"}</td>
                   <td className="px-4 py-3">{o.customerName}<br /><span className="text-xs text-muted">{formatPhone(o.customerPhone)}</span></td>
                   <td className="px-4 py-3">{formatDateISO(o.deliveryDate, false)}<br /><span className="text-xs text-muted">{o.slotLabel} · {o.fulfillment === "pickup" ? "olib ketish" : o.zoneName}</span></td>
                   <td className="px-4 py-3"><span className={`badge ${STATUS_STYLE[o.status]}`}>{ORDER_STATUS_LABEL[o.status]}</span></td>

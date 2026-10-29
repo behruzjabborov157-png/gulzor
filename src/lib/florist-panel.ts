@@ -221,6 +221,21 @@ export type ProfileInput = {
   addressRu: string | null;
 };
 
+/** Reads the ProfileFields form (components/florist/profile-fields.tsx). */
+export function profileFromForm(form: FormData): ProfileInput {
+  const text = (key: string) => String(form.get(key) ?? "");
+  return {
+    name: text("name"),
+    nameRu: text("nameRu") || null,
+    description: text("description"),
+    descriptionRu: text("descriptionRu") || null,
+    phone: text("phone"),
+    telegramUsername: text("telegramUsername"),
+    address: text("address"),
+    addressRu: text("addressRu") || null,
+  };
+}
+
 export async function updateFloristProfile(floristId: number, p: ProfileInput): Promise<ChangeResult> {
   const phone = normalizePhone(p.phone);
   if (p.name.trim().length < 2) return { ok: false, message: "Do‘kon nomini kiriting" };

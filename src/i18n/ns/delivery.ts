@@ -19,6 +19,8 @@ const uz = {
   pickupSoon: "manzil tez orada ko‘rsatiladi",
   payment: "To‘lov usullari",
   noPayments: "To‘lov usullari hali sozlanmagan.",
+  marketplacePayment:
+    "Yuqoridagi usullar Gulzor do‘koni buyurtmalari uchun. Boshqa do‘konlar buyurtmani o‘zi yetkazadi va to‘lovni yetkazib berishda naqd oladi; ularning hududlari va narxlari do‘kon sahifasida.",
   otherTitle: "Hududingiz ro‘yxatda yo‘qmi?",
   otherText: "Boshqa shahar yoki tumanga yetkazib berish imkoniyatini alohida aniqlab beramiz.",
   telegram: "Telegram orqali yozish",
@@ -46,6 +48,8 @@ const ru: typeof uz = {
   pickupSoon: "адрес скоро появится",
   payment: "Способы оплаты",
   noPayments: "Способы оплаты ещё не настроены.",
+  marketplacePayment:
+    "Эти способы — для заказов магазина Gulzor. Другие магазины доставляют заказы сами и принимают оплату наличными при доставке; их зоны и цены — на странице магазина.",
   otherTitle: "Вашего района нет в списке?",
   otherText: "Мы отдельно уточним возможность доставки в другой город или район.",
   telegram: "Написать в Telegram",

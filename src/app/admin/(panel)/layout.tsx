@@ -14,7 +14,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const admin = await requireAdmin();
   // Orders nobody has looked at yet (status "new"), shown as a badge in the menu.
   const db = await getDb();
-  const [{ n: newOrders }] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.orders).where(eq(schema.orders.status, "new"));
+  const [[{ n: newOrders }], [{ n: pendingShops }]] = await Promise.all([
+    db.select({ n: sql<number>`count(*)::int` }).from(schema.orders).where(eq(schema.orders.status, "new")),
+    db.select({ n: sql<number>`count(*)::int` }).from(schema.florists).where(eq(schema.florists.status, "pending")),
+  ]);
   return (
     <div className="min-h-dvh bg-cream lg:grid lg:grid-cols-[240px_1fr]">
       <aside className="border-b border-line bg-white lg:border-r lg:border-b-0">
@@ -23,7 +26,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Link href="/admin" aria-label="Admin bosh sahifa"><Logo /></Link>
             <p className="text-xs text-muted lg:mt-2">{admin.name} · {admin.role === "owner" ? "Egasi" : "Xodim"}</p>
           </div>
-          <AdminNav owner={admin.role === "owner"} newOrders={newOrders} />
+          <AdminNav owner={admin.role === "owner"} newOrders={newOrders} pendingShops={pendingShops} />
           <div className="flex items-center gap-4 px-5 pb-4 lg:block lg:py-4">
             <Link href="/" className="block text-sm text-muted hover:text-wine" target="_blank">Saytni ochish ↗</Link>
             <form action={adminLogoutAction} className="lg:mt-3">

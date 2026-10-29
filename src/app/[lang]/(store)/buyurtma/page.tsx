@@ -9,6 +9,7 @@ import { getCustomer } from "@/lib/auth";
 import { dateWindow, getDeliveryConfig } from "@/lib/delivery";
 import { formatPhone } from "@/lib/format";
 import { availablePaymentMethods } from "@/lib/payments/config";
+import { platformFloristId } from "@/lib/florists";
 import { getSettings, telegramLink } from "@/lib/settings";
 import { addDaysISO } from "@/lib/time";
 
@@ -20,6 +21,7 @@ export default async function CheckoutPage() {
   const locale = await getLocale();
   const [{ regions }, { checkout, store }, customer] = await Promise.all([getDeliveryConfig(locale), getSettings(), getCustomer()]);
   const win = dateWindow(checkout.maxDaysAhead);
+  const platformId = await platformFloristId();
   const addresses = customer
     ? await (await getDb()).select().from(schema.customerAddresses).where(eq(schema.customerAddresses.customerId, customer.id))
     : [];
@@ -31,6 +33,8 @@ export default async function CheckoutPage() {
         regions={regions.map((r) => ({ id: r.id, name: r.name, zones: r.zones.map((z) => ({ id: z.id, floristId: z.floristId, name: z.name, description: z.description, fee: z.fee })) }))}
         pickup={{ enabled: checkout.pickupEnabled, address: pick(locale, checkout.pickupAddress, checkout.pickupAddressRu) }}
         payments={availablePaymentMethods(checkout, locale)}
+        shopPayments={availablePaymentMethods(checkout, locale, { platformShop: false })}
+        platformFloristId={platformId}
         dates={{ min: win.min, max: win.max, today: win.min, tomorrow: addDaysISO(win.min, 1) }}
         customer={customer ? { name: customer.name, phone: formatPhone(customer.phone) } : null}
         addresses={addresses.map((a) => ({

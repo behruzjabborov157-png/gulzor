@@ -74,6 +74,10 @@ export const florists = pgTable(
     /** Commission in basis points (1000 = 10%). */
     commissionRate: integer("commission_rate").notNull().default(1000),
     logoUrl: text("logo_url"),
+    /** Private chat with the shop bot where the florist gets new orders (linked by the florist from its panel). */
+    telegramChatId: text("telegram_chat_id"),
+    /** One-time code in the t.me/<bot>?start=fl_<code> link that connects the chat above. */
+    telegramLinkToken: text("telegram_link_token"),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -407,6 +411,8 @@ export const orders = pgTable(
     /** Commission agreed when the order was placed: rate in basis points and amount in so'm (on goods after discount). */
     commissionRate: integer("commission_rate").notNull().default(0),
     commissionAmount: integer("commission_amount").notNull().default(0),
+    /** Monthly commission statement this delivered order was billed on (null = not billed yet). */
+    commissionStatementId: integer("commission_statement_id").references(() => commissionStatements.id, { onDelete: "set null" }),
     status: orderStatus("status").notNull().default("new"),
     paymentMethod: paymentMethod("payment_method").notNull(),
     paymentStatus: paymentStatus("payment_status").notNull().default("pending"),
@@ -631,6 +637,31 @@ export const tgMedia = pgTable("tg_media", {
 /* ------------------------------------------------------------------ */
 /* Audit log                                                           */
 /* ------------------------------------------------------------------ */
+
+/**
+ * Monthly commission statement: what a florist owes Gulzor for delivered orders. Customers pay the florist directly,
+ * so the florist settles this with Gulzor; the admin records the payment.
+ */
+export const commissionStatements = pgTable(
+  "commission_statements",
+  {
+    id: serial("id").primaryKey(),
+    floristId: integer("florist_id")
+      .notNull()
+      .references(() => florists.id, { onDelete: "restrict" }),
+    /** Billing month, "YYYY-MM" (Tashkent time). */
+    period: text("period").notNull(),
+    orderCount: integer("order_count").notNull(),
+    /** Goods after discount, so'm. */
+    goodsTotal: integer("goods_total").notNull(),
+    commissionTotal: integer("commission_total").notNull(),
+    status: text("status").$type<"unpaid" | "paid">().notNull().default("unpaid"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    paidNote: text("paid_note").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("commission_statement_period_idx").on(t.floristId, t.period), index("commission_statement_status_idx").on(t.status)],
+);
 
 /** Important administrative actions (florist approval, commission changes, …). Append-only. */
 export const auditLogs = pgTable(

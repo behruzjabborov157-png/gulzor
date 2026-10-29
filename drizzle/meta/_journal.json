@@ -43,6 +43,13 @@
       "when": 1793242684802,
       "tag": "0005_marketplace_florists",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793250467340,
+      "tag": "0006_florist_payouts",
+      "breakpoints": true
     }
   ]
 }

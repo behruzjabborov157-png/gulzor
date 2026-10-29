@@ -26,6 +26,27 @@ Boshqaruv paneli: **https://sizning-domeningiz.uz/admin**
 - Ombor soni bo‘sh qoldirilsa — qoldiq hisobi yuritilmaydi. 0 bo‘lsa — mahsulot “mavjud emas” bo‘ladi.
 - Mavsumiy gullar uchun mahsulot sahifasida mavsum oylarini belgilang. Boshqa oylarda u “Mavsumda emas” bo‘ladi va mijozlarga o‘xshash guldastalar taklif qilinadi.
 
+## Do‘konlar (floristlar)
+- Floristlar **/florist/royxatdan-otish** sahifasida ariza qoldiradi. Yangi ariza kelganda Telegram’ga xabar keladi,
+  admin bosh sahifasida va menyudagi **Do‘konlar** yonida raqam chiqadi.
+- **Do‘konlar** → do‘konni oching → yuridik nom va STIR’ni tekshiring → **Tasdiqlash**. Shundan keyin do‘kon va
+  uning faol mahsulotlari saytda ko‘rinadi.
+- **Rad etish** va **To‘xtatish** uchun sabab yozish shart — florist uni o‘z panelida ko‘radi. To‘xtatilgan do‘konning
+  mahsulotlari saytdan yashiriladi, ochiq buyurtmalarni esa florist yakunlay oladi. Keyin qayta tasdiqlash mumkin.
+- **Komissiya** (standart 10%) har bir do‘kon uchun alohida. Yangi foiz faqat bundan keyingi buyurtmalarga qo‘llanadi;
+  har bir buyurtmada o‘sha paytdagi foiz va summa saqlanadi.
+- Gulzor’ning o‘z do‘koni (“Gulzor do‘koni”) profilini shu yerda tahrirlaysiz; uni to‘xtatib bo‘lmaydi.
+- Boshqa do‘konlarning mijozlari faqat **yetkazib berishda naqd** to‘laydi (pul to‘g‘ridan-to‘g‘ri do‘konga tushadi).
+  Payme/Click, Gulzor promokodlari, xizmat haqi va olib ketish faqat Gulzor’ning o‘z do‘koni uchun.
+- Floristlar yangi buyurtmalarni Telegram’da oladi: florist panelida **Profil → Telegram’ni ulash** tugmasini bosadi
+  (do‘kon boti, `TELEGRAM_SHOP_BOT_TOKEN`, sozlangan bo‘lishi kerak). SMTP sozlangan bo‘lsa, emailga ham keladi.
+  Har bir yuborish natijasi buyurtma sahifasida yoziladi.
+- **Komissiya** bo‘limi: oy tugagach oyni tanlab **Hisob chiqarish** ni bosing — har bir do‘konga hisob chiqadi va
+  ularga xabar boradi. Do‘kon pulni o‘tkazgach, **To‘landi** ni bosing (izohga to‘lov raqamini yozing).
+  Oy oxiridan keyin yetkazilgan buyurtma keyingi oy hisobiga tushadi; bitta buyurtma ikki marta hisoblanmaydi.
+- Bu amallarni faqat sayt egasi bajaradi. Kim, qachon, nima qilgani **Jurnal** bo‘limida saqlanadi
+  (buyurtma va to‘lov holatini qo‘lda o‘zgartirish ham).
+
 ## Muhim
 - Faqat o‘zingizga tegishli yoki ruxsat olingan rasmlardan foydalaning.
 - Chegirma narxini (“avvalgi narx”) faqat haqiqiy chegirma bo‘lsa kiriting.

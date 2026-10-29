@@ -81,7 +81,7 @@ export type Quote = {
     minOrder: number | null;
   } | null;
   /** The (single) florist fulfilling this order, or null when the cart is empty or mixes florists. */
-  florist: { id: number; slug: string; name: string } | null;
+  florist: { id: number; slug: string; name: string; isPlatform: boolean } | null;
   slots: SlotOption[];
   prepMinutes: number;
   containsDemo: boolean;
@@ -209,7 +209,10 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
   if (cartFlorists.length > 1) errors.push(t.multiFlorist);
   const floristId = cartFlorists.length === 1 ? cartFlorists[0] : null;
   const floristRow = floristId ? floristRows.find((f) => f.id === floristId) : undefined;
-  const florist = floristRow ? { id: floristRow.id, slug: floristRow.slug, name: pick(locale, floristRow.name, floristRow.nameRu) } : null;
+  const florist = floristRow ? { id: floristRow.id, slug: floristRow.slug, name: pick(locale, floristRow.name, floristRow.nameRu), isPlatform: floristRow.isPlatform } : null;
+  // Customers pay a marketplace shop directly, so Gulzor's own promo codes, service fee and pickup point
+  // only apply to Gulzor's own shop.
+  const marketplaceShop = florist ? !florist.isPlatform : false;
   const subtotal = valid.reduce((s, l) => s + l.lineTotal, 0);
   const prepMinutes = valid.reduce((m, l) => Math.max(m, l.prepTimeMinutes), 0);
 
@@ -220,6 +223,8 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
   if (code) {
     if (!checkout.couponsEnabled) {
       coupon = { code, applied: false, message: t.couponsOff };
+    } else if (marketplaceShop) {
+      coupon = { code, applied: false, message: t.couponPlatformOnly };
     } else {
       const [cp] = await db.select().from(schema.coupons).where(eq(schema.coupons.code, code));
       const now = new Date();
@@ -272,6 +277,7 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
     errors.push(t.zoneRequired);
   }
   if (input.fulfillment === "pickup" && !checkout.pickupEnabled) errors.push(t.pickupOff);
+  else if (input.fulfillment === "pickup" && marketplaceShop) errors.push(t.pickupPlatformOnly);
 
   /* ---- Date & slot ---- */
   let slots: SlotOption[] = [];
@@ -304,7 +310,7 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
     else if (!chosen.available) errors.push(t.slotUnavailable);
   }
 
-  const serviceFee = valid.length ? checkout.serviceFee : 0;
+  const serviceFee = valid.length && !marketplaceShop ? checkout.serviceFee : 0;
   const total = afterDiscount + deliveryFee + serviceFee;
 
   return {

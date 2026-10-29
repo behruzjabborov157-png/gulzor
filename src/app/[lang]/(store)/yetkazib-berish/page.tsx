@@ -122,6 +122,7 @@ export default async function DeliveryPage() {
         ) : (
           <p className="text-muted">{t.noPayments}</p>
         )}
+        <p className="mt-4 text-sm text-muted">{t.marketplacePayment}</p>
       </section>
 
       <section className="card mt-10 bg-petal/30 p-6" aria-labelledby="other-h">

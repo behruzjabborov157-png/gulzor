@@ -6,9 +6,11 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { clientIp, createSession, destroySession, rateLimit, requireFlorist } from "@/lib/auth";
 import { notifyCustomerTelegram } from "@/lib/customer-telegram";
+import { audit } from "@/lib/florists";
 import {
   floristChangeStatus,
   floristMarkCashPaid,
+  profileFromForm,
   registerFlorist,
   saveFloristZone,
   updateFloristProfile,
@@ -17,6 +19,8 @@ import {
 import type { FormState } from "@/lib/form-state";
 import type { Order } from "@/lib/orders";
 import { formInt, saveProductForm } from "@/lib/product-save";
+import { notifyFloristApplication } from "@/lib/telegram";
+import { unlinkFloristChat } from "@/lib/florist-notify";
 
 /*
  * Florist panel actions. The florist id always comes from the signed-in session (requireFlorist),
@@ -25,7 +29,7 @@ import { formInt, saveProductForm } from "@/lib/product-save";
 
 const text = (form: FormData, key: string) => String(form.get(key) ?? "");
 
-/** Public "open a shop" form (/florist/royxatdan-otish). */
+/** Public "open a shop" form (/florist/royxatdan-otish). The owner gets a Telegram note. */
 export async function registerFloristAction(_: FormState, form: FormData): Promise<FormState> {
   if (!(await rateLimit(`florist-register:${await clientIp()}`, 5, 3600))) {
     return { ok: false, message: "Juda ko‘p urinish. Keyinroq qayta urinib ko‘ring." };
@@ -46,6 +50,10 @@ export async function registerFloristAction(_: FormState, form: FormData): Promi
   };
   const res = await registerFlorist(application);
   if (!res.ok) return { ok: false, errors: res.errors, message: "Xatolarni to‘g‘rilang" };
+  after(async () => {
+    await audit({ id: res.userId, email: application.email.trim().toLowerCase() }, "florist.registered", "florist", res.floristId);
+    await notifyFloristApplication(res.floristId, application.shopName.trim());
+  });
   await createSession("admin", res.userId);
   redirect("/florist?yangi=1");
 }
@@ -108,17 +116,14 @@ export async function floristSaveZoneAction(zoneId: number | null, _: FormState,
 
 export async function floristSaveProfileAction(_: FormState, form: FormData): Promise<FormState> {
   const me = await requireFlorist();
-  const res = await updateFloristProfile(me.floristId, {
-    name: text(form, "name"),
-    nameRu: text(form, "nameRu") || null,
-    description: text(form, "description"),
-    descriptionRu: text(form, "descriptionRu") || null,
-    phone: text(form, "phone"),
-    telegramUsername: text(form, "telegramUsername"),
-    address: text(form, "address"),
-    addressRu: text(form, "addressRu") || null,
-  });
+  const res = await updateFloristProfile(me.floristId, profileFromForm(form));
   if (!res.ok) return { ok: false, message: res.message };
   revalidatePath("/florist/profil");
   return { ok: true, message: "Saqlandi" };
+}
+
+export async function floristUnlinkTelegramAction() {
+  const me = await requireFlorist();
+  await unlinkFloristChat(me.floristId);
+  revalidatePath("/florist/profil");
 }

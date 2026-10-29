@@ -10,6 +10,7 @@ import { dateWindow, getDeliveryConfig } from "@/lib/delivery";
 import { formatDateISO, formatPhone, formatUZS, normalizePhone } from "@/lib/format";
 import { createOrder } from "@/lib/orders";
 import { availablePaymentMethods } from "@/lib/payments/config";
+import { linkFloristChat } from "@/lib/florist-notify";
 import { clickCheckoutUrl } from "@/lib/payments/click";
 import { paymeCheckoutUrl } from "@/lib/payments/payme";
 import { MAX_LINE_QUANTITY, priceLine, type PricingProduct } from "@/lib/pricing";
@@ -160,7 +161,7 @@ type LoadedProduct = NonNullable<Awaited<ReturnType<typeof loadProduct>>>;
 async function shopOf(floristId: number, locale: Locale) {
   const db = await getDb();
   const [f] = await db.select().from(schema.florists).where(eq(schema.florists.id, floristId));
-  return f ? { id: f.id, name: pick(locale, f.name, f.nameRu) } : null;
+  return f ? { id: f.id, name: pick(locale, f.name, f.nameRu), isPlatform: f.isPlatform } : null;
 }
 
 /** The shop the bot cart belongs to (one shop per order). */
@@ -377,7 +378,8 @@ async function askRecipient(s: Session, t: BotTexts) {
 
 async function askFulfillment(s: Session, t: BotTexts) {
   const { checkout } = await getSettings();
-  if (!checkout.pickupEnabled) {
+  // Marketplace shops deliver themselves; pickup is only at Gulzor's own shop.
+  if (!checkout.pickupEnabled || (await cartShop(s))?.isPlatform === false) {
     s.draft.fulfillment = "delivery";
     return askZone(s, t);
   }
@@ -433,7 +435,8 @@ async function askSlot(s: Session, t: BotTexts, edit?: Message) {
 
 async function askPayment(s: Session, t: BotTexts) {
   const { checkout } = await getSettings();
-  const methods = availablePaymentMethods(checkout, s.locale!);
+  const shop = await cartShop(s);
+  const methods = availablePaymentMethods(checkout, s.locale!, { platformShop: shop?.isPlatform ?? true });
   await send(s.chatId, t.askPayment, { inline_keyboard: methods.map((m) => [{ text: m.label, callback_data: `Y:${m.id}` }]) });
 }
 
@@ -476,7 +479,7 @@ async function showSummary(s: Session, t: BotTexts) {
   const uzs = (n: number) => formatUZS(n, locale);
   const { checkout } = await getSettings();
   const slot = q.slots.find((x) => x.id === d.slotId);
-  const method = availablePaymentMethods(checkout, locale).find((m) => m.id === d.payment);
+  const method = availablePaymentMethods(checkout, locale, { platformShop: q.florist?.isPlatform ?? true }).find((m) => m.id === d.payment);
   const items = q.lines.map((l) => {
     const opts = [l.variantName, l.stems ? `${l.stems} ${locale === "ru" ? "шт." : "dona"}` : null, l.colorLabel].filter(Boolean).join(", ");
     return `• ${l.name}${opts ? ` (${opts})` : ""} × ${l.quantity} — ${uzs(l.lineTotal)}`;
@@ -546,6 +549,19 @@ async function onMessage(m: Message): Promise<AfterTask | null> {
   if (m.chat.type !== "private" || !m.from) return null;
   const s = await loadSession(String(m.chat.id));
   const text = (m.text ?? "").trim();
+
+  // A florist connecting order notifications from its panel (one-time code in the deep link).
+  const floristCode = /^\/start\s+(fl_[\w-]+)$/.exec(text)?.[1];
+  if (floristCode) {
+    const shop = await linkFloristChat(floristCode, s.chatId);
+    await send(
+      s.chatId,
+      shop
+        ? `✅ «${shop}» do‘koni ulandi. Yangi buyurtmalar va Gulzor xabarlari shu chatga keladi.`
+        : "Havola eskirgan yoki noto‘g‘ri. Florist panelidagi «Telegram’ni ulash» tugmasidan yangi havola oling.",
+    );
+    return null;
+  }
 
   if (text.startsWith("/start") || text === "/lang" || menuAction(text) === "language" || !s.locale) {
     if (text.startsWith("/start") && s.locale) {

@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireFlorist } from "@/lib/auth";
 import { floristOverview } from "@/lib/florist-panel";
+import { shopBotToken } from "@/lib/telegram-miniapp";
 
 export const metadata = { title: "Bosh sahifa" };
 
@@ -15,6 +16,7 @@ export default async function FloristHome({ searchParams }: { searchParams: Prom
     { done: !!shop.description && !!shop.phone, label: "Do‘kon profilini to‘ldiring (tavsif, telefon)", href: "/florist/profil" },
     { done: overview.activeZones > 0, label: "Yetkazib berish hududlari va narxlarini kiriting", href: "/florist/hududlar" },
     { done: overview.products.active > 0, label: "Kamida bitta mahsulotni rasm bilan qo‘shing (holati: faol)", href: "/florist/mahsulotlar/yangi" },
+    ...(shopBotToken() ? [{ done: !!shop.telegramChatId, label: "Yangi buyurtmalar Telegram’ga kelishi uchun botni ulang", href: "/florist/profil#bildirishnomalar" }] : []),
     { done: shop.status === "approved", label: "Gulzor arizangizni tasdiqlaydi — shundan keyin do‘kon saytda ko‘rinadi", href: null },
   ];
   const cards = [

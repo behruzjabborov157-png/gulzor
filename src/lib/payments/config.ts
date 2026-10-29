@@ -22,9 +22,16 @@ export function clickCredentials() {
 /**
  * Methods offered to customers. An online provider is only shown when the
  * owner enabled it in settings AND its server-side credentials exist.
+ * Marketplace shops (platformShop: false) are paid by the customer directly, so they only take cash on
+ * delivery: Payme/Click would put the money into Gulzor's merchant account instead of the shop's.
  */
-export function availablePaymentMethods(c: CheckoutSettings, locale: Locale = DEFAULT_LOCALE): { id: PaymentMethod; label: string; hint: string }[] {
+export function availablePaymentMethods(
+  c: CheckoutSettings,
+  locale: Locale = DEFAULT_LOCALE,
+  opts: { platformShop?: boolean } = {},
+): { id: PaymentMethod; label: string; hint: string }[] {
   const t = getDict(locale).checkout.payments;
+  if (opts.platformShop === false) return [{ id: "cash", ...t.cash }];
   const ids: PaymentMethod[] = [];
   if (c.cashEnabled) ids.push("cash");
   if (c.paymeEnabled && paymeCredentials()) ids.push("payme");

@@ -27,10 +27,16 @@ type SavedAddress = {
   landmark: string;
 };
 
+type PaymentOption = { id: "cash" | "payme" | "click"; label: string; hint: string };
+
 export type CheckoutProps = {
   regions: Region[];
   pickup: { enabled: boolean; address: string };
-  payments: { id: "cash" | "payme" | "click"; label: string; hint: string }[];
+  /** Gulzor's own shop; any other shop is a marketplace shop. */
+  platformFloristId: number;
+  /** Methods for marketplace shops (cash on delivery). */
+  shopPayments: PaymentOption[];
+  payments: PaymentOption[];
   dates: { min: string; max: string; today: string; tomorrow: string };
   customer: { name: string; phone: string } | null;
   addresses: SavedAddress[];
@@ -128,6 +134,11 @@ export function CheckoutForm(props: CheckoutProps) {
 
   // Each shop delivers itself: only the cart's shop's cities and zones are offered (the server re-checks).
   const shop = cartFlorist(lines);
+  // Marketplace shops are paid in cash on delivery and deliver themselves (the server enforces the same rules).
+  const marketplaceShop = shop != null && shop.id !== props.platformFloristId;
+  const payments = marketplaceShop ? props.shopPayments : props.payments;
+  const paymentMethod = payments.some((p) => p.id === f.paymentMethod) ? f.paymentMethod : (payments[0]?.id ?? "cash");
+  const fulfillment = marketplaceShop ? "delivery" : f.fulfillment;
   const regions = shop
     ? props.regions.map((r) => ({ ...r, zones: r.zones.filter((z) => z.floristId === shop.id) })).filter((r) => r.zones.length)
     : props.regions;
@@ -146,8 +157,8 @@ export function CheckoutForm(props: CheckoutProps) {
       ? {
           lines: toServerLines(lines),
           couponCode: prefs.couponCode || null,
-          fulfillment: f.fulfillment,
-          zoneId: f.fulfillment === "delivery" ? zoneId : null,
+          fulfillment: fulfillment,
+          zoneId: fulfillment === "delivery" ? zoneId : null,
           date: f.date,
         }
       : null;
@@ -191,14 +202,14 @@ export function CheckoutForm(props: CheckoutProps) {
         telegramInitData: tg.initData || undefined,
         lines: toServerLines(lines),
         couponCode: prefs.couponCode || null,
-        fulfillment: f.fulfillment,
+        fulfillment: fulfillment,
         customerName: f.customerName,
         customerPhone: f.customerPhone,
         recipientIsCustomer: f.recipientIsCustomer,
         recipientName: f.recipientName,
         recipientPhone: f.recipientPhone,
         anonymous: f.anonymous,
-        zoneId: f.fulfillment === "delivery" ? zoneId : null,
+        zoneId: fulfillment === "delivery" ? zoneId : null,
         district: f.district,
         neighborhood: f.neighborhood,
         address: f.address,
@@ -208,7 +219,7 @@ export function CheckoutForm(props: CheckoutProps) {
         slotId: slotId ?? 0,
         courierNote: f.courierNote,
         cardMessage: f.cardMessage,
-        paymentMethod: f.paymentMethod,
+        paymentMethod: paymentMethod,
         saveAddress: f.saveAddress,
       });
       if (res.ok) {
@@ -305,17 +316,17 @@ export function CheckoutForm(props: CheckoutProps) {
             <legend className="sr-only">{t.method}</legend>
             {[
               { v: "delivery" as const, title: t.toAddress, d: t.toAddressHint },
-              ...(props.pickup.enabled ? [{ v: "pickup" as const, title: t.pickup, d: props.pickup.address || t.pickupFallback }] : []),
+              ...(props.pickup.enabled && !marketplaceShop ? [{ v: "pickup" as const, title: t.pickup, d: props.pickup.address || t.pickupFallback }] : []),
             ].map((o) => (
-              <label key={o.v} className={`cursor-pointer rounded-xl border p-4 transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-wine ${f.fulfillment === o.v ? "border-wine bg-wine/5" : "border-line bg-white"}`}>
-                <input type="radio" name="fulfillment" className="sr-only" checked={f.fulfillment === o.v} onChange={() => set("fulfillment", o.v)} />
+              <label key={o.v} className={`cursor-pointer rounded-xl border p-4 transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-wine ${fulfillment === o.v ? "border-wine bg-wine/5" : "border-line bg-white"}`}>
+                <input type="radio" name="fulfillment" className="sr-only" checked={fulfillment === o.v} onChange={() => set("fulfillment", o.v)} />
                 <span className="block font-semibold">{o.title}</span>
                 <span className="block text-sm text-muted">{o.d}</span>
               </label>
             ))}
           </fieldset>
 
-          {f.fulfillment === "delivery" ? (
+          {fulfillment === "delivery" ? (
             regions.length === 0 ? (
               <Alert tone="warning">
                 {t.noZones}{" "}
@@ -459,7 +470,7 @@ export function CheckoutForm(props: CheckoutProps) {
           {f.date ? <p className="text-sm text-muted">{formatDateISO(f.date, true, locale)}</p> : null}
           <fieldset>
             <legend className="label">{t.slot}</legend>
-            {f.fulfillment === "delivery" && !zoneId ? (
+            {fulfillment === "delivery" && !zoneId ? (
               <p className="text-sm text-muted">{t.pickZoneFirst}</p>
             ) : slots.length === 0 ? (
               <p className="text-sm text-muted">{loading ? dict.common.loading : t.noSlots}</p>
@@ -490,7 +501,7 @@ export function CheckoutForm(props: CheckoutProps) {
           <Field id="cardMessage" label={t.card} error={fe("cardMessage")} hint={fmt(t.cardHint, { n: f.cardMessage.length })}>
             <textarea {...inputProps("cardMessage")} className="field min-h-24" maxLength={300} value={f.cardMessage} onChange={(e) => set("cardMessage", e.target.value)} placeholder={t.cardPlaceholder} />
           </Field>
-          {f.fulfillment === "delivery" ? (
+          {fulfillment === "delivery" ? (
             <Field id="courierNote" label={t.courier} error={fe("courierNote")}>
               <textarea {...inputProps("courierNote")} className="field min-h-20" maxLength={500} value={f.courierNote} onChange={(e) => set("courierNote", e.target.value)} placeholder={t.courierPlaceholder} />
             </Field>
@@ -498,14 +509,14 @@ export function CheckoutForm(props: CheckoutProps) {
         </Section>
 
         <Section n={6} title={t.payment}>
-          {props.payments.length === 0 ? (
+          {payments.length === 0 ? (
             <Alert tone="warning">{t.noPayments}</Alert>
           ) : (
             <fieldset className="grid gap-2">
               <legend className="sr-only">{t.payment}</legend>
-              {props.payments.map((p) => (
-                <label key={p.id} className={`cursor-pointer rounded-xl border p-4 transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-wine ${f.paymentMethod === p.id ? "border-wine bg-wine/5" : "border-line bg-white"}`}>
-                  <input type="radio" name="payment" className="sr-only" checked={f.paymentMethod === p.id} onChange={() => set("paymentMethod", p.id)} />
+              {payments.map((p) => (
+                <label key={p.id} className={`cursor-pointer rounded-xl border p-4 transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-wine ${paymentMethod === p.id ? "border-wine bg-wine/5" : "border-line bg-white"}`}>
+                  <input type="radio" name="payment" className="sr-only" checked={paymentMethod === p.id} onChange={() => set("paymentMethod", p.id)} />
                   <span className="block font-semibold">{p.label}</span>
                   <span className="block text-sm text-muted">{p.hint}</span>
                 </label>
@@ -554,7 +565,7 @@ export function CheckoutForm(props: CheckoutProps) {
             <div className="space-y-1.5 rounded-xl bg-cream p-4 text-sm">
               <p className="font-semibold">{t.check}</p>
               <p>
-                {f.fulfillment === "pickup"
+                {fulfillment === "pickup"
                   ? fmt(t.pickupAt, { address: props.pickup.address })
                   : `${quote.zone?.regionName ?? ""}, ${quote.zone?.name ?? ""}, ${[f.district, f.neighborhood, f.address, f.apartment].filter(Boolean).join(", ")}`}
               </p>
@@ -562,11 +573,11 @@ export function CheckoutForm(props: CheckoutProps) {
                 {formatDateISO(f.date, true, locale)}, {slots.find((s) => s.id === slotId)?.label}
               </p>
               <p>{fmt(t.recipientIs, { name: f.recipientIsCustomer ? f.customerName : f.recipientName })}</p>
-              <p>{fmt(t.paymentIs, { method: props.payments.find((p) => p.id === f.paymentMethod)?.label ?? "" })}</p>
+              <p>{fmt(t.paymentIs, { method: payments.find((p) => p.id === paymentMethod)?.label ?? "" })}</p>
             </div>
           ) : null}
 
-          <button type="submit" className="btn-primary w-full py-4 text-base" disabled={submitting || !canReview || props.payments.length === 0}>
+          <button type="submit" className="btn-primary w-full py-4 text-base" disabled={submitting || !canReview || payments.length === 0}>
             {submitting ? t.sending : reviewed ? fmt(t.confirm, { total: quote ? uzs(quote.total) : "" }) : t.continue}
           </button>
           {!canReview && !loading ? <p className="text-center text-xs text-muted">{t.fillAll}</p> : null}

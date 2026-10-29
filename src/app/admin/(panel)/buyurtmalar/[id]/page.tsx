@@ -31,10 +31,11 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
   if (!data) notFound();
   const { order: o, items, events } = data;
   const db = await getDb();
-  const [notes, pays, slots] = await Promise.all([
+  const [notes, pays, slots, [shop]] = await Promise.all([
     db.select().from(schema.notifications).where(eq(schema.notifications.orderId, o.id)).orderBy(desc(schema.notifications.createdAt)),
     db.select().from(schema.payments).where(eq(schema.payments.orderId, o.id)).orderBy(desc(schema.payments.createTime)),
     db.select().from(schema.timeSlots).orderBy(asc(schema.timeSlots.sortOrder)),
+    db.select({ id: schema.florists.id, name: schema.florists.name }).from(schema.florists).where(eq(schema.florists.id, o.floristId)),
   ]);
   const next = ORDER_TRANSITIONS[o.status];
 
@@ -48,7 +49,15 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
           <span className="badge bg-petal text-charcoal">{PAYMENT_METHOD_LABEL[o.paymentMethod]} · {PAYMENT_STATUS_LABEL[o.paymentStatus]}</span>
         </div>
         <p className="mt-1 text-sm text-muted">
-          Yaratildi: {formatDateTime(o.createdAt)} · Mijoz tili: {o.locale === "ru" ? "rus tili" : "o‘zbek tili"}
+          Do‘kon:{" "}
+          {shop ? (
+            <Link href={`/admin/floristlar/${shop.id}`} className="text-wine underline">
+              {shop.name}
+            </Link>
+          ) : (
+            "—"
+          )}
+          {" · "}Yaratildi: {formatDateTime(o.createdAt)} · Mijoz tili: {o.locale === "ru" ? "rus tili" : "o‘zbek tili"}
           {o.telegramUserId ? (
             <>
               {" · "}
@@ -136,6 +145,7 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
             <div className="flex justify-between"><dt>Yetkazish</dt><dd>{formatUZS(o.deliveryFee)}</dd></div>
             {o.serviceFee ? <div className="flex justify-between"><dt>Xizmat haqi</dt><dd>{formatUZS(o.serviceFee)}</dd></div> : null}
             <div className="flex justify-between text-base font-semibold"><dt>Jami</dt><dd>{formatUZS(o.total)}</dd></div>
+            <div className="flex justify-between text-xs text-muted"><dt>Gulzor komissiyasi ({(o.commissionRate / 100).toLocaleString("uz-UZ")}%)</dt><dd>{formatUZS(o.commissionAmount)}</dd></div>
           </dl>
         </section>
       </div>

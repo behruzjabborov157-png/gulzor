@@ -20,6 +20,7 @@ import {
 import { normalizePhone, slugify } from "@/lib/format";
 import type { FormState } from "@/lib/form-state";
 import { notifyCustomerTelegram } from "@/lib/customer-telegram";
+import { notifyFloristAccount, notifyFloristOrderChange, statementMessage, statusDecisionMessage } from "@/lib/florist-notify";
 import { changeOrderStatus, type Order } from "@/lib/orders";
 import { DEFAULT_CHECKOUT, DEFAULT_STORE, getSettings, saveSetting } from "@/lib/settings";
 import { notifyOrderEmail, sendOwnerEmail } from "@/lib/email";
@@ -27,7 +28,10 @@ import { notifyOrder, sendTelegram } from "@/lib/telegram";
 import { isISODate } from "@/lib/time";
 import { parseCsv, PRODUCT_CSV_COLUMNS } from "@/lib/csv";
 import { buildSearchText } from "@/lib/search";
-import { platformFloristId } from "@/lib/florists";
+import { audit, platformFloristId, type FloristStatus } from "@/lib/florists";
+import { setFloristCommission, setFloristStatus } from "@/lib/florist-admin";
+import { issueStatements, setStatementPaid } from "@/lib/commission";
+import { profileFromForm, updateFloristProfile } from "@/lib/florist-panel";
 import { saveProductForm } from "@/lib/product-save";
 
 /* ------------------------------------------------------------------ */
@@ -67,8 +71,13 @@ export async function setOrderStatusAction(orderId: string, to: Order["status"],
   const admin = await requireAdmin();
   const reason = String(form.get("reason") ?? "").trim().slice(0, 300);
   const changed = await changeOrderStatus(orderId, to, admin.email, reason);
-  // Mini App customers get the new status in Telegram (no-op for website orders).
-  if (changed) after(() => notifyCustomerTelegram(orderId, "status"));
+  if (changed) {
+    const db = await getDb();
+    const [o] = await db.select({ number: schema.orders.number }).from(schema.orders).where(eq(schema.orders.id, orderId));
+    await audit(admin, "order.status", "order", orderId, { number: o?.number, to, ...(reason ? { reason } : {}) });
+  }
+  // Mini App customers get the new status in Telegram (no-op for website orders); a marketplace shop hears about it too.
+  if (changed) after(() => Promise.all([notifyCustomerTelegram(orderId, "status"), notifyFloristOrderChange(orderId, "status")]));
   revalidatePath(`/admin/buyurtmalar/${orderId}`);
 }
 
@@ -83,6 +92,7 @@ export async function setPaymentStatusAction(orderId: string, form: FormData) {
   if (!o || (o.paymentMethod !== "cash" && status.data !== "refunded")) return;
   await db.update(schema.orders).set({ paymentStatus: status.data, updatedAt: new Date() }).where(eq(schema.orders.id, orderId));
   await db.insert(schema.orderEvents).values({ orderId, type: "payment", message: `To‘lov holati qo‘lda o‘zgartirildi: ${status.data}`, actor: admin.email });
+  await audit(admin, "order.payment", "order", orderId, { number: o.number, from: o.paymentStatus, to: status.data });
   revalidatePath(`/admin/buyurtmalar/${orderId}`);
 }
 
@@ -113,6 +123,7 @@ export async function updateOrderDeliveryAction(orderId: string, _: FormState, f
     .set({ ...rest, slotId, slotLabel: slot.label, updatedAt: new Date() })
     .where(eq(schema.orders.id, orderId));
   await db.insert(schema.orderEvents).values({ orderId, type: "edit", message: "Yetkazib berish ma’lumotlari yangilandi", actor: admin.email });
+  after(() => notifyFloristOrderChange(orderId, "details"));
   revalidatePath(`/admin/buyurtmalar/${orderId}`);
   return { ok: true, message: "Saqlandi" };
 }
@@ -520,4 +531,71 @@ export async function archiveDemoProductsAction() {
   const db = await getDb();
   await db.update(schema.products).set({ status: "archived", updatedAt: new Date() }).where(and(eq(schema.products.isDemo, true), sql`${schema.products.status} <> 'archived'`));
   revalidatePath("/admin/mahsulotlar");
+}
+
+/* ------------------------------------------------------------------ */
+/* Florists (marketplace shops)                                        */
+/* ------------------------------------------------------------------ */
+
+const FLORIST_STATUSES = ["pending", "approved", "suspended", "rejected"] as const;
+
+export async function setFloristStatusAction(floristId: number, to: FloristStatus, _: FormState, form: FormData): Promise<FormState> {
+  const owner = await requireOwner();
+  if (!(FLORIST_STATUSES as readonly string[]).includes(to)) return { ok: false, message: "Noto‘g‘ri holat" };
+  const reason = String(form.get("reason") ?? "").trim();
+  const res = await setFloristStatus(owner, floristId, to, reason);
+  if (!res.ok) return res;
+  if (to !== "pending") {
+    const m = statusDecisionMessage(to, reason || null);
+    after(() => notifyFloristAccount(floristId, m.subject, m.body));
+  }
+  revalidatePath("/admin/floristlar");
+  revalidatePath(`/admin/floristlar/${floristId}`);
+  return { ok: true, message: "Saqlandi" };
+}
+
+export async function setFloristCommissionAction(floristId: number, _: FormState, form: FormData): Promise<FormState> {
+  const owner = await requireOwner();
+  const res = await setFloristCommission(owner, floristId, String(form.get("commission") ?? ""));
+  if (!res.ok) return res;
+  revalidatePath(`/admin/floristlar/${floristId}`);
+  return { ok: true, message: "Saqlandi — yangi buyurtmalarga qo‘llanadi" };
+}
+
+export async function saveFloristProfileAction(floristId: number, _: FormState, form: FormData): Promise<FormState> {
+  const owner = await requireOwner();
+  const res = await updateFloristProfile(floristId, profileFromForm(form));
+  if (!res.ok) return res;
+  await audit(owner, "florist.profile", "florist", floristId);
+  revalidatePath(`/admin/floristlar/${floristId}`);
+  return { ok: true, message: "Saqlandi" };
+}
+
+/* ------------------------------------------------------------------ */
+/* Commission statements                                               */
+/* ------------------------------------------------------------------ */
+
+export async function issueStatementsAction(_: FormState, form: FormData): Promise<FormState> {
+  const owner = await requireOwner();
+  const res = await issueStatements(owner, String(form.get("period") ?? ""));
+  if (!res.ok) return res;
+  // Each shop is told what it owes (Telegram / e-mail, whichever it has set up).
+  after(() =>
+    Promise.all(
+      res.issued.map((st) => {
+        const m = statementMessage(st.period, st.orderCount, st.commissionTotal);
+        return notifyFloristAccount(st.floristId, m.subject, m.body);
+      }),
+    ),
+  );
+  revalidatePath("/admin/komissiya");
+  return { ok: true, message: res.issued.length ? `${res.issued.length} ta do‘konga hisob chiqarildi` : "Hisoblanadigan yangi buyurtma yo‘q" };
+}
+
+export async function setStatementPaidAction(statementId: number, paid: boolean, _: FormState, form: FormData): Promise<FormState> {
+  const owner = await requireOwner();
+  const res = await setStatementPaid(owner, statementId, paid, String(form.get("note") ?? ""));
+  if (!res.ok) return res;
+  revalidatePath("/admin/komissiya");
+  return { ok: true, message: "Saqlandi" };
 }

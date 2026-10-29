@@ -6,6 +6,7 @@ import { DEFAULT_LOCALE, fmt, type Locale } from "@/i18n/config";
 import { getDict } from "@/i18n/dict";
 import { normalizePhone } from "@/lib/format";
 import { availablePaymentMethods } from "@/lib/payments/config";
+import { notifyFloristNewOrder } from "@/lib/florist-notify";
 import { adjustStock, cartLineSchema, quoteCart, StockError, type Quote } from "@/lib/quote";
 import { getSettings } from "@/lib/settings";
 import { notifyOrderEmail } from "@/lib/email";
@@ -137,10 +138,6 @@ export async function createOrder(
   if (previous) return previous;
   const { checkout } = await getSettings();
 
-  if (!availablePaymentMethods(checkout).some((m) => m.id === v.paymentMethod)) {
-    return { ok: false, errors: [e.paymentUnavailable], fieldErrors: { paymentMethod: e.paymentRequired } };
-  }
-
   // Authoritative server-side recalculation of every price, fee and availability.
   const quote = await quoteCart(
     { lines: v.lines, couponCode: v.couponCode, fulfillment: v.fulfillment, zoneId: v.zoneId, date: v.date, slotId: v.slotId },
@@ -149,6 +146,10 @@ export async function createOrder(
   if (quote.errors.length) return { ok: false, errors: quote.errors, quote };
   // quoteCart guarantees exactly one approved florist when there are no errors.
   const floristId = quote.florist!.id;
+  // Payment methods depend on the shop: marketplace shops are paid in cash on delivery.
+  if (!availablePaymentMethods(checkout, locale, { platformShop: quote.florist!.isPlatform }).some((m) => m.id === v.paymentMethod)) {
+    return { ok: false, errors: [e.paymentUnavailable], fieldErrors: { paymentMethod: e.paymentRequired }, quote };
+  }
   const db0 = await getDb();
   const [floristRow] = await db0.select({ rate: schema.florists.commissionRate }).from(schema.florists).where(eq(schema.florists.id, floristId));
   const commissionRate = floristRow?.rate ?? 0;
@@ -340,8 +341,15 @@ export async function notifyNewOrder(orderId: string) {
     const [order] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId));
     if (!order) return;
     const items = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
-    // Both channels run independently; each logs its own outcome on the order.
-    const results = await Promise.allSettled([notifyOrder({ ...order, items }), notifyOrderEmail({ ...order, items })]);
+    const [shop] = await db.select({ name: schema.florists.name, isPlatform: schema.florists.isPlatform }).from(schema.florists).where(eq(schema.florists.id, order.floristId));
+    const opts = shop && !shop.isPlatform ? { shop: shop.name } : {};
+    // All channels run independently; each logs its own outcome on the order.
+    // Marketplace shops get the order themselves; the owner still sees every order.
+    const results = await Promise.allSettled([
+      notifyOrder({ ...order, items }, undefined, opts),
+      notifyOrderEmail({ ...order, items }, undefined, opts),
+      notifyFloristNewOrder(orderId),
+    ]);
     for (const r of results) if (r.status === "rejected") console.error("Order notification failed", r.reason);
   } catch (e) {
     console.error("Order notification failed", e);
