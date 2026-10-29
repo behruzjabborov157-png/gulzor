@@ -27,16 +27,26 @@ function transport() {
 /** Sends one e-mail to ORDER_EMAIL_TO. Never throws; reports what really happened. */
 export async function sendOwnerEmail(subject: string, html: string, text: string): Promise<SendResult> {
   if (!emailConfigured()) return { status: "skipped", detail: "SMTP_HOST yoki ORDER_EMAIL_TO sozlanmagan" };
-  return sendEmail(process.env.ORDER_EMAIL_TO!, subject, html, text);
+  // One address, or several separated by commas.
+  const to = process.env.ORDER_EMAIL_TO!.split(",").map((s) => s.trim()).filter(Boolean);
+  return sendEmail(to, subject, html, text);
 }
 
+/**
+ * A plain mailbox address only: no display names, quotes, comments or lists. Keeps nodemailer's address parser
+ * (GHSA-8c8m-p3m8-cjg8, GHSA-m943-m63m-w62w, GHSA-85x2-q946-cp5h in < 10.1.4) away from anything unusual.
+ */
+export const isPlainEmail = (v: string) => /^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,24}$/.test(v) && v.length <= 254;
+
 /** Sends one e-mail to any address (florists). Never throws; reports what really happened. */
-export async function sendEmail(to: string, subject: string, html: string, text: string): Promise<SendResult> {
+export async function sendEmail(to: string | string[], subject: string, html: string, text: string): Promise<SendResult> {
   if (!process.env.SMTP_HOST) return { status: "skipped", detail: "SMTP_HOST sozlanmagan" };
+  const list = Array.isArray(to) ? to : [to];
+  if (!list.length || !list.every(isPlainEmail)) return { status: "failed", detail: "Email manzili noto‘g‘ri" };
   try {
     const info = await transport().sendMail({
       from: process.env.SMTP_FROM || process.env.SMTP_USER,
-      to,
+      to: list,
       subject,
       text,
       html,

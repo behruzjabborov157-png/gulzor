@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { hashPassword } from "@/lib/auth";
+import { isPlainEmail } from "@/lib/email";
 import { normalizePhone, slugify } from "@/lib/format";
 import { changeOrderStatus, ORDER_TRANSITIONS, type Order } from "@/lib/orders";
 
@@ -32,6 +33,12 @@ export type RegisterResult = { ok: true; userId: string; floristId: number } | {
 
 /** Uzbek taxpayer number (STIR / INN): 9 digits. */
 export const isTaxId = (v: string) => /^\d{9}$/.test(v);
+/** Empty, or a valid Telegram username (with or without @). */
+export const isTelegramUsername = (v: string) => {
+  const u = v.trim().replace(/^@/, "");
+  return u === "" || /^[A-Za-z0-9_]{4,32}$/.test(u);
+};
+const TG_ERROR = "Telegram username noto‘g‘ri (lotin harflari, raqam va _, 4–32 belgi)";
 
 export async function registerFlorist(a: FloristApplication): Promise<RegisterResult> {
   const errors: Record<string, string> = {};
@@ -39,9 +46,10 @@ export async function registerFlorist(a: FloristApplication): Promise<RegisterRe
   const phone = normalizePhone(a.phone);
   if (a.shopName.trim().length < 2) errors.shopName = "Do‘kon nomini kiriting";
   if (a.contactName.trim().length < 2) errors.contactName = "Ismingizni kiriting";
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) errors.email = "Email noto‘g‘ri";
+  if (!isPlainEmail(email)) errors.email = "Email noto‘g‘ri";
   if (a.password.length < 12) errors.password = "Parol kamida 12 belgidan iborat bo‘lsin";
   if (!phone) errors.phone = "Telefon raqami noto‘g‘ri";
+  if (!isTelegramUsername(a.telegramUsername)) errors.telegramUsername = TG_ERROR;
   if (!a.regionId) errors.regionId = "Shaharni tanlang";
   if (a.address.trim().length < 5) errors.address = "Do‘kon manzilini kiriting";
   if (a.legalName.trim().length < 2) errors.legalName = "Yuridik nomni kiriting (YaTT yoki MChJ)";
@@ -240,6 +248,7 @@ export async function updateFloristProfile(floristId: number, p: ProfileInput): 
   const phone = normalizePhone(p.phone);
   if (p.name.trim().length < 2) return { ok: false, message: "Do‘kon nomini kiriting" };
   if (!phone) return { ok: false, message: "Telefon raqami noto‘g‘ri" };
+  if (!isTelegramUsername(p.telegramUsername)) return { ok: false, message: TG_ERROR };
   const db = await getDb();
   await db
     .update(schema.florists)

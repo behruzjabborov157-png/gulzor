@@ -16,6 +16,7 @@ const uz = {
   freeFrom: "{amount}dan bepul",
   city: "Shahar: {city}",
   address: "Manzil: {address}",
+  seller: "Sotuvchi: {name}",
   contact: "Aloqa",
   onGulzorSince: "Gulzor’da {date} dan beri",
   // Cart rule
@@ -54,6 +55,7 @@ const ru: typeof uz = {
   freeFrom: "бесплатно от {amount}",
   city: "Город: {city}",
   address: "Адрес: {address}",
+  seller: "Продавец: {name}",
   contact: "Контакты",
   onGulzorSince: "На Gulzor с {date}",
   conflictTitle: "Товар другого магазина",

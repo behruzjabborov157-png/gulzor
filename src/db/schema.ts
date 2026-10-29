@@ -264,7 +264,7 @@ export const deliveryZones = pgTable("delivery_zones", {
   minLeadMinutes: integer("min_lead_minutes").notNull().default(120),
   isActive: boolean("is_active").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
-});
+}, (t) => [index("delivery_zones_florist_idx").on(t.floristId)]);
 
 export const timeSlots = pgTable("time_slots", {
   id: serial("id").primaryKey(),
@@ -465,6 +465,9 @@ export const orders = pgTable(
     index("orders_created_idx").on(t.createdAt),
     index("orders_customer_idx").on(t.customerId),
     index("orders_florist_idx").on(t.floristId),
+    index("orders_status_idx").on(t.status),
+    index("orders_delivery_date_idx").on(t.deliveryDate),
+    index("orders_statement_idx").on(t.commissionStatementId),
   ],
 );
 
@@ -487,7 +490,7 @@ export const orderItems = pgTable(
     addons: jsonb("addons").$type<OrderItemAddon[]>().notNull().default([]),
     lineTotal: integer("line_total").notNull(),
   },
-  (t) => [index("order_items_order_idx").on(t.orderId)],
+  (t) => [index("order_items_order_idx").on(t.orderId), index("order_items_product_idx").on(t.productId)],
 );
 
 export const orderEvents = pgTable(
@@ -541,7 +544,7 @@ export const notifications = pgTable("notifications", {
   status: text("status").$type<"sent" | "failed" | "skipped">().notNull(),
   detail: text("detail").notNull().default(""),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [index("notifications_order_idx").on(t.orderId)]);
 
 /* ------------------------------------------------------------------ */
 /* Leads                                                               */

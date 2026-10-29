@@ -111,13 +111,36 @@ Endi `https://gulzor.uz` ochilishi kerak.
 4. **Rus tili** — sayt rus tilida ham ishlaydi (`https://gulzor.uz/ru`). Mahsulot, kategoriya, yetkazib berish hududlari va sozlamalardagi “(rus.)” / “Rus tilidagi versiya” maydonlarini to‘ldiring; bo‘sh qolsa, o‘zbekcha matn ko‘rsatiladi. CSV’da `name_ru`, `short_description_ru`, `description_ru`, `care_instructions_ru` ustunlari bor. Ruscha matnlarni (shu jumladan oferta va maxfiylik siyosatini) ishga tushirishdan oldin rus tilini yaxshi biladigan odamga tekshirtiring.
 5. **Sozlamalar** — “Demo rejim banneri” o‘chiq ekanini tekshiring.
 
+## 7a. Marketpleys (boshqa do‘konlar)
+
+Gulzor’ning o‘z do‘koni (“Gulzor”) avtomatik yaratiladi. Boshqa floristlar uchun:
+
+1. **Do‘kon boti.** Floristlar yangi buyurtmalarni Telegram’da olishi uchun mijozlar boti (Mini App boti) kerak:
+   `.env.local` ga `TELEGRAM_SHOP_BOT_TOKEN` va `TELEGRAM_WEBHOOK_SECRET` (kamida 16 belgi) yozing, keyin
+   `npm run telegram:setup`. Florist panelda **Profil → Telegram’ni ulash** tugmasini bosadi.
+2. **Email (ixtiyoriy).** `SMTP_*` sozlansa, floristlarga xabarlar emailga ham boradi.
+3. **Ariza → tasdiqlash.** Florist `https://gulzor.uz/florist/royxatdan-otish` da ariza qoldiradi → **Admin → Do‘konlar**
+   da yuridik nom va STIR’ni tekshirib tasdiqlaysiz va komissiya foizini belgilaysiz.
+4. **Pul oqimi.** Boshqa do‘konlar mijozdan to‘lovni **yetkazishda naqd** oladi (Payme/Click faqat Gulzor do‘koni uchun).
+   Har oy **Admin → Komissiya** da hisob chiqarasiz, do‘kon to‘lagach “To‘landi” deysiz.
+5. **Ishonch.** Sharhlar (**Sharhlar**), mijoz murojaatlari (**Murojaatlar**) va do‘konlar ko‘rsatkichlari (**Tahlil**)
+   admin panelda. Ochiq murojaatlarni 1–2 kun ichida yoping.
+
+**Floristlarni taklif qilishdan oldin yurist bilan aniqlang** (bu yerda yozilganlar huquqiy maslahat emas):
+- floristlar bilan shartnoma: komissiya, hisob-kitob muddati, javobgarlik, pulni qaytarish tartibi;
+- komissiya bo‘yicha hisob-faktura va soliq masalalari;
+- iste’molchilar huquqlari: kim sotuvchi ekani (do‘kon sahifasida yuridik nom ko‘rsatilishi), qaytarish shartlari;
+- shaxsiy ma’lumotlar: floristlar mijozning ismi, telefoni va manzilini ko‘radi — buni maxfiylik siyosatida yozing.
+
 ## 8. Yakuniy tekshiruv
 
 ```bash
 sudo -iu gulzor bash -c "cd /opt/gulzor && npm run launch:check -- --send-test"
 ```
 
-Natijada **0 failed** bo‘lishi kerak. Ogohlantirishlarni (WARN) ko‘rib chiqing. So‘ng o‘zingiz
+Natijada **0 failed** bo‘lishi kerak. Ogohlantirishlarni (WARN) ko‘rib chiqing — tekshiruv marketpleysni ham
+ko‘radi (Gulzor do‘koni, do‘kon boti, hududsiz yoki bildirishnomasiz do‘konlar, uzoq ochiq turgan murojaatlar,
+kutubxonalar xavfsizligi). So‘ng o‘zingiz
 telefondan bitta sinov buyurtma bering → Telegram’ga xabar kelganini va admin panelda ko‘rinishini
 tekshiring → sinov buyurtmani “Bekor qilish” qiling.
 

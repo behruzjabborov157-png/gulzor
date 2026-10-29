@@ -279,22 +279,22 @@ test("trust: bouquet photo, complaint and decision, then a verified review that 
   // Review: pending until the admin publishes it.
   await page.goto(orderUrl);
   await page.getByRole("radio", { name: "5 yulduz" }).check({ force: true });
-  await page.getByLabel("Izoh (ixtiyoriy)").fill("Juda chiroyli guldasta (e2e sinov)");
+  await page.getByLabel("Izoh (ixtiyoriy)").fill(`Juda chiroyli guldasta (${orderNumber})`);
   await page.getByRole("button", { name: "Sharh yuborish" }).click();
   await expect(page.getByText(/Sizning bahoyingiz: 5\/5 · Sharhingiz tekshirilmoqda\./)).toBeVisible();
   await page.goto("/dokon/gulzor");
-  await expect(page.getByText("Juda chiroyli guldasta (e2e sinov)")).toHaveCount(0);
+  await expect(page.getByText(`Juda chiroyli guldasta (${orderNumber})`)).toHaveCount(0);
 
   await page.goto("/admin/sharhlar");
-  const review = page.getByRole("listitem").filter({ hasText: "Juda chiroyli guldasta (e2e sinov)" });
+  const review = page.getByRole("listitem").filter({ hasText: `Juda chiroyli guldasta (${orderNumber})` });
   await review.getByRole("button", { name: "E’lon qilish" }).click();
   await expect(review).toHaveCount(0); // moved to "E’lon qilingan"
   await page.goto("/admin/sharhlar?holat=approved");
-  await expect(page.getByText("Juda chiroyli guldasta (e2e sinov)")).toBeVisible();
+  await expect(page.getByText(`Juda chiroyli guldasta (${orderNumber})`)).toBeVisible();
 
   await page.goto("/dokon/gulzor");
   await expect(page.getByRole("heading", { name: "Mijozlar sharhlari" })).toBeVisible();
-  await expect(page.getByText("Juda chiroyli guldasta (e2e sinov)")).toBeVisible();
+  await expect(page.getByText(`Juda chiroyli guldasta (${orderNumber})`)).toBeVisible();
   await expect(page.getByText(/Tasdiqlangan xarid/).first()).toBeVisible();
 
   await page.goto("/admin/tahlil");

@@ -120,6 +120,9 @@ test("the owner approves the shop and sets its commission; the shop goes live an
   // Live on the storefront now, with its active product.
   await page.goto("/dokonlar");
   await expect(page.getByText(shopName)).toBeVisible();
+  await page.getByText(shopName).click();
+  await expect(page.getByText("Sotuvchi: YaTT Test Floristov")).toBeVisible(); // seller identity; the tax id stays private
+  await expect(page.getByText("123456789")).toHaveCount(0);
   expect((await page.request.get(`/gul/e2e-lolalar-${run}`)).status()).toBe(200);
 });
 

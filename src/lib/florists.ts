@@ -60,6 +60,8 @@ export type PublicFlorist = {
   name: string;
   description: string;
   address: string;
+  /** Legal seller name (YaTT / MChJ) — shown to customers as the seller. The tax id stays private. */
+  legalName: string;
   phone: string;
   telegramUsername: string;
   logoUrl: string | null;
@@ -81,6 +83,7 @@ function publicFlorist(
     name: pick(locale, f.name, f.nameRu),
     description: pick(locale, f.description, f.descriptionRu),
     address: pick(locale, f.address, f.addressRu),
+    legalName: f.legalName,
     phone: f.phone,
     telegramUsername: f.telegramUsername,
     logoUrl: f.logoUrl,

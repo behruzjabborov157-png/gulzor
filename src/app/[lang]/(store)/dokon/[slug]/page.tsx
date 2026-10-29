@@ -77,6 +77,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
             </li>
           ) : null}
           {shop.address ? <li className="pl-6 text-muted">{fmt(t.address, { address: shop.address })}</li> : null}
+          {shop.legalName && !shop.isPlatform ? <li className="pl-6 text-muted">{fmt(t.seller, { name: shop.legalName })}</li> : null}
           {shop.phone ? (
             <li>
               <a href={`tel:${shop.phone}`} className="inline-flex items-center gap-2 hover:text-wine">

@@ -21,6 +21,8 @@ import { sendTelegram, telegramConfigured } from "@/lib/telegram";
 type Level = "OK" | "WARN" | "FAIL" | "INFO";
 const results: { level: Level; text: string }[] = [];
 const report = (level: Level, text: string) => results.push({ level, text });
+/** db.execute returns an array on postgres-js and { rows } on PGlite. */
+const rowsOf = <T>(r: unknown): T[] => (Array.isArray(r) ? r : ((r as { rows?: T[] }).rows ?? [])) as T[];
 
 async function main() {
   /* ---- Environment ---- */
@@ -45,14 +47,14 @@ async function main() {
   }
 
   if (databaseKind() === "postgres") {
-    const rows = (await db.execute(sql`SHOW server_encoding`)) as unknown as { server_encoding: string }[];
+    const rows = rowsOf<{ server_encoding: string }>(await db.execute(sql`SHOW server_encoding`));
     const enc = rows[0]?.server_encoding;
     report(enc === "UTF8" ? "OK" : "FAIL", `Database encoding: ${enc}${enc === "UTF8" ? "" : " (must be UTF8)"}`);
   }
 
   const journal = JSON.parse(fs.readFileSync(path.resolve("drizzle/meta/_journal.json"), "utf8")) as { entries: unknown[] };
   try {
-    const applied = (await db.execute(sql`SELECT count(*)::int AS n FROM drizzle.__drizzle_migrations`)) as unknown as { n: number }[];
+    const applied = rowsOf<{ n: number }>(await db.execute(sql`SELECT count(*)::int AS n FROM drizzle.__drizzle_migrations`));
     const n = Number(applied[0]?.n ?? 0);
     report(n >= journal.entries.length ? "OK" : "FAIL", `Migrations applied: ${n}/${journal.entries.length}${n < journal.entries.length ? " — run npm run db:migrate" : ""}`);
   } catch {
@@ -124,16 +126,64 @@ async function main() {
   } else report("OK", "E-mail configured (add --send-test to send a real test e-mail)");
   if (!telegramConfigured() && !emailConfigured()) report("WARN", "No order notification channel configured — new orders are only visible in the admin panel");
 
-  /* ---- Storage ---- */
+  /* ---- Marketplace ---- */
+  const [platform] = await db.select().from(schema.florists).where(eq(schema.florists.isPlatform, true));
+  report(platform?.status === "approved" ? "OK" : "FAIL", platform ? `Platform shop “${platform.name}”: ${platform.status}` : "Platform shop missing — run npm run db:migrate");
+  const shops = await db
+    .select({
+      id: schema.florists.id,
+      name: schema.florists.name,
+      status: schema.florists.status,
+      chat: schema.florists.telegramChatId,
+      zones: sql<number>`(SELECT count(*)::int FROM ${schema.deliveryZones} z WHERE z.florist_id = ${schema.florists.id} AND z.is_active)`,
+    })
+    .from(schema.florists)
+    .where(eq(schema.florists.isPlatform, false));
+  const approved = shops.filter((s) => s.status === "approved");
+  report("INFO", `Marketplace shops: ${approved.length} approved, ${shops.filter((s) => s.status === "pending").length} waiting for review`);
+  const noZones = approved.filter((s) => s.zones === 0);
+  if (noZones.length) report("WARN", `Approved shops without an active delivery zone (customers cannot order): ${noZones.map((s) => s.name).join(", ")}`);
+  const shopBot = !!(process.env.TELEGRAM_SHOP_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN);
+  if (!shopBot) report("WARN", "Shop bot not configured (TELEGRAM_SHOP_BOT_TOKEN) — florists cannot receive orders in Telegram");
+  else if ((process.env.TELEGRAM_WEBHOOK_SECRET ?? "").length < 16) report("FAIL", "TELEGRAM_WEBHOOK_SECRET must be at least 16 characters");
+  else report("OK", "Shop bot configured (after deploy: npm run telegram:setup)");
+  const deaf = approved.filter((s) => !s.chat);
+  if (deaf.length && !process.env.SMTP_HOST) report("WARN", `Shops with no notification channel (no Telegram linked, no SMTP): ${deaf.map((s) => s.name).join(", ")}`);
+  else if (deaf.length) report("INFO", `Shops that have not linked Telegram (they get e-mail only): ${deaf.map((s) => s.name).join(", ")}`);
+
+  const [{ stale }] = await db
+    .select({ stale: sql<number>`count(*)::int` })
+    .from(schema.disputes)
+    .where(and(eq(schema.disputes.status, "open"), sql`${schema.disputes.createdAt} < now() - interval '3 days'`));
+  if (stale) report("WARN", `${stale} customer complaint(s) open for more than 3 days (admin → Murojaatlar)`);
+  const [{ overdue }] = await db
+    .select({ overdue: sql<number>`count(*)::int` })
+    .from(schema.commissionStatements)
+    .where(and(eq(schema.commissionStatements.status, "unpaid"), sql`${schema.commissionStatements.createdAt} < now() - interval '30 days'`));
+  if (overdue) report("INFO", `${overdue} commission statement(s) unpaid for more than 30 days (admin → Komissiya)`);
+
+  /* ---- Dependencies with known advisories ---- */
   try {
-    const dir = path.join(uploadRoot(), "products");
-    fs.mkdirSync(dir, { recursive: true });
-    const probe = path.join(dir, `.write-test-${process.pid}`);
-    fs.writeFileSync(probe, "ok");
-    fs.rmSync(probe);
-    report("OK", `Upload folder writable: ${uploadRoot()}`);
-  } catch (e) {
-    report("FAIL", `Upload folder not writable (${uploadRoot()}): ${(e as Error).message}`);
+    const v = (JSON.parse(fs.readFileSync(path.resolve("node_modules/nodemailer/package.json"), "utf8")) as { version: string }).version;
+    const [maj, min, pat] = v.split(".").map(Number);
+    const fixed = maj > 10 || (maj === 10 && (min > 1 || (min === 1 && pat >= 4)));
+    report(fixed ? "OK" : "WARN", `nodemailer ${v}${fixed ? "" : " — upgrade to ≥ 10.1.4 (address-parser advisories; recipients are already restricted to plain addresses)"}`);
+  } catch {
+    report("INFO", "nodemailer not installed");
+  }
+
+  /* ---- Storage ---- */
+  for (const folder of ["products", "orders", "requests"]) {
+    try {
+      const dir = path.join(uploadRoot(), folder);
+      fs.mkdirSync(dir, { recursive: true });
+      const probe = path.join(dir, `.write-test-${process.pid}`);
+      fs.writeFileSync(probe, "ok");
+      fs.rmSync(probe);
+      report("OK", `Upload folder writable: ${dir}`);
+    } catch (e) {
+      report("FAIL", `Upload folder not writable (${path.join(uploadRoot(), folder)}): ${(e as Error).message}`);
+    }
   }
 
   report("INFO", "Personal data of Uzbek citizens must be stored on servers in Uzbekistan — confirm your hosting");

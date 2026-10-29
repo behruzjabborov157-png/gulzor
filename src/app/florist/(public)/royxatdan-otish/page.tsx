@@ -43,6 +43,7 @@ export default async function FloristRegisterPage() {
           <li>• Shu orada mahsulotlar va yetkazib berish hududlarini panelda tayyorlab qo‘yasiz.</li>
           <li>• Tasdiqlangach, do‘koningiz saytda ko‘rinadi; buyurtmalarni o‘zingiz yig‘asiz va yetkazasiz, to‘lovni mijozdan o‘zingiz olasiz.</li>
           <li>• Gulzor har bir yetkazilgan buyurtmadan komissiya oladi — foiz tasdiqlash paytida kelishiladi.</li>
+          <li>• Yuridik nomingiz do‘kon sahifasida sotuvchi sifatida ko‘rsatiladi; STIR faqat Gulzor tekshiruvi uchun.</li>
         </ul>
         <div className="card mt-8 p-6 sm:p-8">
           {regions.length === 0 ? (
