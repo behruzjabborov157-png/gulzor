@@ -33,6 +33,10 @@ export default async function PrivacyPage() {
             <li>Если создан аккаунт — имя, номер телефона, зашифрованный (хеш) вид пароля (сам пароль не хранится), сохранённые адреса и избранное;</li>
             <li>Заявка на индивидуальный букет — имя, телефон, описание и (по желанию) фото-пример; фото видят только сотрудники Магазина;</li>
             <li>Подписка на новости — номер телефона и текст согласия, который вы подтвердили.</li>
+            <li>
+              Заказ через Telegram-бота (Mini App) — имя, ID и имя пользователя Telegram; номер телефона — только если вы сами нажмёте «Поделиться номером». Через этого бота мы
+              сообщаем вам о статусе заказа.
+            </li>
           </ul>
           <h2>Для чего мы их используем</h2>
           <p>Только для выполнения и доставки заказа, уведомлений о его статусе и — если вы дали согласие — для сообщений об акциях.</p>
@@ -72,6 +76,10 @@ export default async function PrivacyPage() {
             <li>Hisob ochilgan bo‘lsa — ism, telefon raqami, parolning shifrlangan (hash) ko‘rinishi (parolning o‘zi saqlanmaydi), saqlangan manzillar va sevimlilar;</li>
             <li>Maxsus guldasta so‘rovi — ism, telefon, tavsif va (xohishga ko‘ra) namuna rasm; rasmni faqat Do‘kon xodimlari ko‘radi;</li>
             <li>Yangiliklarga obuna — telefon raqami va siz tasdiqlagan rozilik matni.</li>
+            <li>
+              Telegram bot (Mini App) orqali buyurtma — Telegram’dagi ismingiz, ID va username; telefon raqami — faqat o‘zingiz «raqamni ulashish»ni bossangiz. Shu bot orqali
+              buyurtma holati haqida xabar beramiz.
+            </li>
           </ul>
           <h2>Nima uchun ishlatamiz</h2>
           <p>Faqat buyurtmani bajarish, yetkazib berish, buyurtma holati haqida xabar berish va siz rozilik bergan bo‘lsangiz — aksiyalar haqida xabar yuborish uchun.</p>

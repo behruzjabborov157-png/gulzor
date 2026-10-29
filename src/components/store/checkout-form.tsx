@@ -1,6 +1,7 @@
 "use client";
 
-import { PhoneInput } from "@/components/ui/phone-input";
+import { useTelegram } from "@/components/telegram";
+import { formatPhoneInput, PhoneInput } from "@/components/ui/phone-input";
 import Link from "next/link";
 import { useState } from "react";
 import { checkoutAction } from "@/app/actions";
@@ -107,6 +108,24 @@ export function CheckoutForm(props: CheckoutProps) {
   });
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((p) => ({ ...p, [k]: v }));
 
+  // Inside the Telegram Mini App the name comes from Telegram (once, only into an empty field).
+  const tg = useTelegram();
+  const [tgPrefilled, setTgPrefilled] = useState(false);
+  if (tg.user && !tgPrefilled) {
+    setTgPrefilled(true);
+    const tgName = [tg.user.first_name, tg.user.last_name].filter(Boolean).join(" ").trim().slice(0, 80);
+    if (!f.customerName && tgName) setF((p) => ({ ...p, customerName: tgName }));
+  }
+  const [tgPhoneState, setTgPhoneState] = useState<"idle" | "asking" | "denied">("idle");
+  async function shareTelegramPhone() {
+    setTgPhoneState("asking");
+    const phone = await tg.requestPhone();
+    if (phone) {
+      set("customerPhone", formatPhoneInput(phone.startsWith("+") ? phone : `+${phone}`));
+      setTgPhoneState("idle");
+    } else setTgPhoneState("denied");
+  }
+
   // Region and zone are derived: an explicit choice wins, then the zone remembered from the cart, then the first one.
   const regionId = f.regionId ?? props.regions.find((r) => r.zones.some((z) => z.id === prefs.zoneId))?.id ?? props.regions[0]?.id ?? null;
   const region = props.regions.find((r) => r.id === regionId) ?? null;
@@ -160,6 +179,7 @@ export function CheckoutForm(props: CheckoutProps) {
     try {
       const res = await checkoutAction({
         submissionId,
+        telegramInitData: tg.initData || undefined,
         lines: toServerLines(lines),
         couponCode: prefs.couponCode || null,
         fulfillment: f.fulfillment,
@@ -234,6 +254,16 @@ export function CheckoutForm(props: CheckoutProps) {
             </Field>
             <Field id="customerPhone" label={t.yourPhone} error={fe("customerPhone")} hint={t.yourPhoneHint}>
               <PhoneInput {...inputProps("customerPhone")} value={f.customerPhone} onValueChange={(v) => set("customerPhone", v)} required />
+              {tg.active ? (
+                <div className="mt-2">
+                  <button type="button" onClick={shareTelegramPhone} disabled={tgPhoneState === "asking"} className="btn-secondary btn-sm">
+                    {t.tgPhone}
+                  </button>
+                  <p className="mt-1 text-xs text-muted" role="status">
+                    {tgPhoneState === "denied" ? t.tgPhoneDenied : t.tgPhoneHint}
+                  </p>
+                </div>
+              ) : null}
             </Field>
           </div>
         </Section>

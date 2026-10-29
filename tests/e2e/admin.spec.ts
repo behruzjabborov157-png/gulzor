@@ -120,7 +120,11 @@ test("pages are served with a nonce-based Content-Security-Policy", async ({ pag
   const res = await page.goto("/gul/qizil-atirgullar-guldastasi");
   const csp = res?.headers()["content-security-policy"] ?? "";
   expect(csp).toMatch(/script-src 'self' 'nonce-[^']+' 'strict-dynamic'/);
-  expect(csp).toContain("frame-ancestors 'none'");
+  // The shop may only be framed by itself and Telegram Web (Mini App); admin never.
+  expect(csp).toContain("frame-ancestors 'self' https://web.telegram.org");
+  const adminRes = await page.request.get("/admin/kirish");
+  expect(adminRes.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");
+  expect(adminRes.headers()["x-frame-options"]).toBe("DENY");
   // Interactive parts still work under the policy.
   await page.getByText("Kichik", { exact: true }).click();
   await page.getByRole("button", { name: "Savatga qo‘shish", exact: true }).click();

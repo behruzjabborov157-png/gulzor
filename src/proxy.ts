@@ -38,7 +38,8 @@ export function proxy(request: NextRequest) {
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
-    "frame-ancestors 'none'",
+    // The Telegram Mini App runs in an iframe on Telegram Web; nothing else may frame the shop, and nothing may frame admin.
+    isAdmin ? "frame-ancestors 'none'" : "frame-ancestors 'self' https://web.telegram.org",
     https ? "upgrade-insecure-requests" : "",
   ]
     .filter(Boolean)

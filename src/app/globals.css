@@ -60,6 +60,11 @@
   }
 }
 
+/* Inside the Telegram Mini App: hide things that make no sense there (e.g. "install the app"). */
+html[data-telegram] [data-tg-hide] {
+  display: none;
+}
+
 @utility container-page {
   @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
 }

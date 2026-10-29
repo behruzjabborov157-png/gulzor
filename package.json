@@ -17,7 +17,8 @@
     "db:check": "tsx scripts/check-db.ts",
     "test:e2e": "playwright test",
     "lint": "eslint .",
-    "launch:check": "tsx scripts/launch-check.ts"
+    "launch:check": "tsx scripts/launch-check.ts",
+    "telegram:setup": "tsx scripts/telegram-setup.ts"
   },
   "engines": {
     "node": ">=20.9"

@@ -77,7 +77,7 @@ export function InstallApp() {
   }
 
   return (
-    <div className="mt-5">
+    <div className="mt-5" data-tg-hide>
       <button
         type="button"
         onClick={install}

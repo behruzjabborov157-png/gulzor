@@ -6,7 +6,7 @@
  * tests against a real PostgreSQL server (production driver). ⚠️ That database is WIPED first.
  */
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
@@ -25,6 +25,7 @@ delete process.env.TELEGRAM_BOT_TOKEN;
 delete process.env.TELEGRAM_CHAT_ID;
 delete process.env.SMTP_HOST;
 delete process.env.ORDER_EMAIL_TO;
+process.env.TELEGRAM_SHOP_BOT_TOKEN = "777:integration-test-shop-bot";
 
 const { closeDb, getDb, schema } = await import("@/db");
 const { eq } = await import("drizzle-orm");
@@ -358,4 +359,26 @@ test("repeated submits with the same submission id create exactly one order", as
   assert.equal(rows.length, 1);
   const [p] = await db.select().from(schema.products).where(eq(schema.products.id, productId));
   assert.equal(p.stockQuantity, 4); // stock reserved once
+});
+
+test("Mini App orders are linked to the verified Telegram user; forged initData is ignored", async () => {
+  const db = await getDb();
+  await db.update(schema.products).set({ stockQuantity: null }).where(eq(schema.products.id, productId));
+  const sign = (fields: Record<string, string>, token: string) => {
+    const dcs = Object.keys(fields).sort().map((k) => `${k}=${fields[k]}`).join("\n");
+    const secret = createHmac("sha256", "WebAppData").update(token).digest();
+    return new URLSearchParams({ ...fields, hash: createHmac("sha256", secret).update(dcs).digest("hex") }).toString();
+  };
+  const fields = { auth_date: String(Math.floor(Date.now() / 1000)), user: JSON.stringify({ id: 5550001, first_name: "Aziza", username: "aziza_uz" }) };
+
+  const real = await createOrder(checkout({ telegramInitData: sign(fields, process.env.TELEGRAM_SHOP_BOT_TOKEN!) }), null);
+  assert.ok(real.ok, JSON.stringify(real));
+  const [a] = await db.select().from(schema.orders).where(eq(schema.orders.number, real.number));
+  assert.equal(a.telegramUserId, "5550001");
+  assert.equal(a.telegramUsername, "aziza_uz");
+
+  const forged = await createOrder(checkout({ telegramInitData: sign(fields, "666:someone-elses-bot") }), null);
+  assert.ok(forged.ok); // the order itself is still accepted…
+  const [b] = await db.select().from(schema.orders).where(eq(schema.orders.number, forged.number));
+  assert.equal(b.telegramUserId, null); // …but not linked to any Telegram account
 });

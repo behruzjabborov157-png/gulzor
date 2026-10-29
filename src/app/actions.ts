@@ -23,6 +23,7 @@ import {
 import { getProductsByIds, type ProductCard } from "@/lib/catalog";
 import type { FormState } from "@/lib/form-state";
 import { normalizePhone } from "@/lib/format";
+import { notifyCustomerTelegram } from "@/lib/customer-telegram";
 import { createOrder, notifyNewOrder } from "@/lib/orders";
 import { clickCheckoutUrl } from "@/lib/payments/click";
 import { paymeCheckoutUrl } from "@/lib/payments/payme";
@@ -70,7 +71,11 @@ export async function checkoutAction(input: unknown): Promise<CheckoutResult> {
     if (!res.ok) return { ok: false, errors: res.errors, fieldErrors: res.fieldErrors };
     // Owner notification runs after the response; its real outcome is logged on the order.
     // A repeated submit of an already created order is not announced twice.
-    if (!res.duplicate) after(() => notifyNewOrder(res.orderId));
+    if (!res.duplicate) {
+      after(() => notifyNewOrder(res.orderId));
+      // Mini App orders: confirmation to the customer's own Telegram chat with the shop bot.
+      after(() => notifyCustomerTelegram(res.orderId, "received"));
+    }
 
     const orderUrl = orderPath(locale, res.number, res.accessToken, true);
     if (res.paymentMethod === "cash") return { ok: true, redirectTo: orderUrl };

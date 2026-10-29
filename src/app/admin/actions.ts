@@ -2,6 +2,7 @@
 
 import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getDb, schema } from "@/db";
@@ -18,6 +19,7 @@ import {
 } from "@/lib/auth";
 import { normalizePhone, slugify } from "@/lib/format";
 import type { FormState } from "@/lib/form-state";
+import { notifyCustomerTelegram } from "@/lib/customer-telegram";
 import { changeOrderStatus, type Order } from "@/lib/orders";
 import { DEFAULT_CHECKOUT, DEFAULT_STORE, getSettings, saveSetting } from "@/lib/settings";
 import { saveImage, UploadError } from "@/lib/storage";
@@ -63,7 +65,9 @@ export async function adminLogoutAction() {
 export async function setOrderStatusAction(orderId: string, to: Order["status"], form: FormData) {
   const admin = await requireAdmin();
   const reason = String(form.get("reason") ?? "").trim().slice(0, 300);
-  await changeOrderStatus(orderId, to, admin.email, reason);
+  const changed = await changeOrderStatus(orderId, to, admin.email, reason);
+  // Mini App customers get the new status in Telegram (no-op for website orders).
+  if (changed) after(() => notifyCustomerTelegram(orderId, "status"));
   revalidatePath(`/admin/buyurtmalar/${orderId}`);
 }
 

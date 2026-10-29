@@ -123,6 +123,7 @@ tekshiring → sinov buyurtmani “Bekor qilish” qiling.
 
 Telefonda saytni ilova sifatida o‘rnatib ko‘ring (pastdagi “Ilovani o‘rnatish” tugmasi).
 Android ilova (Google Play) yasash — alohida qo‘llanma: `docs/ANDROID-ILOVA.md`.
+Telegram’da «Do‘kon» tugmasi (Mini App) — `docs/TELEGRAM-MINI-APP.md` (2–3-qadamlar: `.env.local` + `npm run telegram:setup`).
 
 ## 9. Zaxira nusxa va kuzatuv
 

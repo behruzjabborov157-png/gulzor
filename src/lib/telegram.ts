@@ -61,6 +61,9 @@ export function orderMessage(o: OrderForMessage, heading = "🌸 Yangi buyurtma"
     "",
     `<b>Mijoz:</b> ${esc(o.customerName)}, ${formatPhone(o.customerPhone)}`,
     o.locale === "ru" ? "<b>Mijoz tili:</b> rus tili" : null,
+    o.telegramUserId
+      ? `<b>Telegram:</b> <a href="tg://user?id=${o.telegramUserId}">${o.telegramUsername ? "@" + esc(o.telegramUsername) : esc(o.customerName)}</a> (Mini App orqali)`
+      : null,
     `<b>Qabul qiluvchi:</b> ${esc(o.recipientName)}, ${formatPhone(o.recipientPhone)}${o.anonymous ? " (anonim)" : ""}`,
     `<b>${o.fulfillment === "pickup" ? "Olib ketish" : "Manzil"}:</b> ${where}`,
     `<b>Sana va vaqt:</b> ${formatDateISO(o.deliveryDate)}, ${esc(o.slotLabel)}`,

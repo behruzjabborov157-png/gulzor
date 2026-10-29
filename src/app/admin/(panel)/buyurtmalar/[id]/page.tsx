@@ -48,6 +48,15 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
         </div>
         <p className="mt-1 text-sm text-muted">
           Yaratildi: {formatDateTime(o.createdAt)} · Mijoz tili: {o.locale === "ru" ? "rus tili" : "o‘zbek tili"}
+          {o.telegramUserId ? (
+            <>
+              {" · "}
+              <a href={o.telegramUsername ? `https://t.me/${o.telegramUsername}` : `tg://user?id=${o.telegramUserId}`} className="text-wine underline">
+                Telegram{o.telegramUsername ? `: @${o.telegramUsername}` : ""}
+              </a>{" "}
+              (Mini App orqali)
+            </>
+          ) : null}
         </p>
       </div>
 
@@ -177,7 +186,7 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
             <ul className="space-y-1">
               {notes.map((n) => (
                 <li key={n.id}>
-                  <span className="font-semibold">{n.channel === "email" ? "Email" : "Telegram"}</span> · <span className={n.status === "sent" ? "text-success" : n.status === "failed" ? "text-danger" : "text-muted"}>{n.status === "sent" ? "Yuborildi" : n.status === "failed" ? "Xato" : "O‘tkazib yuborildi"}</span> · {formatDateTime(n.createdAt)} · {n.detail}
+                  <span className="font-semibold">{n.channel === "email" ? "Email" : n.channel === "telegram-customer" ? "Mijozga (Telegram)" : "Telegram"}</span> · <span className={n.status === "sent" ? "text-success" : n.status === "failed" ? "text-danger" : "text-muted"}>{n.status === "sent" ? "Yuborildi" : n.status === "failed" ? "Xato" : "O‘tkazib yuborildi"}</span> · {formatDateTime(n.createdAt)} · {n.detail}
                 </li>
               ))}
             </ul>

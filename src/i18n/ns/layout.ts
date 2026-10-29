@@ -29,6 +29,13 @@ const uz = {
   search: { label: "Gullarni qidirish", placeholder: "Atirgul, lola, guldasta…", submit: "Qidirish", toggle: "Qidiruv" },
   menu: { open: "Menyuni ochish", title: "Menyu", main: "Asosiy", more: "Qo‘shimcha" },
   language: { label: "Til", switchTo: "Русская версия", short: "Ру" },
+  // Shop bot (Telegram Mini App)
+  tgBot: {
+    welcome: "Assalomu alaykum! 🌸 Gulzor’ga xush kelibsiz.",
+    text: "Guldasta tanlash, buyurtma berish va uning holatini kuzatish — shu yerning o‘zida. Pastdagi «Do‘kon» tugmasini bosing.",
+    open: "🌸 Do‘konni ochish",
+    menu: "Do‘kon",
+  },
   install: {
     button: "Ilovani o‘rnatish",
     iosHint: "Safari’da pastdagi «Ulashish» tugmasini bosing va «Bosh ekranga qo‘shish» (На экран «Домой») ni tanlang.",
@@ -82,6 +89,12 @@ const ru: typeof uz = {
   search: { label: "Поиск цветов", placeholder: "Розы, тюльпаны, букет…", submit: "Найти", toggle: "Поиск" },
   menu: { open: "Открыть меню", title: "Меню", main: "Основное", more: "Дополнительно" },
   language: { label: "Язык", switchTo: "O‘zbekcha versiya", short: "O‘z" },
+  tgBot: {
+    welcome: "Здравствуйте! 🌸 Добро пожаловать в Gulzor.",
+    text: "Выбрать букет, оформить заказ и следить за его статусом — прямо здесь. Нажмите кнопку «Магазин» внизу.",
+    open: "🌸 Открыть магазин",
+    menu: "Магазин",
+  },
   install: {
     button: "Установить приложение",
     iosHint: "В Safari нажмите кнопку «Поделиться» внизу экрана и выберите «На экран «Домой»».",

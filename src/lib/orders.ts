@@ -10,6 +10,7 @@ import { adjustStock, cartLineSchema, quoteCart, StockError, type Quote } from "
 import { getSettings } from "@/lib/settings";
 import { notifyOrderEmail } from "@/lib/email";
 import { notifyOrder } from "@/lib/telegram";
+import { telegramUserFromInitData } from "@/lib/telegram-miniapp";
 import { tashkentNow } from "@/lib/time";
 
 export type Order = typeof schema.orders.$inferSelect;
@@ -80,6 +81,8 @@ export function makeCheckoutSchema(locale: Locale = DEFAULT_LOCALE) {
     paymentMethod: z.enum(["cash", "payme", "click"]),
     saveAddress: z.boolean().default(false),
     submissionId: z.string().uuid().optional(),
+    /** Raw Telegram Mini App initData; only used after its signature is verified. */
+    telegramInitData: z.string().max(8192).optional(),
   })
   .superRefine((v, ctx) => {
     if (!v.recipientIsCustomer) {
@@ -134,6 +137,8 @@ export async function createOrder(raw: unknown, customerId: string | null, local
   const recipientName = v.recipientIsCustomer ? v.customerName : v.recipientName;
   const recipientPhone = v.recipientIsCustomer ? v.customerPhone : normalizePhone(v.recipientPhone)!;
   const accessToken = randomBytes(18).toString("base64url");
+  // Ordered inside the Telegram Mini App: link the Telegram account (signature-checked, never trusted blindly).
+  const tgUser = telegramUserFromInitData(v.telegramInitData);
   const db = await getDb();
 
   let created: Order | null = null;
@@ -178,6 +183,8 @@ export async function createOrder(raw: unknown, customerId: string | null, local
             number: orderNumber(),
             accessToken,
             idempotencyKey: v.submissionId ?? null,
+            telegramUserId: tgUser ? String(tgUser.id) : null,
+            telegramUsername: tgUser?.username ?? null,
             customerId,
             paymentMethod: v.paymentMethod,
             fulfillment: v.fulfillment,

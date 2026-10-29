@@ -5,6 +5,8 @@ import { computeSlots } from "@/lib/delivery";
 import { formatPhoneInput } from "@/components/ui/phone-input";
 import { formatUZS, maskPhone, normalizePhone } from "@/lib/format";
 import { buildAssetLinks } from "@/lib/twa";
+import { verifyTelegramData } from "@/lib/telegram-miniapp";
+import { createHmac } from "node:crypto";
 import { couponDiscount, deliveryFeeFor, fromPrice, priceLine, type PricingProduct } from "@/lib/pricing";
 
 const fixed: PricingProduct = { pricingMode: "fixed", price: 149_000, stemPrice: null, minStems: null, maxStems: null, stemStep: 1, variants: [] };
@@ -120,4 +122,33 @@ test("Android app asset links: only served when package and fingerprints are val
   assert.deepEqual(links?.[0].relation, ["delegate_permission/common.handle_all_urls"]);
   assert.equal(links?.[0].target.package_name, "uz.gulzor.app");
   assert.deepEqual(links?.[0].target.sha256_cert_fingerprints, [fp.toUpperCase(), `${"FF:".repeat(31)}FF`]);
+});
+
+/** Signs fields the way Telegram does for Mini App initData. */
+function signTelegram(fields: Record<string, string>, token: string) {
+  const dcs = Object.keys(fields).sort().map((k) => `${k}=${fields[k]}`).join("\n");
+  const secret = createHmac("sha256", "WebAppData").update(token).digest();
+  const hash = createHmac("sha256", secret).update(dcs).digest("hex");
+  return new URLSearchParams({ ...fields, hash }).toString();
+}
+
+test("Telegram Mini App data: signature, tampering, staleness and wrong bot are all checked", () => {
+  const token = "123456:TEST-token-for-unit-tests";
+  const now = Date.UTC(2026, 9, 29, 12, 0, 0);
+  const user = JSON.stringify({ id: 42, first_name: "Aziza", username: "aziza_uz", language_code: "uz" });
+  const fields = { auth_date: String(now / 1000 - 60), query_id: "AAE", user };
+  const raw = signTelegram(fields, token);
+
+  const ok = verifyTelegramData(raw, token, 86400, now);
+  assert.equal(ok?.user, user);
+  assert.equal(verifyTelegramData(raw.replace("aziza_uz", "hacker"), token, 86400, now), null); // tampered
+  assert.equal(verifyTelegramData(raw, "999:another-bot", 86400, now), null); // signed for another bot
+  assert.equal(verifyTelegramData(raw, token, 30, now), null); // older than allowed
+  assert.equal(verifyTelegramData(signTelegram({ ...fields, auth_date: String(now / 1000 + 3600) }, token), token, 86400, now), null); // from the future
+  assert.equal(verifyTelegramData("user=x", token, 86400, now), null); // no hash
+  assert.equal(verifyTelegramData("", token), null);
+
+  // A shared contact (requestContact response) uses the same signature scheme.
+  const contact = signTelegram({ auth_date: String(now / 1000), contact: JSON.stringify({ user_id: 42, phone_number: "998901234567" }) }, token);
+  assert.ok(verifyTelegramData(contact, token, 86400, now));
 });

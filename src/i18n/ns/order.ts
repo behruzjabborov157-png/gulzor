@@ -73,6 +73,13 @@ const uz = {
   trackPhone: "Telefon raqami",
   trackSubmit: "Holatni ko‘rish",
   trackSearching: "Qidirilmoqda…",
+  // Messages from the shop bot to a customer who ordered in the Telegram Mini App
+  tg: {
+    received: "🌸 Buyurtmangiz qabul qilindi!\nRaqam: {number}\nJami: {total}\n\nHolati o‘zgarganda shu yerga xabar beramiz.",
+    status: "Buyurtma {number}: {status}",
+    reason: "Sabab: {reason}",
+    open: "Buyurtmani ko‘rish",
+  },
 };
 
 const ru: typeof uz = {
@@ -149,6 +156,12 @@ const ru: typeof uz = {
   trackPhone: "Номер телефона",
   trackSubmit: "Узнать статус",
   trackSearching: "Ищем…",
+  tg: {
+    received: "🌸 Ваш заказ принят!\nНомер: {number}\nИтого: {total}\n\nСообщим сюда, когда статус изменится.",
+    status: "Заказ {number}: {status}",
+    reason: "Причина: {reason}",
+    open: "Открыть заказ",
+  },
 };
 
 const ns = { uz, ru };

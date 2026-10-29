@@ -6,6 +6,7 @@ Bu qo‘llanma dasturlashni bilmaydigan do‘kon egasi uchun. Har bir buyruqni *
 Boshqa qo‘llanmalar:
 - Saytni internetga chiqarish — `docs/ISHGA-TUSHIRISH.md`
 - Android ilova va Google Play — `docs/ANDROID-ILOVA.md`, `docs/play-store/README.md`
+- Telegram orqali buyurtma (Mini App, «Do‘kon» tugmasi) — `docs/TELEGRAM-MINI-APP.md`
 
 ---
 
@@ -118,10 +119,10 @@ Saytda hozircha **mijoz sharhlari bo‘limi yo‘q** — haqiqiy sharhlar bo‘l
 ```powershell
 npm run typecheck   # TypeScript
 npm run lint        # kod uslubi
-npm test            # 21 ta unit/integratsiya testi (buyurtma, to‘lov, email, takroriy yuborish)
+npm test            # 23 ta unit/integratsiya testi (buyurtma, to‘lov, email, takroriy yuborish)
 npm run build       # production build
 ```
-Brauzer testlari (31 ta) — `README.md`, “Testing” bo‘limi.
+Brauzer testlari (34 ta) — `README.md`, “Testing” bo‘limi.
 
 ## 10. Muammolar
 
