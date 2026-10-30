@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 /**
  * Telegram Mini App ("Do‘kon" button in the shop bot).
@@ -10,6 +10,17 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  */
 export function shopBotToken(): string | null {
   return process.env.TELEGRAM_SHOP_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || null;
+}
+
+/**
+ * Secret Telegram sends with every webhook call. TELEGRAM_WEBHOOK_SECRET if set; otherwise derived from the bot
+ * token (as secret as the token itself), so a host like Render needs no extra variable. Empty without a bot.
+ */
+export function webhookSecret(): string {
+  const set = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
+  if (set) return set;
+  const token = shopBotToken();
+  return token ? createHash("sha256").update(`gulzor-webhook:${token}`).digest("hex").slice(0, 48) : "";
 }
 
 export type TelegramUser = {

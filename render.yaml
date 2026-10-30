@@ -1,0 +1,32 @@
+# Render Blueprint: the site and the shop bot (webhook) in one free web service.
+# Data lives in an external PostgreSQL (Neon) because Render's free disk is wiped on every restart and its free
+# database is deleted after 30 days. See docs/RENDER.md.
+services:
+  - type: web
+    name: gulzor
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: master
+    autoDeploy: true
+    buildCommand: npm ci --include=dev && npm run build
+    # Apply database migrations, then serve. Render passes PORT; next start listens on all interfaces.
+    startCommand: npm run db:migrate && npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Neon connection string (Dashboard → Connection string, "Pooled connection" on). Entered in Render, never in git.
+      - key: DATABASE_URL
+        sync: false
+      # Bot token from @BotFather and the owner's chat id for order notifications. Entered in Render.
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      # The server registers the bot webhook itself at start (no shell on the free plan).
+      - key: TELEGRAM_AUTO_SETUP
+        value: "1"
+      # Uploaded images are stored in the database (the free disk does not persist).
+      - key: MEDIA_STORAGE
+        value: db

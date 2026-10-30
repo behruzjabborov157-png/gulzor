@@ -64,6 +64,13 @@
       "when": 1793288026043,
       "tag": "0008_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793346314833,
+      "tag": "0009_media_files",
+      "breakpoints": true
     }
   ]
 }

@@ -120,9 +120,24 @@ export async function getCustomer(): Promise<Customer | null> {
   return c ? { id: c.id, phone: c.phone, name: c.name } : null;
 }
 
+/**
+ * The visitor's IP, used for rate limits. Which header to trust depends on the proxy in front of the app:
+ * - our nginx (deploy/nginx.conf) overwrites X-Forwarded-For with the real address → the default;
+ * - a proxy that only appends to X-Forwarded-For (Render) → TRUSTED_PROXY_HOPS=n takes the n-th entry
+ *   from the right, the one written by the outermost trusted proxy, so a client cannot fake it;
+ * - a proxy that sets its own header (e.g. Cloudflare's CF-Connecting-IP) → CLIENT_IP_HEADER=cf-connecting-ip.
+ */
 export async function clientIp(): Promise<string> {
   const h = await headers();
-  return (h.get("x-forwarded-for")?.split(",")[0] || h.get("x-real-ip") || "local").trim();
+  const custom = process.env.CLIENT_IP_HEADER?.trim().toLowerCase();
+  if (custom) {
+    const v = h.get(custom)?.split(",")[0]?.trim();
+    if (v) return v;
+  }
+  const xff = (h.get("x-forwarded-for") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const hops = Number(process.env.TRUSTED_PROXY_HOPS ?? 0);
+  if (Number.isInteger(hops) && hops > 0 && xff.length) return xff[Math.max(0, xff.length - hops)];
+  return (xff[0] || h.get("x-real-ip") || "local").trim();
 }
 
 export { rateLimit, resetRateLimit } from "@/lib/rate-limit";

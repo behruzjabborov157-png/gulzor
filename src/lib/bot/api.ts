@@ -1,9 +1,9 @@
-import fs from "node:fs";
+import fs from "node:fs/promises";
 import path from "node:path";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { getDb, schema } from "@/db";
-import { resolveMediaPath } from "@/lib/storage";
+import { readMedia } from "@/lib/storage";
 import { shopBotApi, shopBotToken } from "@/lib/telegram-miniapp";
 
 export type ApiResult = { ok: boolean; description?: string; result?: unknown };
@@ -41,10 +41,12 @@ export function send(chatId: string | number, text: string, reply_markup?: Keybo
   return api("sendMessage", { chat_id: chatId, text, ...(reply_markup ? { reply_markup } : {}), link_preview_options: { is_disabled: true } });
 }
 
-/** Local file behind a site image URL (/images/... in public, /media/... in the upload folder). */
-function localImage(url: string): string | null {
-  if (url.startsWith("/images/") && !url.includes("..")) return path.join(/*turbopackIgnore: true*/ process.cwd(), "public", url);
-  if (url.startsWith("/media/")) return resolveMediaPath(url.slice("/media/".length).split("/"));
+/** Bytes behind a site image URL: /images/... from public/, /media/... from the upload storage (disk or database). */
+async function imageBytes(url: string): Promise<Buffer | null> {
+  if (url.startsWith("/images/") && !url.includes("..")) {
+    return fs.readFile(path.join(/*turbopackIgnore: true*/ process.cwd(), "public", url)).catch(() => null);
+  }
+  if (url.startsWith("/media/")) return readMedia(url.slice("/media/".length).split("/"));
   return null;
 }
 
@@ -60,9 +62,9 @@ export async function sendPhoto(chatId: string | number, imageUrl: string | null
       const r = await transport("sendPhoto", { chat_id: chatId, photo: cached.fileId, caption, reply_markup });
       if (r.ok) return r;
     }
-    const file = localImage(imageUrl);
-    if (file && fs.existsSync(/*turbopackIgnore: true*/ file)) {
-      const data = await sharp(/*turbopackIgnore: true*/ file).rotate().resize(1280, 1280, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 82 }).toBuffer();
+    const source = await imageBytes(imageUrl);
+    if (source) {
+      const data = await sharp(source).rotate().resize(1280, 1280, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 82 }).toBuffer();
       const r = await transport("sendPhoto", { chat_id: chatId, caption, reply_markup }, { field: "photo", name: "photo.jpg", data });
       const photos = (r.result as { photo?: { file_id: string }[] } | undefined)?.photo;
       if (r.ok && photos?.length) {

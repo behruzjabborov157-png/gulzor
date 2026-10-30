@@ -2,11 +2,12 @@ import { timingSafeEqual } from "node:crypto";
 import { after } from "next/server";
 import { handleUpdate, type Update } from "@/lib/bot/handler";
 import { notifyNewOrder } from "@/lib/orders";
+import { webhookSecret } from "@/lib/telegram-miniapp";
 
 export const dynamic = "force-dynamic";
 
 function secretOk(given: string | null) {
-  const expected = process.env.TELEGRAM_WEBHOOK_SECRET ?? "";
+  const expected = webhookSecret();
   if (!expected || !given) return false;
   const a = Buffer.from(given);
   const b = Buffer.from(expected);

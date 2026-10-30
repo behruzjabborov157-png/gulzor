@@ -18,7 +18,8 @@
     "test:e2e": "playwright test",
     "lint": "eslint .",
     "launch:check": "tsx scripts/launch-check.ts",
-    "telegram:setup": "tsx scripts/telegram-setup.ts"
+    "telegram:setup": "tsx scripts/telegram-setup.ts",
+    "telegram:poll": "tsx scripts/telegram-poll.ts"
   },
   "engines": {
     "node": ">=20.9"

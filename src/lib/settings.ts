@@ -92,6 +92,7 @@ export function telegramLink(username: string): string | null {
   return /^[A-Za-z0-9_]{4,32}$/.test(u) ? `https://t.me/${u}` : null;
 }
 
+/** Public address of the site. On Render, RENDER_EXTERNAL_URL (set by Render) is used when NEXT_PUBLIC_SITE_URL is empty. */
 export function siteUrl(): string {
-  return (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
+  return (process.env.NEXT_PUBLIC_SITE_URL || process.env.RENDER_EXTERNAL_URL || "http://localhost:3000").replace(/\/$/, "");
 }

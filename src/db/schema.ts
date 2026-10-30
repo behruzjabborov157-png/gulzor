@@ -1,6 +1,7 @@
 import { relations } from "drizzle-orm";
 import {
   boolean,
+  customType,
   date,
   doublePrecision,
   index,
@@ -631,6 +632,19 @@ export const tgSessions = pgTable("tg_sessions", {
 });
 
 /** Telegram file_id of product photos already uploaded by the bot (so each photo is uploaded once). */
+/** Raw bytes (Postgres bytea). postgres-js returns a Buffer, PGlite a Uint8Array. */
+const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({ dataType: () => "bytea" });
+
+/**
+ * Uploaded images kept in the database (MEDIA_STORAGE=db), for hosts without a persistent disk
+ * such as Render's free tier. path is "<folder>/<name>.webp", exactly as in the /media/ URL.
+ */
+export const mediaFiles = pgTable("media_files", {
+  path: text("path").primaryKey(),
+  data: bytea("data").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const tgMedia = pgTable("tg_media", {
   url: text("url").primaryKey(),
   fileId: text("file_id").notNull(),

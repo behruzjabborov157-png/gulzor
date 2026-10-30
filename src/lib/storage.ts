@@ -1,13 +1,19 @@
 import { randomBytes } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { eq } from "drizzle-orm";
 import sharp from "sharp";
+import { getDb, schema } from "@/db";
 
 /**
- * Local-disk image storage. Files are served by /media/[...path].
- * For serverless hosting (no persistent disk) replace these two functions with
- * an S3 / Supabase Storage implementation — the rest of the app only uses them.
+ * Uploaded-image storage, served by /media/[...path]. Two backends:
+ * - disk (default): files under UPLOAD_DIR — for a VPS with a persistent disk;
+ * - database (MEDIA_STORAGE=db): rows in media_files — for hosts whose disk is wiped on restart
+ *   (Render's free tier). Images are re-encoded WebP of at most 1800 px, so they stay small.
+ * The rest of the app only uses saveImage and readMedia.
  */
+
+export const mediaInDb = () => process.env.MEDIA_STORAGE === "db";
 
 export const MAX_UPLOAD_BYTES = 6 * 1024 * 1024;
 const ALLOWED = new Set(["jpeg", "png", "webp", "avif", "heif"]);
@@ -46,15 +52,42 @@ export async function saveImage(file: File, folder: "products" | "requests" | "o
 
   const out = await sharp(input).rotate().resize({ width: 1800, height: 1800, fit: "inside", withoutEnlargement: true }).webp({ quality: 82 }).toBuffer();
   const name = `${Date.now().toString(36)}-${randomBytes(8).toString("hex")}.webp`;
-  const dir = path.join(/*turbopackIgnore: true*/ uploadRoot(), folder);
-  await fs.mkdir(dir, { recursive: true });
-  await fs.writeFile(path.join(dir, name), out);
+  if (mediaInDb()) {
+    const db = await getDb();
+    await db.insert(schema.mediaFiles).values({ path: `${folder}/${name}`, data: out });
+  } else {
+    const dir = path.join(/*turbopackIgnore: true*/ uploadRoot(), folder);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, name), out);
+  }
   return `/media/${folder}/${name}`;
 }
 
-/** Resolves a /media path to a file on disk, refusing path traversal. */
-export function resolveMediaPath(parts: string[]): string | null {
+/** Validates a /media path (["products", "x.webp"]) and returns "products/x.webp", or null. Refuses path traversal. */
+export function mediaKey(parts: string[]): string | null {
   if (parts.length !== 2 || !["products", "requests", "orders"].includes(parts[0])) return null;
   if (!/^[a-z0-9-]+\.webp$/.test(parts[1])) return null;
-  return path.join(/*turbopackIgnore: true*/ uploadRoot(), parts[0], parts[1]);
+  return `${parts[0]}/${parts[1]}`;
+}
+
+/** Resolves a /media path to a file on disk (disk backend), or null for an invalid path. */
+export function resolveMediaPath(parts: string[]): string | null {
+  const key = mediaKey(parts);
+  return key ? path.join(/*turbopackIgnore: true*/ uploadRoot(), key) : null;
+}
+
+/** The bytes of an uploaded image from whichever backend is configured, or null if it does not exist. */
+export async function readMedia(parts: string[]): Promise<Buffer | null> {
+  const key = mediaKey(parts);
+  if (!key) return null;
+  if (mediaInDb()) {
+    const db = await getDb();
+    const [row] = await db.select({ data: schema.mediaFiles.data }).from(schema.mediaFiles).where(eq(schema.mediaFiles.path, key));
+    return row ? Buffer.from(row.data) : null;
+  }
+  try {
+    return await fs.readFile(path.join(/*turbopackIgnore: true*/ uploadRoot(), key));
+  } catch {
+    return null;
+  }
 }

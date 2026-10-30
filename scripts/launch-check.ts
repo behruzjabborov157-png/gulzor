@@ -14,7 +14,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { closeDb, databaseKind, getDb, schema } from "@/db";
 import { clickCredentials, paymeCredentials } from "@/lib/payments/config";
 import { getSettings, telegramLink } from "@/lib/settings";
-import { uploadRoot } from "@/lib/storage";
+import { mediaInDb, uploadRoot } from "@/lib/storage";
 import { emailConfigured, sendOwnerEmail } from "@/lib/email";
 import { sendTelegram, telegramConfigured } from "@/lib/telegram";
 
@@ -145,7 +145,7 @@ async function main() {
   if (noZones.length) report("WARN", `Approved shops without an active delivery zone (customers cannot order): ${noZones.map((s) => s.name).join(", ")}`);
   const shopBot = !!(process.env.TELEGRAM_SHOP_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN);
   if (!shopBot) report("WARN", "Shop bot not configured (TELEGRAM_SHOP_BOT_TOKEN) — florists cannot receive orders in Telegram");
-  else if ((process.env.TELEGRAM_WEBHOOK_SECRET ?? "").length < 16) report("FAIL", "TELEGRAM_WEBHOOK_SECRET must be at least 16 characters");
+  else if (process.env.TELEGRAM_WEBHOOK_SECRET && !/^[A-Za-z0-9_-]{16,256}$/.test(process.env.TELEGRAM_WEBHOOK_SECRET)) report("FAIL", "TELEGRAM_WEBHOOK_SECRET must be 16–256 characters of A–Z, a–z, 0–9, _ or - (or leave it empty to derive it from the bot token)");
   else report("OK", "Shop bot configured (after deploy: npm run telegram:setup)");
   const deaf = approved.filter((s) => !s.chat);
   if (deaf.length && !process.env.SMTP_HOST) report("WARN", `Shops with no notification channel (no Telegram linked, no SMTP): ${deaf.map((s) => s.name).join(", ")}`);
@@ -173,7 +173,8 @@ async function main() {
   }
 
   /* ---- Storage ---- */
-  for (const folder of ["products", "orders", "requests"]) {
+  if (mediaInDb()) report("OK", "Uploaded images are stored in the database (MEDIA_STORAGE=db)");
+  else for (const folder of ["products", "orders", "requests"]) {
     try {
       const dir = path.join(uploadRoot(), folder);
       fs.mkdirSync(dir, { recursive: true });

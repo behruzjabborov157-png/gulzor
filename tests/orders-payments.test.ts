@@ -972,3 +972,56 @@ test("trust: bouquet photos, verified-purchase reviews with moderation, disputes
     fs.rmSync(uploads, { recursive: true, force: true });
   }
 });
+
+test("hosting without a disk: images in the database, webhook secret derived from the token, webhook URL fingerprint", async () => {
+  const { saveImage, readMedia, mediaKey } = await import("@/lib/storage");
+  const { webhookSecret } = await import("@/lib/telegram-miniapp");
+  const { webhookUrl, isSecret } = await import("@/lib/telegram-setup");
+  const sharp = (await import("sharp")).default;
+
+  // Images: stored as rows, read back byte for byte; invalid paths are refused.
+  process.env.MEDIA_STORAGE = "db";
+  try {
+    const png = await sharp({ create: { width: 30, height: 30, channels: 3, background: "#7a1732" } }).png().toBuffer();
+    const url = await saveImage(new File([new Uint8Array(png)], "a.png", { type: "image/png" }), "products");
+    assert.match(url, /^\/media\/products\/[a-z0-9-]+\.webp$/);
+    const parts = url.slice("/media/".length).split("/");
+    const bytes = await readMedia(parts);
+    assert.ok(bytes && bytes.length > 0);
+    assert.equal((await sharp(bytes!).metadata()).format, "webp");
+    const db = await getDb();
+    const [row] = await db.select().from(schema.mediaFiles).where(eq(schema.mediaFiles.path, parts.join("/")));
+    assert.ok(row, "stored in media_files");
+    assert.equal(await readMedia(["products", "missing.webp"]), null);
+    assert.equal(mediaKey(["products", "../../etc/passwd"]), null);
+    assert.equal(mediaKey(["secret", "x.webp"]), null);
+  } finally {
+    delete process.env.MEDIA_STORAGE;
+  }
+
+  // Webhook secret: explicit value wins; otherwise derived from the token, valid for Telegram, stable.
+  const saved = { secret: process.env.TELEGRAM_WEBHOOK_SECRET, token: process.env.TELEGRAM_SHOP_BOT_TOKEN };
+  try {
+    delete process.env.TELEGRAM_WEBHOOK_SECRET;
+    process.env.TELEGRAM_SHOP_BOT_TOKEN = "123:abc";
+    const derived = webhookSecret();
+    assert.ok(isSecret(derived));
+    assert.equal(webhookSecret(), derived);
+    assert.ok(!derived.includes("abc"), "the token itself is not exposed");
+    process.env.TELEGRAM_SHOP_BOT_TOKEN = "123:other";
+    assert.notEqual(webhookSecret(), derived, "a new token gives a new secret");
+    process.env.TELEGRAM_WEBHOOK_SECRET = "explicit-secret-123456";
+    assert.equal(webhookSecret(), "explicit-secret-123456");
+  } finally {
+    if (saved.secret === undefined) delete process.env.TELEGRAM_WEBHOOK_SECRET;
+    else process.env.TELEGRAM_WEBHOOK_SECRET = saved.secret;
+    if (saved.token === undefined) delete process.env.TELEGRAM_SHOP_BOT_TOKEN;
+    else process.env.TELEGRAM_SHOP_BOT_TOKEN = saved.token;
+  }
+
+  // The webhook URL changes when the secret changes, so a restart knows whether to re-register.
+  const a = webhookUrl("https://gulzor.onrender.com/", "secret-one-1234567");
+  assert.match(a, /^https:\/\/gulzor\.onrender\.com\/api\/telegram\/webhook\?v=[0-9a-f]{10}$/);
+  assert.equal(a, webhookUrl("https://gulzor.onrender.com", "secret-one-1234567"));
+  assert.notEqual(a, webhookUrl("https://gulzor.onrender.com", "secret-two-1234567"));
+});

@@ -25,7 +25,7 @@ export function proxy(request: NextRequest) {
 
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const isDev = process.env.NODE_ENV === "development";
-  const https = (process.env.NEXT_PUBLIC_SITE_URL ?? "").startsWith("https://");
+  const https = (process.env.NEXT_PUBLIC_SITE_URL || process.env.RENDER_EXTERNAL_URL || "").startsWith("https://");
 
   const csp = [
     "default-src 'self'",
