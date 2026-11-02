@@ -1,6 +1,6 @@
 /**
- * Storefront dictionary. Each namespace file exports { uz, ru } where ru is typed as typeof uz,
- * so a missing Russian string is a compile error. Use fmt() from ./config for {placeholders}.
+ * Storefront dictionary. Each namespace file exports { uz, ru, en } where ru and en are typed as typeof uz,
+ * so a missing translation is a compile error. Use fmt() from ./config for {placeholders}.
  */
 import account from "./ns/account";
 import cart from "./ns/cart";
@@ -26,7 +26,7 @@ export type Dict = { [K in keyof Namespaces]: Namespaces[K]["uz"] };
 const build = (locale: Locale) =>
   Object.fromEntries(Object.entries(namespaces).map(([k, v]) => [k, v[locale]])) as Dict;
 
-const dictionaries: Record<Locale, Dict> = { uz: build("uz"), ru: build("ru") };
+const dictionaries: Record<Locale, Dict> = { uz: build("uz"), ru: build("ru"), en: build("en") };
 
 export function getDict(locale: Locale): Dict {
   return dictionaries[locale];

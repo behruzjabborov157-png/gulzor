@@ -57,8 +57,10 @@ export const florists = pgTable(
     slug: text("slug").notNull(),
     name: text("name").notNull(),
     nameRu: text("name_ru"),
+    nameEn: text("name_en"),
     description: text("description").notNull().default(""),
     descriptionRu: text("description_ru"),
+    descriptionEn: text("description_en"),
     status: text("status").$type<"pending" | "approved" | "suspended" | "rejected">().notNull().default("pending"),
     /** Why the florist was rejected or suspended (shown to the florist). */
     statusReason: text("status_reason"),
@@ -68,6 +70,7 @@ export const florists = pgTable(
     telegramUsername: text("telegram_username").notNull().default(""),
     address: text("address").notNull().default(""),
     addressRu: text("address_ru"),
+    addressEn: text("address_en"),
     /** City (a delivery region) the shop works in. */
     regionId: integer("region_id").references(() => deliveryRegions.id, { onDelete: "set null" }),
     /** Verification data submitted by the florist. */
@@ -106,16 +109,20 @@ export const categories = pgTable(
     slug: text("slug").notNull(),
     name: text("name").notNull(),
     nameRu: text("name_ru"),
+    nameEn: text("name_en"),
     kind: categoryKind("kind").notNull(),
     description: text("description").notNull().default(""),
     descriptionRu: text("description_ru"),
+    descriptionEn: text("description_en"),
     imageUrl: text("image_url"),
     sortOrder: integer("sort_order").notNull().default(0),
     isActive: boolean("is_active").notNull().default(true),
     seoTitle: text("seo_title"),
     seoDescription: text("seo_description"),
     seoTitleRu: text("seo_title_ru"),
+    seoTitleEn: text("seo_title_en"),
     seoDescriptionRu: text("seo_description_ru"),
+    seoDescriptionEn: text("seo_description_en"),
   },
   (t) => [uniqueIndex("categories_slug_idx").on(t.slug)],
 );
@@ -136,15 +143,24 @@ export const products = pgTable(
     flowerVarieties: jsonb("flower_varieties").$type<string[]>().notNull().default([]),
     /* Russian content — optional; the storefront falls back to Uzbek when empty. */
     nameRu: text("name_ru"),
+    nameEn: text("name_en"),
     shortDescriptionRu: text("short_description_ru"),
+    shortDescriptionEn: text("short_description_en"),
     descriptionRu: text("description_ru"),
+    descriptionEn: text("description_en"),
     careInstructionsRu: text("care_instructions_ru"),
+    careInstructionsEn: text("care_instructions_en"),
     sizeLabelRu: text("size_label_ru"),
+    sizeLabelEn: text("size_label_en"),
     flowerVarietiesRu: jsonb("flower_varieties_ru").$type<string[]>().notNull().default([]),
+    flowerVarietiesEn: jsonb("flower_varieties_en").$type<string[]>().notNull().default([]),
     /** Russian labels for colorOptions, same order (the Uzbek value is what gets stored on orders). */
     colorOptionsRu: jsonb("color_options_ru").$type<string[]>().notNull().default([]),
+    colorOptionsEn: jsonb("color_options_en").$type<string[]>().notNull().default([]),
     seoTitleRu: text("seo_title_ru"),
+    seoTitleEn: text("seo_title_en"),
     seoDescriptionRu: text("seo_description_ru"),
+    seoDescriptionEn: text("seo_description_en"),
     /** Lower-cased, apostrophe-free text in both languages, maintained by the app for search. */
     searchText: text("search_text").notNull().default(""),
     stemCount: integer("stem_count"),
@@ -214,6 +230,7 @@ export const productVariants = pgTable(
     /** e.g. "Kichik", "O‘rtacha", "Katta" */
     name: text("name").notNull(),
     nameRu: text("name_ru"),
+    nameEn: text("name_en"),
     stemCount: integer("stem_count"),
     price: integer("price").notNull(),
     compareAtPrice: integer("compare_at_price"),
@@ -266,6 +283,7 @@ export const deliveryRegions = pgTable(
     slug: text("slug").notNull(),
     name: text("name").notNull(),
     nameRu: text("name_ru"),
+    nameEn: text("name_en"),
     /** The region or city in `locations` this delivery area is; its districts are offered at checkout. */
     locationId: integer("location_id").references(() => locations.id, { onDelete: "set null" }),
     isActive: boolean("is_active").notNull().default(true),
@@ -286,9 +304,11 @@ export const deliveryZones = pgTable("delivery_zones", {
     .references(() => deliveryRegions.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   nameRu: text("name_ru"),
+  nameEn: text("name_en"),
   /** Districts / areas covered, shown to customers. */
   description: text("description").notNull().default(""),
   descriptionRu: text("description_ru"),
+  descriptionEn: text("description_en"),
   fee: integer("fee").notNull().default(0),
   freeFrom: integer("free_from"),
   minOrder: integer("min_order"),
@@ -383,6 +403,8 @@ export const customers = pgTable(
     phone: text("phone").notNull(),
     name: text("name").notNull(),
     passwordHash: text("password_hash").notNull(),
+    /** Preferred language (uz / ru / en): the language of their last visit, order or sign-in. */
+    locale: text("locale").notNull().default("uz"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("customers_phone_idx").on(t.phone)],
@@ -679,7 +701,7 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
 /** Conversation state per private chat with the shop bot (language, cart, checkout step). */
 export const tgSessions = pgTable("tg_sessions", {
   chatId: text("chat_id").primaryKey(),
-  locale: text("locale").$type<"uz" | "ru">(),
+  locale: text("locale").$type<"uz" | "ru" | "en">(),
   step: text("step").notNull().default("idle"),
   cart: jsonb("cart").$type<{ productId: number; variantId: number | null; stems: number | null; color: string | null; quantity: number }[]>().notNull().default([]),
   draft: jsonb("draft").$type<Record<string, unknown>>().notNull().default({}),

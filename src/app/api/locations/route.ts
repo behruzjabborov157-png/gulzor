@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   const parent = Number(params.get("parent"));
   if (!Number.isInteger(parent) || parent <= 0) return Response.json({ error: "parent" }, { status: 400 });
   const lang = params.get("lang");
-  const locale = lang === "en" || isLocale(lang) ? lang : "uz";
+  const locale = isLocale(lang) ? lang : "uz";
   const rows = await childLocations(parent);
   return Response.json(
     { items: rows.map((l) => ({ id: l.id, name: locationName(l, locale), level: l.level, search: l.searchText })) },

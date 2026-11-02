@@ -86,8 +86,8 @@ export function Footer({ store, locale }: { store: StoreSettings; locale: Locale
   const t = getDict(locale).layout.footer;
   const tg = telegramLink(store.telegramUsername);
   const lp = (p: string) => localePath(locale, p);
-  const address = pick(locale, store.address, store.addressRu);
-  const hours = pick(locale, store.workingHours, store.workingHoursRu);
+  const address = pick(locale, store.address, store.addressRu, store.addressEn);
+  const hours = pick(locale, store.workingHours, store.workingHoursRu, store.workingHoursEn);
   return (
     <footer className="mt-24 bg-plum text-ivory/85">
       <div className="container-page grid gap-10 py-14 sm:grid-cols-2 lg:grid-cols-4">

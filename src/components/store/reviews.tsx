@@ -1,4 +1,4 @@
-import { fmt, type Locale } from "@/i18n/config";
+import { fmt, INTL_LOCALE, type Locale } from "@/i18n/config";
 import { getDict } from "@/i18n/dict";
 import { formatDateISO } from "@/lib/format";
 import { publicReviews } from "@/lib/trust";
@@ -18,7 +18,7 @@ export async function Reviews({ by, locale, className = "" }: { by: { floristId:
           <span className="text-coral" aria-hidden="true">
             ★
           </span>{" "}
-          {fmt(t.reviewsSummary, { avg: average.toLocaleString(locale === "ru" ? "ru-RU" : "uz-UZ"), n: count })}
+          {fmt(t.reviewsSummary, { avg: average.toLocaleString(INTL_LOCALE[locale]), n: count })}
         </p>
       </div>
       <ul className="grid gap-4 md:grid-cols-2">

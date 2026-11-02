@@ -78,5 +78,45 @@ const ru: typeof uz = {
   },
 };
 
-const ns = { uz, ru };
+const en: typeof uz = {
+  priceFrom: "from {price}",
+  oldPrice: "Was {price}",
+  photoSoon: "Photo coming soon",
+  seeAll: "See all",
+  breadcrumbs: "Breadcrumbs",
+  home: "Home",
+  catalog: "Catalog",
+  loading: "Loading…",
+  close: "Close",
+  pieces: "{n} pcs",
+  stock: {
+    available: "In stock",
+    made_to_order: "Made to order",
+    out_of_stock: "Out of stock",
+    out_of_season: "Out of season",
+  },
+  badge: { new: "New", premium: "Premium", madeToOrder: "Made to order", sale: "Sale" },
+  demoProduct: "Sample product",
+  favoriteAdd: "{name} — add to favorites",
+  favoriteRemove: "{name} — remove from favorites",
+  error: {
+    title: "Something went wrong",
+    text: "The page could not be loaded. Please try again — if the problem persists, come back a little later.",
+    code: "Error code: {code}",
+    retry: "Try again",
+  },
+  notFound: {
+    title: "Page not found",
+    text: "The link may be outdated or the product is no longer sold. Browse other bouquets in the catalog.",
+  },
+  credits: {
+    title: "Photo credits",
+    intro:
+      "Decorative photos on the home page and section pages come from Unsplash under the Unsplash License; they set the mood and are not presented as products for sale. Photos in the sample catalog come from Wikimedia Commons under free licenses (CC0, public domain, CC BY, CC BY-SA) and were cropped/compressed for the site. They are not photos of real products. They will be replaced when the shop uploads photos of its own products.",
+    author: "Author: {author} · License: {license}",
+    unknown: "unknown",
+  },
+};
+
+const ns = { uz, ru, en };
 export default ns;

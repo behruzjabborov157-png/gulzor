@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { z } from "zod";
 import { getDb, schema } from "@/db";
-import { isLocale, localePath, type Locale } from "@/i18n/config";
+import { isLocale, LANGUAGE_NAME_UZ, localePath, type Locale } from "@/i18n/config";
 import { getDict } from "@/i18n/dict";
 import { getLocale } from "@/i18n/server";
 import {
@@ -218,7 +218,7 @@ export async function customRequestAction(_: FormState, form: FormData): Promise
   // Sent after the response so a slow Telegram API never delays the customer.
   after(async () => {
     const r = await sendTelegram(
-      `<b>💐 Maxsus guldasta so‘rovi #${row.id}</b>${locale === "ru" ? " (rus tilida)" : ""}\n${esc(name)}, ${phone}\nMunosabat: ${esc(occasion) || "—"}\nByudjet: ${budget ?? "—"}\nSana: ${date || "—"}\nRanglar: ${esc(colors) || "—"}\n\n${esc(description.slice(0, 1500))}\n\n${siteUrl()}/admin/sorovlar`,
+      `<b>💐 Maxsus guldasta so‘rovi #${row.id}</b>${locale !== "uz" ? ` (${LANGUAGE_NAME_UZ[locale]}da)` : ""}\n${esc(name)}, ${phone}\nMunosabat: ${esc(occasion) || "—"}\nByudjet: ${budget ?? "—"}\nSana: ${date || "—"}\nRanglar: ${esc(colors) || "—"}\n\n${esc(description.slice(0, 1500))}\n\n${siteUrl()}/admin/sorovlar`,
     );
     await db.insert(schema.notifications).values({ channel: "telegram", status: r.status, detail: `custom_request:${row.id} ${r.detail}` });
   });
@@ -245,7 +245,7 @@ export async function registerAction(_: FormState, form: FormData): Promise<Form
   const db = await getDb();
   const [exists] = await db.select({ id: schema.customers.id }).from(schema.customers).where(eq(schema.customers.phone, phone!));
   if (exists) return { ok: false, errors: { phone: e.phoneTaken } };
-  const [c] = await db.insert(schema.customers).values({ name, phone: phone!, passwordHash: await hashPassword(password) }).returning();
+  const [c] = await db.insert(schema.customers).values({ name, phone: phone!, passwordHash: await hashPassword(password), locale }).returning();
   // Guest orders are NOT linked by phone: phone ownership is not verified (no SMS OTP).
   await createSession("customer", c.id);
   redirect(safeNext(form.get("next"), locale));
@@ -264,6 +264,7 @@ export async function loginAction(_: FormState, form: FormData): Promise<FormSta
   const ok = c ? await verifyPassword(password, c.passwordHash) : await verifyAgainstDummy(password);
   if (!c || !ok) return { ok: false, message: e.loginFailed };
   await resetRateLimit(key);
+  if (c.locale !== locale) await db.update(schema.customers).set({ locale }).where(eq(schema.customers.id, c.id));
   await createSession("customer", c.id);
   redirect(safeNext(form.get("next"), locale));
 }

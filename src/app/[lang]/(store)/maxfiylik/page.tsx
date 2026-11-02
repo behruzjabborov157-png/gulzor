@@ -61,6 +61,50 @@ export default async function PrivacyPage() {
             используются.
           </p>
         </>
+      ) : locale === "en" ? (
+        <>
+          <h1 className="text-4xl">Privacy policy</h1>
+          <p className="text-sm text-muted">This is a translation of the Uzbek text, provided for convenience.</p>
+          <p>
+            This policy explains how the personal data you provide when ordering on the website of {owner} (the “Shop”) is collected, used and protected. The
+            data is processed in accordance with the Law of the Republic of Uzbekistan “On Personal Data”.
+          </p>
+          <h2>What data we collect</h2>
+          <ul className="list-disc space-y-1 pl-6">
+            <li>The customer’s name and phone number;</li>
+            <li>The recipient’s name, phone number and delivery address;</li>
+            <li>The order contents, card message and notes for the courier;</li>
+            <li>If you open an account — your name, phone number, an encrypted (hashed) form of the password (the password itself is not stored), saved addresses and favorites;</li>
+            <li>A custom bouquet request — name, phone, description and (optionally) a reference photo; only Shop staff can see the photo;</li>
+            <li>A newsletter subscription — your phone number and the consent text you confirmed.</li>
+            <li>
+              Orders through the Telegram bot (Mini App) — your Telegram name, ID and username; your phone number only if you tap «share my number» yourself. We
+              use this bot to inform you about the order status.
+            </li>
+          </ul>
+          <h2>What we use it for</h2>
+          <p>Only to fulfil and deliver the order, to inform you about the order status and — if you gave your consent — to send you news about offers.</p>
+          <h2>Who receives it</h2>
+          <p>
+            The data is given only to the people needed to fulfil the order (florist, courier) and to the payment system you choose (Payme, Click). Card
+            details are not stored on the Shop’s server — payment is made on the payment system’s page.
+          </p>
+          <h2>Retention and your rights</h2>
+          <p>You can ask to see, correct or delete your data. To do so, contact the shop{contact}.</p>
+          <p>
+            You can delete your account yourself on the{" "}
+            <Link href={localePath(locale, "/hisobni-ochirish")} className="text-wine underline">
+              “Delete account”
+            </Link>{" "}
+            page: the account, saved addresses and favorites are deleted immediately. Orders already placed are kept for as long as needed to fulfil them
+            and for accounting, but they are no longer linked to the account.
+          </p>
+          <h2>Cookies</h2>
+          <p>
+            The website only uses the cookie needed to keep you signed in. The cart and favorites (without an account) are stored in your browser’s local
+            storage. No advertising trackers are used.
+          </p>
+        </>
       ) : (
         <>
           <h1 className="text-4xl">Maxfiylik siyosati</h1>

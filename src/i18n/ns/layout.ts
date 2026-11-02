@@ -29,7 +29,7 @@ const uz = {
   favoritesLink: "Sevimlilar, {n} ta",
   search: { label: "Gullarni qidirish", placeholder: "Atirgul, lola, guldasta…", submit: "Qidirish", toggle: "Qidiruv" },
   menu: { open: "Menyuni ochish", title: "Menyu", main: "Asosiy", more: "Qo‘shimcha" },
-  language: { label: "Til", switchTo: "Русская версия", short: "Ру" },
+  language: { label: "Til" },
   // Shop bot (Telegram Mini App)
   tgBot: {
     welcome: "Assalomu alaykum! 🌸 Gulzor’ga xush kelibsiz.",
@@ -90,7 +90,7 @@ const ru: typeof uz = {
   favoritesLink: "Избранное: {n}",
   search: { label: "Поиск цветов", placeholder: "Розы, тюльпаны, букет…", submit: "Найти", toggle: "Поиск" },
   menu: { open: "Открыть меню", title: "Меню", main: "Основное", more: "Дополнительно" },
-  language: { label: "Язык", switchTo: "O‘zbekcha versiya", short: "O‘z" },
+  language: { label: "Язык" },
   tgBot: {
     welcome: "Здравствуйте! 🌸 Добро пожаловать в Gulzor.",
     text: "Выбрать букет, оформить заказ и следить за его статусом — прямо здесь. Нажмите кнопку «Магазин» внизу.",
@@ -119,5 +119,66 @@ const ru: typeof uz = {
   },
 };
 
-const ns = { uz, ru };
+const en: typeof uz = {
+  nav: {
+    home: "Home",
+    all: "All flowers",
+    bouquets: "Bouquets",
+    roses: "Roses",
+    tulips: "Tulips",
+    boxes: "Flowers in a box",
+    baskets: "Flower baskets",
+    plants: "Plants",
+    gifts: "Gifts",
+    delivery: "Delivery",
+  },
+  extra: {
+    shops: "Shops",
+    custom: "Order a custom bouquet",
+    track: "Track your order",
+    favorites: "Favorites",
+    account: "My account",
+  },
+  demoBanner: "The site is in demo mode: products, prices and delivery terms are samples. Real prices are confirmed by the shop.",
+  logoHome: "Gulzor — home",
+  accountOf: "My account: {name}",
+  signIn: "Sign in",
+  signInOrRegister: "Sign in or sign up",
+  categoriesNav: "Categories",
+  skipToContent: "Skip to main content",
+  cartLink: "Cart, {n} items",
+  favoritesLink: "Favorites, {n}",
+  search: { label: "Search flowers", placeholder: "Rose, tulip, bouquet…", submit: "Search", toggle: "Search" },
+  menu: { open: "Open menu", title: "Menu", main: "Main", more: "More" },
+  language: { label: "Language" },
+  // Shop bot (Telegram Mini App)
+  tgBot: {
+    welcome: "Hello! 🌸 Welcome to Gulzor.",
+    text: "Choose a bouquet, place an order and track it — all right here. Tap the «Shop» button below.",
+    open: "🌸 Open the shop",
+    menu: "Shop",
+  },
+  install: {
+    button: "Install the app",
+    iosHint: "In Safari, tap the «Share» button at the bottom and choose «Add to Home Screen».",
+    installed: "The Gulzor app is installed.",
+  },
+  footer: {
+    tagline: "Bouquets chosen with care for every occasion and every person.",
+    catalog: "Catalog",
+    customers: "For customers",
+    deliveryPayment: "Delivery and payment",
+    track: "Track your order",
+    custom: "Custom bouquet",
+    offer: "Terms of sale",
+    privacy: "Privacy policy",
+    credits: "Photo credits",
+    contact: "Contact",
+    contactSoon: "Contact details will be added soon.",
+    rights: "All rights reserved.",
+    currency: "Prices are shown in Uzbek soʻm (UZS).",
+  },
+};
+
+const ns = { uz, ru, en };
 export default ns;

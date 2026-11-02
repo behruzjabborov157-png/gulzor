@@ -3,12 +3,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { timingSafeEqual } from "node:crypto";
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { DisputeForm, ReviewForm } from "@/components/store/order-trust";
 import { RetryPayment } from "@/components/store/retry-payment";
 import { Alert, ProductImage } from "@/components/ui/primitives";
-import { fmt, localePath, pick, type Locale } from "@/i18n/config";
+import { fmt, localePath, type Locale } from "@/i18n/config";
+import { locationName } from "@/lib/locations";
 import { getDict } from "@/i18n/dict";
 import { getLocale } from "@/i18n/server";
 import { getCustomer } from "@/lib/auth";
@@ -32,27 +33,48 @@ function tokenMatches(a: string, b: string) {
 type Data = NonNullable<Awaited<ReturnType<typeof getOrderWithItems>>>;
 
 /** Order items, events and delivery area are stored in Uzbek; look up current Russian names when shown in Russian. */
-async function russianNames(data: Data) {
+/** Names of the ordered items in the page's language (orders store the Uzbek originals). */
+async function translatedNames(data: Data, locale: "ru" | "en") {
   const db = await getDb();
+  const ru = locale === "ru";
   const productIds = [
     ...new Set(data.items.flatMap((i) => [i.productId, ...i.addons.map((a) => a.productId)]).filter((x): x is number => x != null)),
   ];
   const variantIds = data.items.map((i) => i.variantId).filter((x): x is number => x != null);
-  const [products, variants, zones, regions] = await Promise.all([
-    productIds.length ? db
-          .select({ id: schema.products.id, nameRu: schema.products.nameRu, colorOptions: schema.products.colorOptions, colorOptionsRu: schema.products.colorOptionsRu })
-          .from(schema.products).where(inArray(schema.products.id, productIds)) : [],
-    variantIds.length
-      ? db.select({ id: schema.productVariants.id, nameRu: schema.productVariants.nameRu }).from(schema.productVariants).where(inArray(schema.productVariants.id, variantIds))
+  const P = schema.products;
+  const V = schema.productVariants;
+  const Z = schema.deliveryZones;
+  const R = schema.deliveryRegions;
+  const o = data.order;
+  const [products, variants, zones, regions, places] = await Promise.all([
+    productIds.length
+      ? db
+          .select({ id: P.id, name: ru ? P.nameRu : P.nameEn, colorOptions: P.colorOptions, colorOptionsT: ru ? P.colorOptionsRu : P.colorOptionsEn })
+          .from(P)
+          .where(inArray(P.id, productIds))
       : [],
-    data.order.zoneId ? db.select({ id: schema.deliveryZones.id, nameRu: schema.deliveryZones.nameRu }).from(schema.deliveryZones).where(inArray(schema.deliveryZones.id, [data.order.zoneId])) : [],
-    data.order.regionId
-      ? db.select({ id: schema.deliveryRegions.id, nameRu: schema.deliveryRegions.nameRu }).from(schema.deliveryRegions).where(inArray(schema.deliveryRegions.id, [data.order.regionId]))
+    variantIds.length ? db.select({ id: V.id, name: ru ? V.nameRu : V.nameEn }).from(V).where(inArray(V.id, variantIds)) : [],
+    o.zoneId ? db.select({ name: ru ? Z.nameRu : Z.nameEn }).from(Z).where(eq(Z.id, o.zoneId)) : [],
+    o.regionId ? db.select({ name: ru ? R.nameRu : R.nameEn }).from(R).where(eq(R.id, o.regionId)) : [],
+    o.districtId || o.mahallaId
+      ? db.select().from(schema.locations).where(inArray(schema.locations.id, [o.districtId, o.mahallaId].filter((x): x is number => x != null)))
       : [],
   ]);
-  const map = (rows: { id: number; nameRu: string | null }[]) => new Map(rows.map((r) => [r.id, r.nameRu]));
-  const colors = new Map(products.map((p) => [p.id, (c: string) => p.colorOptionsRu[p.colorOptions.indexOf(c)] || c]));
-  return { product: map(products), variant: map(variants), color: colors, zone: zones[0]?.nameRu ?? null, region: regions[0]?.nameRu ?? null };
+  const place = (id: number | null) => {
+    const l = places.find((x) => x.id === id);
+    return l ? locationName(l, locale) : null;
+  };
+  const map = (rows: { id: number; name: string | null }[]) => new Map(rows.map((r) => [r.id, r.name]));
+  const colors = new Map(products.map((p) => [p.id, (c: string) => p.colorOptionsT[p.colorOptions.indexOf(c)] || c]));
+  return {
+    product: map(products),
+    variant: map(variants),
+    color: colors,
+    zone: zones[0]?.name ?? null,
+    region: regions[0]?.name ?? null,
+    district: place(o.districtId),
+    mahalla: place(o.mahallaId),
+  };
 }
 
 function eventText(locale: Locale, e: Data["events"][number]): string {
@@ -83,9 +105,10 @@ export default async function OrderPage({ params, searchParams }: Props) {
   const dict = getDict(locale);
   const t = dict.order;
   const uzs = (n: number) => formatUZS(n, locale);
-  const ru = locale === "ru" ? await russianNames(data) : null;
-  const productName = (id: number | null, stored: string) => (ru && id != null ? pick(locale, stored, ru.product.get(id)) : stored);
-  const variantName = (id: number | null, stored: string | null) => (ru && id != null && stored ? pick(locale, stored, ru.variant.get(id)) : stored);
+  const tr = locale === "uz" ? null : await translatedNames(data, locale);
+  const own = (n: string | null | undefined, stored: string) => (n && n.trim() ? n : stored);
+  const productName = (id: number | null, stored: string) => (tr && id != null ? own(tr.product.get(id), stored) : stored);
+  const variantName = (id: number | null, stored: string | null) => (tr && id != null && stored ? own(tr.variant.get(id), stored) : stored);
 
   const [{ store }, photos, review, disputes] = await Promise.all([getSettings(), orderPhotos(o.id), reviewForOrder(o.id), orderDisputes(o.id)]);
   const tg = telegramLink(store.telegramUsername);
@@ -99,7 +122,14 @@ export default async function OrderPage({ params, searchParams }: Props) {
   // Checkout redirects here with ?yangi=1, so the success header is shown right after ordering.
   const isFresh = yangi === "1";
   const online = o.paymentMethod !== "cash";
-  const area = [ru?.region || o.regionName, ru?.zone || o.zoneName, o.district, o.neighborhood, o.address, o.apartment && fmt(t.apartment, { n: o.apartment })];
+  const area = [
+    tr?.region || o.regionName,
+    o.districtId ? tr?.district || o.district : tr?.zone || o.zoneName,
+    o.districtId ? null : o.district,
+    tr?.mahalla || o.neighborhood,
+    o.address,
+    o.apartment && fmt(t.apartment, { n: o.apartment }),
+  ];
 
   return (
     <div className="container-page max-w-4xl pt-10">
@@ -244,7 +274,7 @@ export default async function OrderPage({ params, searchParams }: Props) {
                       {[
                         variantName(i.variantId, i.variantName),
                         i.stems ? fmt(dict.common.pieces, { n: i.stems }) : null,
-                        i.color && ru && i.productId != null ? (ru.color.get(i.productId)?.(i.color) ?? i.color) : i.color,
+                        i.color && tr && i.productId != null ? (tr.color.get(i.productId)?.(i.color) ?? i.color) : i.color,
                         ...i.addons.map((a) => `+ ${productName(a.productId, a.name)}`),
                       ]
                         .filter(Boolean)

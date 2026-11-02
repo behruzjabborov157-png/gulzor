@@ -67,4 +67,8 @@ export const PRODUCT_CSV_COLUMNS = [
   "short_description_ru",
   "description_ru",
   "care_instructions_ru",
+  "name_en",
+  "short_description_en",
+  "description_en",
+  "care_instructions_en",
 ];

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import { fmt, localePath, pick, type Locale } from "@/i18n/config";
+import { fmt, localePath, pick, pickAt, type Locale } from "@/i18n/config";
 import { getDict } from "@/i18n/dict";
 import { getCategories, listProducts, stockState, toPricing } from "@/lib/catalog";
 import { isOrderable } from "@/lib/catalog-shared";
@@ -109,17 +109,17 @@ function mainMenu(t: BotTexts): Keyboard {
 }
 
 const languageKeyboard: Keyboard = {
-  inline_keyboard: [[{ text: "🇺🇿 O‘zbekcha", callback_data: "L:uz" }, { text: "🇷🇺 Русский", callback_data: "L:ru" }]],
+  inline_keyboard: [[{ text: "🇺🇿 O‘zbekcha", callback_data: "L:uz" }, { text: "🇷🇺 Русский", callback_data: "L:ru" }, { text: "🇬🇧 English", callback_data: "L:en" }]],
 };
 
-/** Menu button texts in both languages, so a button pressed just before switching language still works. */
+/** Menu button texts in every language, so a button pressed just before switching language still works. */
 function menuAction(text: string): keyof BotTexts["menu"] | null {
-  for (const t of [BOT_TEXTS.uz, BOT_TEXTS.ru]) {
+  for (const t of Object.values(BOT_TEXTS)) {
     for (const [k, v] of Object.entries(t.menu)) if (v === text) return k as keyof BotTexts["menu"];
   }
   return null;
 }
-const isCancelText = (text: string) => text === BOT_TEXTS.uz.cancel || text === BOT_TEXTS.ru.cancel;
+const isCancelText = (text: string) => Object.values(BOT_TEXTS).some((t) => t.cancel === text);
 
 function https() {
   return siteUrl().startsWith("https://");
@@ -151,9 +151,9 @@ async function loadProduct(productId: number, locale: Locale) {
     prod,
     pricing: toPricing(prod, variants, locale),
     orderable: isOrderable(stockState(prod, variants)),
-    name: pick(locale, prod.name, prod.nameRu),
-    short: pick(locale, prod.shortDescription, prod.shortDescriptionRu),
-    colors: prod.colorOptions.map((value, i) => ({ value, label: locale === "ru" ? prod.colorOptionsRu[i] || value : value })),
+    name: pick(locale, prod.name, prod.nameRu, prod.nameEn),
+    short: pick(locale, prod.shortDescription, prod.shortDescriptionRu, prod.shortDescriptionEn),
+    colors: prod.colorOptions.map((value, i) => ({ value, label: pickAt(locale, i, prod.colorOptions, prod.colorOptionsRu, prod.colorOptionsEn) })),
     image: prod.images[0]?.url ?? null,
     florist: await shopOf(prod.floristId, locale),
   };
@@ -163,7 +163,7 @@ type LoadedProduct = NonNullable<Awaited<ReturnType<typeof loadProduct>>>;
 async function shopOf(floristId: number, locale: Locale) {
   const db = await getDb();
   const [f] = await db.select().from(schema.florists).where(eq(schema.florists.id, floristId));
-  return f ? { id: f.id, name: pick(locale, f.name, f.nameRu), isPlatform: f.isPlatform } : null;
+  return f ? { id: f.id, name: pick(locale, f.name, f.nameRu, f.nameEn), isPlatform: f.isPlatform } : null;
 }
 
 /** The shop the bot cart belongs to (one shop per order). */
@@ -295,7 +295,7 @@ async function showCart(s: Session, t: BotTexts, edit?: Message) {
   const q = await quoteCart({ lines: s.cart.map((l) => ({ ...l, addons: [] })) }, { locale });
   const uzs = (n: number) => formatUZS(n, locale);
   const lines = q.lines.map((l, i) => {
-    const opts = [l.variantName, l.stems ? `${l.stems} ${locale === "ru" ? "шт." : "dona"}` : null, l.colorLabel].filter(Boolean).join(", ");
+    const opts = [l.variantName, l.stems ? fmt(getDict(locale).common.pieces, { n: l.stems }) : null, l.colorLabel].filter(Boolean).join(", ");
     return `${i + 1}. ${l.name}${opts ? ` (${opts})` : ""} × ${l.quantity} — ${uzs(l.lineTotal)}${l.error ? `\n   ⚠️ ${l.error}` : ""}`;
   });
   const text = [t.cartTitle, "", ...lines, "", fmt(t.subtotal, { amount: uzs(q.subtotal) })].join("\n");
@@ -340,8 +340,8 @@ async function showOrders(s: Session, t: BotTexts, userId: number) {
 async function showContact(s: Session, t: BotTexts) {
   const locale = s.locale!;
   const { store } = await getSettings();
-  const address = pick(locale, store.address, store.addressRu);
-  const hours = pick(locale, store.workingHours, store.workingHoursRu);
+  const address = pick(locale, store.address, store.addressRu, store.addressEn);
+  const hours = pick(locale, store.workingHours, store.workingHoursRu, store.workingHoursEn);
   const lines = [
     store.phone ? fmt(t.contactPhone, { phone: formatPhone(store.phone) }) : null,
     telegramLink(store.telegramUsername) ? fmt(t.contactTelegram, { username: store.telegramUsername.replace(/^@/, "") }) : null,
@@ -538,7 +538,7 @@ async function showSummary(s: Session, t: BotTexts) {
   const slot = q.slots.find((x) => x.id === d.slotId);
   const method = availablePaymentMethods(checkout, locale, { platformShop: q.florist?.isPlatform ?? true }).find((m) => m.id === d.payment);
   const items = q.lines.map((l) => {
-    const opts = [l.variantName, l.stems ? `${l.stems} ${locale === "ru" ? "шт." : "dona"}` : null, l.colorLabel].filter(Boolean).join(", ");
+    const opts = [l.variantName, l.stems ? fmt(getDict(locale).common.pieces, { n: l.stems }) : null, l.colorLabel].filter(Boolean).join(", ");
     return `• ${l.name}${opts ? ` (${opts})` : ""} × ${l.quantity} — ${uzs(l.lineTotal)}`;
   });
   const text = [
@@ -554,7 +554,7 @@ async function showSummary(s: Session, t: BotTexts) {
     "",
     fmt(t.sumRecipient, { name: d.self === false ? d.rName! : d.name!, phone: formatPhone(d.self === false ? d.rPhone! : d.phone!) }),
     d.fulfillment === "pickup"
-      ? fmt(t.sumPickup, { address: pick(locale, checkout.pickupAddress, checkout.pickupAddressRu) })
+      ? fmt(t.sumPickup, { address: pick(locale, checkout.pickupAddress, checkout.pickupAddressRu, checkout.pickupAddressEn) })
       : fmt(t.sumAddress, { address: [q.zone?.regionName, q.district?.name ?? q.zone?.name, d.address, d.extra].filter(Boolean).join(", ") }),
     fmt(t.sumWhen, { date: formatDateISO(d.date!, true, locale), slot: slot?.label ?? "" }),
     d.card ? fmt(t.sumCard, { text: d.card }) : null,
@@ -729,7 +729,7 @@ async function onCallback(cb: Callback): Promise<AfterTask | null> {
   let task: AfterTask | null = null;
 
   if (data.startsWith("L:")) {
-    s.locale = data === "L:ru" ? "ru" : "uz";
+    s.locale = data === "L:ru" ? "ru" : data === "L:en" ? "en" : "uz";
     const t = BOT_TEXTS[s.locale];
     await api("answerCallbackQuery", { callback_query_id: cb.id });
     await send(s.chatId, t.welcome, mainMenu(t));

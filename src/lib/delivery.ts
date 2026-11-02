@@ -43,11 +43,11 @@ export async function getDeliveryConfig(locale: Locale = DEFAULT_LOCALE, florist
         const own = zones.filter((z) => z.regionId === r.id);
         return {
           ...r,
-          name: pick(locale, r.name, r.nameRu),
+          name: pick(locale, r.name, r.nameRu, r.nameEn),
           zones: own.map((z) => ({
             ...z,
-            name: pick(locale, z.name, z.nameRu),
-            description: pick(locale, z.description, z.descriptionRu),
+            name: pick(locale, z.name, z.nameRu, z.nameEn),
+            description: pick(locale, z.description, z.descriptionRu, z.descriptionEn),
             /** Covered districts; null = the whole region. */
             districtIds: coverage.get(z.id) ?? null,
           })),

@@ -46,18 +46,18 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const productIds = [...new Set(items.map((i) => i.productId).filter((x): x is number => x != null))];
   const productRows = productIds.length
     ? await db
-        .select({ id: schema.products.id, slug: schema.products.slug, nameRu: schema.products.nameRu })
+        .select({ id: schema.products.id, slug: schema.products.slug, nameRu: schema.products.nameRu, nameEn: schema.products.nameEn })
         .from(schema.products)
         .where(inArray(schema.products.id, productIds))
     : [];
   const productOf = new Map(productRows.map((r) => [r.id, r]));
   const floristIds = [...new Set(orders.map((o) => o.floristId))];
   const floristRows = floristIds.length
-    ? await db.select({ id: schema.florists.id, name: schema.florists.name, nameRu: schema.florists.nameRu }).from(schema.florists).where(inArray(schema.florists.id, floristIds))
+    ? await db.select({ id: schema.florists.id, name: schema.florists.name, nameRu: schema.florists.nameRu, nameEn: schema.florists.nameEn }).from(schema.florists).where(inArray(schema.florists.id, floristIds))
     : [];
   const floristName = (id: number) => {
     const f = floristRows.find((x) => x.id === id);
-    return f ? pick(locale, f.name, f.nameRu) : "";
+    return f ? pick(locale, f.name, f.nameRu, f.nameEn) : "";
   };
   const itemsOf = (orderId: string) => items.filter((i) => i.orderId === orderId && i.productId);
 
@@ -115,7 +115,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                         stems: i.stems,
                         color: i.color,
                         quantity: i.quantity,
-                        name: pick(locale, i.productName, productOf.get(i.productId!)?.nameRu),
+                        name: pick(locale, i.productName, productOf.get(i.productId!)?.nameRu, productOf.get(i.productId!)?.nameEn),
                         variantName: i.variantName,
                         image: i.imageUrl,
                         unitPrice: i.unitPrice,

@@ -13,16 +13,29 @@ export function normalizeSearch(s: string): string {
 type Searchable = {
   name: string;
   nameRu?: string | null;
+  nameEn?: string | null;
   shortDescription?: string | null;
   shortDescriptionRu?: string | null;
+  shortDescriptionEn?: string | null;
   flowerVarieties?: string[] | null;
   flowerVarietiesRu?: string[] | null;
+  flowerVarietiesEn?: string[] | null;
 };
 
-/** Text stored in products.search_text — both languages, so a search in either finds the product. */
+/** Text stored in products.search_text — all languages, so a search in any of them finds the product. */
 export function buildSearchText(p: Searchable): string {
   return normalizeSearch(
-    [p.name, p.nameRu, p.shortDescription, p.shortDescriptionRu, ...(p.flowerVarieties ?? []), ...(p.flowerVarietiesRu ?? [])]
+    [
+      p.name,
+      p.nameRu,
+      p.nameEn,
+      p.shortDescription,
+      p.shortDescriptionRu,
+      p.shortDescriptionEn,
+      ...(p.flowerVarieties ?? []),
+      ...(p.flowerVarietiesRu ?? []),
+      ...(p.flowerVarietiesEn ?? []),
+    ]
       .filter(Boolean)
       .join(" "),
   );

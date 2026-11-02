@@ -1,3 +1,4 @@
+import { LANGUAGE_NAME_UZ } from "@/i18n/config";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { floristCashPaidAction, floristDisputeNoteAction, floristOrderPhotoAction, floristOrderStatusAction } from "@/app/florist/actions";
@@ -48,7 +49,7 @@ export default async function FloristOrderPage({ params }: { params: Promise<{ i
           </span>
         </div>
         <p className="mt-1 text-sm text-muted">
-          Yaratildi: {formatDateTime(o.createdAt)} · Mijoz tili: {o.locale === "ru" ? "rus tili" : "o‘zbek tili"}
+          Yaratildi: {formatDateTime(o.createdAt)} · Mijoz tili: {LANGUAGE_NAME_UZ[o.locale] ?? o.locale}
         </p>
       </div>
 

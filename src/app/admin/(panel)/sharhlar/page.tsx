@@ -1,3 +1,4 @@
+import { LANGUAGE_NAME_UZ } from "@/i18n/config";
 import Link from "next/link";
 import { moderateReviewAction } from "@/app/admin/actions";
 import { AdminForm } from "@/components/admin/admin-form";
@@ -55,7 +56,7 @@ export default async function ReviewsAdminPage({ searchParams }: { searchParams:
                   </Link>
                 </span>
                 <span className="text-muted">
-                  {formatDateTime(r.createdAt)} · {r.locale === "ru" ? "rus" : "o‘zbek"}
+                  {formatDateTime(r.createdAt)} · {LANGUAGE_NAME_UZ[r.locale] ?? r.locale}
                 </span>
               </p>
               {r.text ? <p className="mt-2 whitespace-pre-line">{r.text}</p> : <p className="mt-2 text-muted">(izohsiz)</p>}

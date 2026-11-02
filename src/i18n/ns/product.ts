@@ -87,5 +87,50 @@ const ru: typeof uz = {
   quickAddShort: "В корзину",
 };
 
-const ns = { uz, ru };
+const en: typeof uz = {
+  demoNote: "Sample product: the photo is a licensed illustration; the price and contents must be confirmed by the shop.",
+  stockLeft: "In stock: {n}",
+  prepDays: "Order {n} days in advance",
+  prepHours: "Preparation: ~{n} h",
+  prepMinutes: "Preparation: ~{n} min",
+  deliveryTerms: "Delivery terms",
+  description: "Description",
+  flowers: "Flowers",
+  stems: "Number of stems",
+  size: "Size",
+  priceUpdated: "Price updated",
+  care: "Care",
+  relatedLike: "You may also like",
+  relatedSimilar: "Similar bouquets",
+  gallery: "Photos",
+  galleryItem: "Photo {n}",
+  // Configurator
+  sizeLegend: "Bouquet size",
+  stemsLabel: "Number of stems",
+  perStem: "{price} each",
+  decrease: "Decrease",
+  increase: "Increase",
+  stemsHint: "{min}–{max} stems",
+  oddOnly: ", odd numbers only",
+  color: "Colour",
+  addGift: "Add a gift",
+  cardNote: "You will write the card message at checkout.",
+  quantity: "Quantity",
+  total: "Total",
+  bouquet: "Bouquet",
+  deliveryNote: "The delivery fee is added at checkout depending on the address.",
+  addToCart: "Add to cart",
+  updateCart: "Update cart",
+  unavailable: "This product cannot be ordered right now. See similar bouquets below.",
+  added: "Added to cart",
+  goToCart: "Go to cart",
+  continue: "Continue shopping",
+  close: "Close",
+  inCart: "In cart: {n} items",
+  stemsCount: "{n} stems",
+  quickAdd: "{name} — add to cart",
+  quickAddShort: "Add",
+};
+
+const ns = { uz, ru, en };
 export default ns;

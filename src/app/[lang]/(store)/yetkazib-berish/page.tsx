@@ -24,7 +24,7 @@ export default async function DeliveryPage() {
   const [{ regions, slots }, { checkout, store }] = await Promise.all([getDeliveryConfig(locale), getSettings()]);
   const payments = availablePaymentMethods(checkout, locale);
   const tg = telegramLink(store.telegramUsername);
-  const pickupAddress = pick(locale, checkout.pickupAddress, checkout.pickupAddressRu);
+  const pickupAddress = pick(locale, checkout.pickupAddress, checkout.pickupAddressRu, checkout.pickupAddressEn);
 
   return (
     <div className="container-page max-w-4xl pt-8">

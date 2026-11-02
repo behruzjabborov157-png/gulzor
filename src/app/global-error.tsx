@@ -1,6 +1,6 @@
 "use client";
 
-/** Last-resort boundary (replaces the root layout), so it must render its own <html>. Shown in both languages. */
+/** Last-resort boundary (replaces the root layout), so it must render its own <html>. Shown in all languages. */
 export default function GlobalError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
     <html lang="uz">
@@ -9,6 +9,7 @@ export default function GlobalError({ reset }: { error: Error & { digest?: strin
           <h1 style={{ fontWeight: 500 }}>Nimadir noto‘g‘ri ketdi</h1>
           <p>Sahifani yangilang yoki birozdan so‘ng qayta urinib ko‘ring.</p>
           <p lang="ru" style={{ color: "#6f6266" }}>Что-то пошло не так. Обновите страницу или попробуйте чуть позже.</p>
+          <p lang="en" style={{ color: "#6f6266" }}>Something went wrong. Refresh the page or try again a little later.</p>
           <button type="button" onClick={reset} style={{ marginTop: 16, padding: "12px 24px", borderRadius: 999, border: 0, background: "#7a1732", color: "#fbf6ef", cursor: "pointer" }}>
             Qayta urinish / Повторить
           </button>

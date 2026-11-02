@@ -34,6 +34,10 @@ function Fields({ c }: { c?: typeof schema.categories.$inferSelect }) {
       <div className="sm:col-span-3"><F label="Tavsif (rus.)" name="descriptionRu" defaultValue={c?.descriptionRu} lang="ru" /></div>
       <F label="SEO sarlavha (rus.)" name="seoTitleRu" defaultValue={c?.seoTitleRu} lang="ru" />
       <div className="sm:col-span-3"><F label="SEO tavsif (rus.)" name="seoDescriptionRu" defaultValue={c?.seoDescriptionRu} lang="ru" /></div>
+      <F label="Nomi (ingl.)" name="nameEn" defaultValue={c?.nameEn} lang="en" />
+      <div className="sm:col-span-3"><F label="Tavsif (ingl.)" name="descriptionEn" defaultValue={c?.descriptionEn} lang="en" /></div>
+      <F label="SEO sarlavha (ingl.)" name="seoTitleEn" defaultValue={c?.seoTitleEn} lang="en" />
+      <div className="sm:col-span-3"><F label="SEO tavsif (ingl.)" name="seoDescriptionEn" defaultValue={c?.seoDescriptionEn} lang="en" /></div>
     </div>
   );
 }

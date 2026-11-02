@@ -68,5 +68,40 @@ const ru: typeof uz = {
   serverCheck: "Цены перепроверяются на сервере.",
 };
 
-const ns = { uz, ru };
+const en: typeof uz = {
+  title: "Cart",
+  calculating: "Calculating",
+  products: "Products",
+  discount: "Discount",
+  delivery: "Delivery",
+  free: "Free",
+  pickZone: "choose an area",
+  total: "Total",
+  freeDeliveryLeft: "Add {amount} more for free delivery.",
+  emptyTitle: "Your cart is empty",
+  emptyText: "Pick a bouquet from the catalog — we will arrange it with care and deliver it at the time you choose.",
+  choose: "Choose flowers",
+  items: "Items in your cart",
+  similar: "Similar bouquets",
+  priceChanged: "Price updated: {price} each",
+  decrease: "{name}: decrease",
+  increase: "{name}: increase",
+  quantity: "Quantity {n}",
+  edit: "Edit",
+  remove: "Remove",
+  order: "Order",
+  zone: "Delivery area",
+  select: "Select…",
+  noZones: "Delivery areas have not been set up yet.",
+  zoneMissing: "Your area is not listed?",
+  contactUs: "Contact us",
+  coupon: "Promo code",
+  removeCoupon: "Remove promo code",
+  apply: "Apply",
+  calculatingShort: "Calculating…",
+  checkout: "Checkout",
+  serverCheck: "Prices are re-checked by the server.",
+};
+
+const ns = { uz, ru, en };
 export default ns;

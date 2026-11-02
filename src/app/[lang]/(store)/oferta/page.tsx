@@ -45,6 +45,37 @@ export default async function OfferPage() {
           <h2>5. Отмена</h2>
           <p>Заказ можно отменить до начала его сборки. Предоплата возвращается тем же способом оплаты.</p>
         </>
+      ) : locale === "en" ? (
+        <>
+          <h1 className="text-4xl">Terms of sale</h1>
+          <p className="text-sm text-muted">This is a translation of the Uzbek text, provided for convenience.</p>
+          <p>
+            This document sets out the terms of sale and delivery of flowers and gifts between {seller} (the “Seller”) and the person placing an order on the
+            website (the “Buyer”).
+          </p>
+          <h2>1. Order</h2>
+          <p>
+            An order is accepted from the moment it is placed on the website and given an order number. The Seller checks that the flowers are available and
+            contacts the Buyer if necessary. If a flower is not available, it is replaced only with the Buyer’s consent.
+          </p>
+          <h2>2. Price and payment</h2>
+          <p>
+            Prices are shown in Uzbek soʻm. The final amount (products, delivery and other charges) is shown before the order is confirmed. Payment is made
+            using the methods shown on the website.
+          </p>
+          <h2>3. Delivery</h2>
+          <p>
+            Delivery is made on the date and in the time slot chosen by the Buyer. If the recipient is not at the given address or does not answer the phone,
+            the Seller contacts the Buyer to agree on the terms of a repeat delivery.
+          </p>
+          <h2>4. Quality and returns</h2>
+          <p>
+            Flowers are perishable goods. If you have a complaint about the quality of the bouquet, contact us with a photo on the day you receive it — the
+            Seller reviews the situation and decides on a replacement or a refund.
+          </p>
+          <h2>5. Cancellation</h2>
+          <p>An order can be cancelled before its preparation begins. An amount paid in advance is refunded via the payment method used.</p>
+        </>
       ) : (
         <>
           <h1 className="text-4xl">Ommaviy oferta</h1>

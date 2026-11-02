@@ -1,3 +1,4 @@
+import { LANGUAGE_NAME_UZ } from "@/i18n/config";
 import Link from "next/link";
 import { SubmitButton } from "@/components/admin/submit-button";
 import { notFound } from "next/navigation";
@@ -61,7 +62,7 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
           ) : (
             "—"
           )}
-          {" · "}Yaratildi: {formatDateTime(o.createdAt)} · Mijoz tili: {o.locale === "ru" ? "rus tili" : "o‘zbek tili"}
+          {" · "}Yaratildi: {formatDateTime(o.createdAt)} · Mijoz tili: {LANGUAGE_NAME_UZ[o.locale] ?? o.locale}
           {o.telegramUserId ? (
             <>
               {" · "}

@@ -72,5 +72,42 @@ const ru: typeof uz = {
   next: "Далее →",
 };
 
-const ns = { uz, ru };
+const en: typeof uz = {
+  allTitle: "All flowers and bouquets",
+  searchTitle: "Search results for “{q}”",
+  filters: "Filters",
+  open: "Open",
+  close: "Close",
+  search: "Search",
+  searchPlaceholder: "Name or flower",
+  flower: "Flower",
+  occasion: "Occasion",
+  type: "Bouquet type",
+  all: "All",
+  price: "Price (UZS)",
+  priceMin: "from",
+  priceMax: "to",
+  priceMinAria: "Minimum price",
+  priceMaxAria: "Maximum price",
+  inStock: "In stock only",
+  inStockChip: "In stock only",
+  fromChip: "from {amount}",
+  toChip: "up to {amount}",
+  sort: "Sort by",
+  sorts: { popular: "Popular", price_asc: "Price: low to high", price_desc: "Price: high to low", new: "Newest" },
+  apply: "Apply",
+  reset: "Clear",
+  products: "Products",
+  count: "{n} products",
+  removeFilter: "Remove filter: {label}",
+  emptyTitle: "Nothing found",
+  emptyText: "Try changing the filters or order a custom bouquet — our florist will make one for you.",
+  resetFilters: "Clear filters",
+  customBouquet: "Custom bouquet",
+  pages: "Pages",
+  prev: "← Previous",
+  next: "Next →",
+};
+
+const ns = { uz, ru, en };
 export default ns;

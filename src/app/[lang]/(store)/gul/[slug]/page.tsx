@@ -12,7 +12,7 @@ import { RecentlyViewed } from "@/components/store/widgets";
 import { ClockIcon, InfoIcon, TruckIcon } from "@/components/ui/icons";
 import { Breadcrumbs, Price } from "@/components/ui/primitives";
 import { CardGridSkeleton } from "@/components/ui/skeletons";
-import { fmt, localePath, pick, type Locale } from "@/i18n/config";
+import { fmt, localePath, pick, pickAt, pickList, type Locale } from "@/i18n/config";
 import { getDict } from "@/i18n/dict";
 import { alternates } from "@/i18n/seo";
 import { getLocale } from "@/i18n/server";
@@ -30,10 +30,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const data = await getProductBySlug((await params).slug, locale);
   if (!data) return { title: t.productNotFound };
   const p = data.product;
-  const name = pick(locale, p.name, p.nameRu);
-  const seoTitle = locale === "ru" ? p.seoTitleRu : p.seoTitle;
-  const seoDescription = locale === "ru" ? p.seoDescriptionRu : p.seoDescription;
-  const text = `${pick(locale, p.shortDescription, p.shortDescriptionRu)} ${pick(locale, p.description, p.descriptionRu)}`;
+  const name = pick(locale, p.name, p.nameRu, p.nameEn);
+  // An SEO text only in Uzbek would be wrong on the Russian/English page: use it only when written for this language.
+  const seoTitle = { uz: p.seoTitle, ru: p.seoTitleRu, en: p.seoTitleEn }[locale];
+  const seoDescription = { uz: p.seoDescription, ru: p.seoDescriptionRu, en: p.seoDescriptionEn }[locale];
+  const text = `${pick(locale, p.shortDescription, p.shortDescriptionRu, p.shortDescriptionEn)} ${pick(locale, p.description, p.descriptionRu, p.descriptionEn)}`;
   return {
     title: seoTitle || fmt(t.productTitle, { name }),
     description: seoDescription || text.slice(0, 160),
@@ -80,12 +81,12 @@ export default async function ProductPage({ params }: Props) {
   const primary = categories.find((c) => c.id === p.primaryCategoryId) ?? categories[0];
   const price = fromPrice(pricing);
 
-  const name = pick(locale, p.name, p.nameRu);
-  const description = pick(locale, p.description, p.descriptionRu);
-  const care = pick(locale, p.careInstructions, p.careInstructionsRu);
-  const sizeLabel = p.sizeLabel ? pick(locale, p.sizeLabel, p.sizeLabelRu) : null;
-  const varieties = locale === "ru" && p.flowerVarietiesRu.length ? p.flowerVarietiesRu : p.flowerVarieties;
-  const colors = p.colorOptions.map((value, i) => ({ value, label: (locale === "ru" && p.colorOptionsRu[i]) || value }));
+  const name = pick(locale, p.name, p.nameRu, p.nameEn);
+  const description = pick(locale, p.description, p.descriptionRu, p.descriptionEn);
+  const care = pick(locale, p.careInstructions, p.careInstructionsRu, p.careInstructionsEn);
+  const sizeLabel = p.sizeLabel ? pick(locale, p.sizeLabel, p.sizeLabelRu, p.sizeLabelEn) : null;
+  const varieties = pickList(locale, p.flowerVarieties, p.flowerVarietiesRu, p.flowerVarietiesEn);
+  const colors = p.colorOptions.map((value, i) => ({ value, label: pickAt(locale, i, p.colorOptions, p.colorOptionsRu, p.colorOptionsEn) }));
 
   // Structured data only for real (non-demo) products, so search engines never index sample prices.
   const jsonLd = p.isDemo
@@ -149,7 +150,7 @@ export default async function ProductPage({ params }: Props) {
                 <span className="text-xs text-muted">{fmt(t.stockLeft, { n: p.stockQuantity })}</span>
               ) : null}
             </div>
-            <p className="mt-4 text-lg leading-relaxed text-muted">{pick(locale, p.shortDescription, p.shortDescriptionRu)}</p>
+            <p className="mt-4 text-lg leading-relaxed text-muted">{pick(locale, p.shortDescription, p.shortDescriptionRu, p.shortDescriptionEn)}</p>
 
             <div className="mt-8">
               <Suspense>

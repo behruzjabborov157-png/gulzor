@@ -77,5 +77,45 @@ const ru: typeof uz = {
   reviewsNote: "Отзывы оставляют только покупатели, чей заказ был доставлен.",
 };
 
-const ns = { uz, ru };
+const en: typeof uz = {
+  listTitle: "Shops",
+  listIntro: "Every flower shop on Gulzor has been verified. Each shop arranges its bouquets and delivers them itself.",
+  verified: "Verified shop",
+  verifiedHint: "The shop's details have been checked by Gulzor",
+  products: "{n} bouquets",
+  noShops: "No shops yet.",
+  openShop: "View shop",
+  soldBy: "Shop:",
+  // Shop page
+  shopProducts: "Bouquets",
+  noProducts: "This shop has no products yet.",
+  delivery: "Delivery areas",
+  deliveryNone: "The shop has not added its delivery areas yet.",
+  freeFrom: "free from {amount}",
+  city: "City: {city}",
+  address: "Address: {address}",
+  seller: "Seller: {name}",
+  contact: "Contact",
+  onGulzorSince: "On Gulzor since {date}",
+  // Cart rule
+  conflictTitle: "Product from another shop",
+  conflictText: "Your cart has bouquets from «{current}». One order can only come from one shop, because each shop delivers itself.",
+  conflictReplace: "Empty the cart and add this",
+  conflictKeep: "Keep my cart",
+  cartFrom: "from «{name}»",
+  filterShop: "Shop: {name}",
+  filterCity: "City: {name}",
+  allCities: "All cities",
+  cityLabel: "City",
+  removeFilter: "Remove filter",
+  openYourShop: "Own a flower shop? Open your shop on Gulzor",
+  openShopShort: "Open a shop",
+  reviewsTitle: "Customer reviews",
+  reviewsSummary: "{avg} / 5 · {n} reviews",
+  verifiedPurchase: "Verified purchase",
+  shopReply: "Shop's reply",
+  reviewsNote: "Only customers whose order was delivered can leave a review.",
+};
+
+const ns = { uz, ru, en };
 export default ns;

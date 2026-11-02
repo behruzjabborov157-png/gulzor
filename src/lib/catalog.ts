@@ -36,7 +36,7 @@ export function toPricing(prod: Product, variants: Variant[], locale: Locale = D
     minStems: prod.minStems,
     maxStems: prod.maxStems,
     stemStep: prod.stemStep,
-    variants: variants.map((v) => ({ id: v.id, name: pick(locale, v.name, v.nameRu), price: v.price, stemCount: v.stemCount, isActive: v.isActive })),
+    variants: variants.map((v) => ({ id: v.id, name: pick(locale, v.name, v.nameRu, v.nameEn), price: v.price, stemCount: v.stemCount, isActive: v.isActive })),
   };
 }
 
@@ -53,12 +53,12 @@ export type CardFlorist = { id: number; slug: string; name: string };
 export function toCard(prod: Product, variants: Variant[], locale: Locale = DEFAULT_LOCALE, florist: CardFlorist | null = null): ProductCard {
   const price = fromPrice(toPricing(prod, variants));
   const cmp = compareFor(prod, variants);
-  const name = pick(locale, prod.name, prod.nameRu);
+  const name = pick(locale, prod.name, prod.nameRu, prod.nameEn);
   return {
     id: prod.id,
     slug: prod.slug,
     name,
-    shortDescription: pick(locale, prod.shortDescription, prod.shortDescriptionRu),
+    shortDescription: pick(locale, prod.shortDescription, prod.shortDescriptionRu, prod.shortDescriptionEn),
     // Uploaded alt texts are Uzbek; in Russian the localized product name describes the photo better.
     image: prod.images[0] ? { url: prod.images[0].url, alt: locale === DEFAULT_LOCALE ? prod.images[0].alt || name : name } : null,
     price,
@@ -166,7 +166,7 @@ export async function withVariants(rows: Product[], locale: Locale = DEFAULT_LOC
   const fs = await db.select().from(schema.florists).where(inArray(schema.florists.id, fIds));
   const florist = (id: number): CardFlorist | null => {
     const f = fs.find((x) => x.id === id);
-    return f ? { id: f.id, slug: f.slug, name: pick(locale, f.name, f.nameRu) } : null;
+    return f ? { id: f.id, slug: f.slug, name: pick(locale, f.name, f.nameRu, f.nameEn) } : null;
   };
   return rows.map((r) => toCard(r, vs.filter((v) => v.productId === r.id), locale, florist(r.floristId)));
 }
@@ -185,14 +185,14 @@ export async function getProductBySlug(slug: string, locale: Locale = DEFAULT_LO
   if (!prod) return null;
   const variants = await db.select().from(pv).where(eq(pv.productId, prod.id)).orderBy(asc(pv.sortOrder), asc(pv.price));
   const cats = await db
-    .select({ id: c.id, slug: c.slug, name: c.name, nameRu: c.nameRu, kind: c.kind })
+    .select({ id: c.id, slug: c.slug, name: c.name, nameRu: c.nameRu, nameEn: c.nameEn, kind: c.kind })
     .from(pc)
     .innerJoin(c, eq(c.id, pc.categoryId))
     .where(and(eq(pc.productId, prod.id), eq(c.isActive, true)));
   return {
     product: prod,
     variants,
-    categories: cats.map((x) => ({ id: x.id, slug: x.slug, kind: x.kind, name: pick(locale, x.name, x.nameRu) })),
+    categories: cats.map((x) => ({ id: x.id, slug: x.slug, kind: x.kind, name: pick(locale, x.name, x.nameRu, x.nameEn) })),
     stock: stockState(prod, variants),
   };
 }
@@ -207,7 +207,7 @@ export async function getAddons(locale: Locale = DEFAULT_LOCALE, floristId?: num
     .orderBy(asc(p.price));
   return rows
     .filter((r) => isOrderable(stockState(r, [])))
-    .map((r) => ({ productId: r.id, name: pick(locale, r.name, r.nameRu), price: r.price, image: r.images[0]?.url ?? null, slug: r.slug }));
+    .map((r) => ({ productId: r.id, name: pick(locale, r.name, r.nameRu, r.nameEn), price: r.price, image: r.images[0]?.url ?? null, slug: r.slug }));
 }
 
 /** Products that share categories with the given product, available first. */
@@ -240,8 +240,8 @@ export function localizeCategory(row: Category, locale: Locale): Category {
   if (locale === DEFAULT_LOCALE) return row;
   return {
     ...row,
-    name: pick(locale, row.name, row.nameRu),
-    description: pick(locale, row.description, row.descriptionRu),
+    name: pick(locale, row.name, row.nameRu, row.nameEn),
+    description: pick(locale, row.description, row.descriptionRu, row.descriptionEn),
     seoTitle: row.seoTitleRu || null,
     seoDescription: row.seoDescriptionRu || null,
   };

@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 /**
  * 1. Language routing: Uzbek pages keep clean URLs (/katalog) and are rewritten internally to
- *    /uz/katalog; Russian pages live under /ru/…; /uz/… redirects to the clean URL.
+ *    /uz/katalog; Russian pages live under /ru/…, English ones under /en/…; /uz/… redirects to the clean URL.
  *    The detected language is passed to the app as the x-locale request header.
  * 2. Per-request Content-Security-Policy with a nonce (Next.js applies it to its own scripts).
  *    style-src keeps 'unsafe-inline' because inline style *attributes* (next/image `fill`,
@@ -20,8 +20,8 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
-  const isRu = pathname === "/ru" || pathname.startsWith("/ru/");
-  const locale = isRu ? "ru" : "uz";
+  const prefixed = pathname.match(/^\/(ru|en)(?=\/|$)/)?.[1] as "ru" | "en" | undefined;
+  const locale = prefixed ?? "uz";
 
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const isDev = process.env.NODE_ENV === "development";
@@ -52,7 +52,7 @@ export function proxy(request: NextRequest) {
   requestHeaders.set("Content-Security-Policy", csp);
 
   let response: NextResponse;
-  if (!isRu && !isAdmin) {
+  if (!prefixed && !isAdmin) {
     // Serve the Uzbek page from /uz/... without changing the address bar.
     const url = request.nextUrl.clone();
     url.pathname = `/uz${pathname === "/" ? "" : pathname}`;

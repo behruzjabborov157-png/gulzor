@@ -75,6 +75,7 @@ export async function saveProductForm(scope: ProductScope, productId: number | n
       id: id ? Number(id) : null,
       name: String(form.getAll("variant_name")[i] ?? "").trim(),
       nameRu: String(form.getAll("variant_name_ru")[i] ?? "").trim() || null,
+      nameEn: String(form.getAll("variant_name_en")[i] ?? "").trim() || null,
       stemCount: int(form.getAll("variant_stems")[i] ?? null),
       price: int(form.getAll("variant_price")[i] ?? null),
       compareAtPrice: int(form.getAll("variant_compare")[i] ?? null),
@@ -112,7 +113,7 @@ export async function saveProductForm(scope: ProductScope, productId: number | n
 
   const shortDescription = String(form.get("shortDescription") ?? "").trim();
   const flowerVarieties = lines(form.get("flowerVarieties"));
-  const ru = {
+  const translations = {
     nameRu: String(form.get("nameRu") ?? "").trim() || null,
     shortDescriptionRu: String(form.get("shortDescriptionRu") ?? "").trim() || null,
     descriptionRu: String(form.get("descriptionRu") ?? "").trim() || null,
@@ -122,6 +123,15 @@ export async function saveProductForm(scope: ProductScope, productId: number | n
     colorOptionsRu: lines(form.get("colorOptionsRu")),
     seoTitleRu: String(form.get("seoTitleRu") ?? "").trim() || null,
     seoDescriptionRu: String(form.get("seoDescriptionRu") ?? "").trim() || null,
+    nameEn: String(form.get("nameEn") ?? "").trim() || null,
+    shortDescriptionEn: String(form.get("shortDescriptionEn") ?? "").trim() || null,
+    descriptionEn: String(form.get("descriptionEn") ?? "").trim() || null,
+    careInstructionsEn: String(form.get("careInstructionsEn") ?? "").trim() || null,
+    sizeLabelEn: String(form.get("sizeLabelEn") ?? "").trim() || null,
+    flowerVarietiesEn: lines(form.get("flowerVarietiesEn")),
+    colorOptionsEn: lines(form.get("colorOptionsEn")),
+    seoTitleEn: String(form.get("seoTitleEn") ?? "").trim() || null,
+    seoDescriptionEn: String(form.get("seoDescriptionEn") ?? "").trim() || null,
   };
   const isFlorist = scope.kind === "florist";
   // Curation flags are Gulzor's decision: a florist keeps whatever Gulzor set (false on new products).
@@ -134,8 +144,8 @@ export async function saveProductForm(scope: ProductScope, productId: number | n
     careInstructions: String(form.get("careInstructions") ?? "").trim(),
     flowerVarieties,
     colorOptions: lines(form.get("colorOptions")),
-    ...ru,
-    searchText: buildSearchText({ name, shortDescription, flowerVarieties, ...ru }),
+    ...translations,
+    searchText: buildSearchText({ name, shortDescription, flowerVarieties, ...translations }),
     stemCount,
     sizeLabel: String(form.get("sizeLabel") ?? "").trim() || null,
     primaryCategoryId: primaryCategoryId && categoryIds.includes(primaryCategoryId) ? primaryCategoryId : (categoryIds[0] ?? null),
@@ -189,7 +199,7 @@ export async function saveProductForm(scope: ProductScope, productId: number | n
     const keep = new Set(variants.filter((v) => v.id).map((v) => v.id));
     for (const c of current) if (!keep.has(c.id)) await tx.delete(schema.productVariants).where(eq(schema.productVariants.id, c.id));
     for (const v of variants) {
-      const data = { name: v.name, nameRu: v.nameRu, stemCount: v.stemCount, price: v.price ?? 0, compareAtPrice: v.compareAtPrice, stockQuantity: v.stockQuantity, isActive: v.isActive, sortOrder: v.sortOrder };
+      const data = { name: v.name, nameRu: v.nameRu, nameEn: v.nameEn, stemCount: v.stemCount, price: v.price ?? 0, compareAtPrice: v.compareAtPrice, stockQuantity: v.stockQuantity, isActive: v.isActive, sortOrder: v.sortOrder };
       if (v.id && current.some((c) => c.id === v.id)) await tx.update(schema.productVariants).set(data).where(eq(schema.productVariants.id, v.id));
       else await tx.insert(schema.productVariants).values({ ...data, productId: pid });
     }

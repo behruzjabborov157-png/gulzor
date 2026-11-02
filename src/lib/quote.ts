@@ -1,7 +1,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, schema } from "@/db";
-import { DEFAULT_LOCALE, fmt, pick, type Locale } from "@/i18n/config";
+import { DEFAULT_LOCALE, fmt, pick, pickAt, type Locale } from "@/i18n/config";
 import { getDict, priceErrorText } from "@/i18n/dict";
 import { isOrderable, stockState, toPricing, type StockState } from "@/lib/catalog";
 import { bookedSlotCounts, computeSlots, dateWindow, getDeliveryConfig, type SlotOption } from "@/lib/delivery";
@@ -121,7 +121,7 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
   const orderableAddons = prods.filter((x) => x.isAddon && x.status === "active" && approved.has(x.floristId) && isOrderable(stockState(x, [])));
   // Add-ons only from the same florist as the bouquet (one florist fulfils the order).
   const addonCatalogFor = (floristId: number, uz = false) =>
-    orderableAddons.filter((x) => x.floristId === floristId).map((x) => ({ productId: x.id, name: uz ? x.name : pick(locale, x.name, x.nameRu), price: x.price }));
+    orderableAddons.filter((x) => x.floristId === floristId).map((x) => ({ productId: x.id, name: uz ? x.name : pick(locale, x.name, x.nameRu, x.nameEn), price: x.price }));
 
   /* ---- Price every line ---- */
   const demand = new Map<string, number>(); // stock key -> requested quantity
@@ -131,7 +131,7 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
       index,
       productId: l.productId,
       slug: prod?.slug ?? null,
-      name: prod ? pick(locale, prod.name, prod.nameRu) : t.productMissing,
+      name: prod ? pick(locale, prod.name, prod.nameRu, prod.nameEn) : t.productMissing,
       nameUz: prod?.name ?? t.productMissing,
       variantNameUz: null,
       addonsUz: [],
@@ -161,7 +161,7 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
     if (l.color && prod.colorOptions.length && !prod.colorOptions.includes(l.color)) {
       return { ...base, error: t.colorMissing };
     }
-    if (l.color && locale === "ru") base.colorLabel = prod.colorOptionsRu[prod.colorOptions.indexOf(l.color)] || l.color;
+    if (l.color) base.colorLabel = pickAt(locale, prod.colorOptions.indexOf(l.color), prod.colorOptions, prod.colorOptionsRu, prod.colorOptionsEn) || l.color;
 
     const others = <T extends { productId: number }>(c: T[]) => c.filter((a) => a.productId !== prod.id);
     const priced = priceLine(toPricing(prod, pvs, locale), l, others(addonCatalogFor(prod.floristId)));
@@ -195,7 +195,7 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
     const available = kind === "v" ? vars.find((v) => v.id === id)?.stockQuantity : prodById.get(id)?.stockQuantity;
     if (available != null && qty > available) {
       const prod = kind === "v" ? prodById.get(vars.find((v) => v.id === id)!.productId) : prodById.get(id);
-      const name = prod ? pick(locale, prod.name, prod.nameRu) : "";
+      const name = prod ? pick(locale, prod.name, prod.nameRu, prod.nameEn) : "";
       errors.push(fmt(t.stockLimit, { name, n: available }));
       for (const line of lines) {
         const hit = kind === "v" ? line.variantId === id : line.productId === id || line.addons.some((a) => a.productId === id);
@@ -214,7 +214,7 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
   if (cartFlorists.length > 1) errors.push(t.multiFlorist);
   const floristId = cartFlorists.length === 1 ? cartFlorists[0] : null;
   const floristRow = floristId ? floristRows.find((f) => f.id === floristId) : undefined;
-  const florist = floristRow ? { id: floristRow.id, slug: floristRow.slug, name: pick(locale, floristRow.name, floristRow.nameRu), isPlatform: floristRow.isPlatform } : null;
+  const florist = floristRow ? { id: floristRow.id, slug: floristRow.slug, name: pick(locale, floristRow.name, floristRow.nameRu, floristRow.nameEn), isPlatform: floristRow.isPlatform } : null;
   // Customers pay a marketplace shop directly, so Gulzor's own promo codes, service fee and pickup point
   // only apply to Gulzor's own shop.
   const marketplaceShop = florist ? !florist.isPlatform : false;
@@ -265,9 +265,9 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
     } else {
       zone = {
         id: row.z.id,
-        name: pick(locale, row.z.name, row.z.nameRu),
+        name: pick(locale, row.z.name, row.z.nameRu, row.z.nameEn),
         regionId: row.r.id,
-        regionName: pick(locale, row.r.name, row.r.nameRu),
+        regionName: pick(locale, row.r.name, row.r.nameRu, row.r.nameEn),
         nameUz: row.z.name,
         regionNameUz: row.r.name,
         fee: row.z.fee,
@@ -336,7 +336,7 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
     coupon,
     deliveryFee,
     serviceFee,
-    serviceFeeLabel: pick(locale, checkout.serviceFeeLabel, checkout.serviceFeeLabelRu),
+    serviceFeeLabel: pick(locale, checkout.serviceFeeLabel, checkout.serviceFeeLabelRu, checkout.serviceFeeLabelEn),
     total,
     zone,
     district,

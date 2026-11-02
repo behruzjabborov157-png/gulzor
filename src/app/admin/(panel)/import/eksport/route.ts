@@ -37,6 +37,10 @@ export async function GET() {
     p.shortDescriptionRu,
     p.descriptionRu,
     p.careInstructionsRu,
+    p.nameEn,
+    p.shortDescriptionEn,
+    p.descriptionEn,
+    p.careInstructionsEn,
   ]);
   const date = new Date().toISOString().slice(0, 10);
   return new Response(toCsv([PRODUCT_CSV_COLUMNS, ...rows]), {

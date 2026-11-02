@@ -1,3 +1,4 @@
+import { isLocale } from "@/i18n/config";
 import { timingSafeEqual } from "node:crypto";
 import { and, asc, avg, count, desc, eq, gte, inArray, sql, type SQL } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -84,7 +85,7 @@ export async function submitReview(
   const db = await getDb();
   const inserted = await db
     .insert(schema.reviews)
-    .values({ orderId: o.id, floristId: o.floristId, rating: input.rating, text, authorName, locale: input.locale === "ru" ? "ru" : "uz" })
+    .values({ orderId: o.id, floristId: o.floristId, rating: input.rating, text, authorName, locale: isLocale(input.locale) ? input.locale : "uz" })
     .onConflictDoNothing()
     .returning({ id: schema.reviews.id });
   if (!inserted.length) return { ok: false, message: "exists" };

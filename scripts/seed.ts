@@ -9,11 +9,17 @@ import { buildSearchText } from "@/lib/search";
 import { platformFloristId } from "@/lib/florists";
 import { CARE_BOX, CARE_CUT, CARE_DEFAULT, CARE_PLANT, CATEGORIES, PRODUCTS } from "./seed-data";
 import { CARE_RU, CATEGORIES_RU, PRODUCTS_RU, VARIANT_RU } from "./seed-data-ru";
+import { CARE_EN, CATEGORIES_EN, PRODUCTS_EN, VARIANT_EN } from "./seed-data-en";
 
 const careRu = new Map([
   [CARE_CUT, CARE_RU.cut],
   [CARE_BOX, CARE_RU.box],
   [CARE_PLANT, CARE_RU.plant],
+]);
+const careEn = new Map([
+  [CARE_CUT, CARE_EN.cut],
+  [CARE_BOX, CARE_EN.box],
+  [CARE_PLANT, CARE_EN.plant],
 ]);
 
 type Credit = { file: string; title: string; author: string; license: string; source: string };
@@ -66,6 +72,8 @@ async function main() {
           description: c.description,
           nameRu: CATEGORIES_RU[c.slug]?.name ?? null,
           descriptionRu: CATEGORIES_RU[c.slug]?.description ?? null,
+          nameEn: CATEGORIES_EN[c.slug]?.name ?? null,
+          descriptionEn: CATEGORIES_EN[c.slug]?.description ?? null,
           imageUrl: c.image ? `/images/demo/${c.image}.webp` : null,
           sortOrder: i,
         })),
@@ -76,6 +84,7 @@ async function main() {
     for (const p of noDemo ? [] : PRODUCTS) {
       const mode = p.variants ? "variants" : p.perStem ? "per_stem" : "fixed";
       const ru = PRODUCTS_RU[p.slug];
+      const en = PRODUCTS_EN[p.slug];
       const care = p.addon ? "" : (p.care ?? CARE_DEFAULT);
       const [row] = await tx
         .insert(schema.products)
@@ -93,13 +102,23 @@ async function main() {
           sizeLabelRu: ru?.size ?? null,
           flowerVarietiesRu: ru?.flowers ?? [],
           colorOptionsRu: ru?.colors ?? [],
+          nameEn: en?.name ?? null,
+          shortDescriptionEn: en?.short ?? null,
+          descriptionEn: en?.description ?? null,
+          careInstructionsEn: care ? (careEn.get(care) ?? null) : null,
+          sizeLabelEn: en?.size ?? null,
+          flowerVarietiesEn: en?.flowers ?? [],
+          colorOptionsEn: en?.colors ?? [],
           searchText: buildSearchText({
             name: p.name,
             nameRu: ru?.name,
+            nameEn: en?.name,
             shortDescription: p.short,
             shortDescriptionRu: ru?.short,
+            shortDescriptionEn: en?.short,
             flowerVarieties: p.flowers,
             flowerVarietiesRu: ru?.flowers,
+            flowerVarietiesEn: en?.flowers,
           }),
           flowerVarieties: p.flowers,
           stemCount: p.stems ?? null,
@@ -128,7 +147,7 @@ async function main() {
         .returning();
       if (p.variants) {
         await tx.insert(schema.productVariants).values(
-          p.variants.map((v, i) => ({ productId: row.id, name: v.name, nameRu: VARIANT_RU[v.name] ?? null, stemCount: v.stems ?? null, price: v.price, compareAtPrice: v.compareAt ?? null, sortOrder: i })),
+          p.variants.map((v, i) => ({ productId: row.id, name: v.name, nameRu: VARIANT_RU[v.name] ?? null, nameEn: VARIANT_EN[v.name] ?? null, stemCount: v.stems ?? null, price: v.price, compareAtPrice: v.compareAt ?? null, sortOrder: i })),
         );
       }
       const ids = [...new Set(p.categories.map((s) => catId.get(s)).filter((x): x is number => x != null))];

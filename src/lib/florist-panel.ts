@@ -179,6 +179,7 @@ export type ZoneInput = {
   regionId: number;
   name: string;
   nameRu: string | null;
+  nameEn?: string | null;
   description: string;
   fee: number;
   freeFrom: number | null;
@@ -227,12 +228,15 @@ export async function saveFloristZone(floristId: number, zoneId: number | null, 
 export type ProfileInput = {
   name: string;
   nameRu: string | null;
+  nameEn: string | null;
   description: string;
   descriptionRu: string | null;
+  descriptionEn: string | null;
   phone: string;
   telegramUsername: string;
   address: string;
   addressRu: string | null;
+  addressEn: string | null;
 };
 
 /** Reads the ProfileFields form (components/florist/profile-fields.tsx). */
@@ -241,12 +245,15 @@ export function profileFromForm(form: FormData): ProfileInput {
   return {
     name: text("name"),
     nameRu: text("nameRu") || null,
+    nameEn: text("nameEn") || null,
     description: text("description"),
     descriptionRu: text("descriptionRu") || null,
+    descriptionEn: text("descriptionEn") || null,
     phone: text("phone"),
     telegramUsername: text("telegramUsername"),
     address: text("address"),
     addressRu: text("addressRu") || null,
+    addressEn: text("addressEn") || null,
   };
 }
 
@@ -261,12 +268,15 @@ export async function updateFloristProfile(floristId: number, p: ProfileInput): 
     .set({
       name: p.name.trim().slice(0, 80),
       nameRu: p.nameRu?.trim() || null,
+      nameEn: p.nameEn?.trim() || null,
       description: p.description.trim().slice(0, 1000),
       descriptionRu: p.descriptionRu?.trim() || null,
+      descriptionEn: p.descriptionEn?.trim() || null,
       phone,
       telegramUsername: p.telegramUsername.trim().replace(/^@/, "").slice(0, 64),
       address: p.address.trim().slice(0, 200),
       addressRu: p.addressRu?.trim() || null,
+      addressEn: p.addressEn?.trim() || null,
       updatedAt: new Date(),
     })
     .where(eq(schema.florists.id, floristId));

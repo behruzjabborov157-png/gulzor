@@ -40,6 +40,12 @@ function ZoneFields({ z, regions, prefix, covered = [] }: { z: Zone | null; regi
         </label>
         <input id={id("nameRu")} name="nameRu" defaultValue={z?.nameRu ?? ""} maxLength={80} className="field py-2.5" />
       </div>
+      <div>
+        <label htmlFor={id("nameEn")} className="label">
+          Nomi (ingl.)
+        </label>
+        <input id={id("nameEn")} name="nameEn" defaultValue={z?.nameEn ?? ""} maxLength={80} className="field py-2.5" />
+      </div>
       <div className="sm:col-span-2 lg:col-span-3">
         <label htmlFor={id("desc")} className="label">
           Qaysi tumanlar / mahallalar

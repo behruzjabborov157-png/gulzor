@@ -298,6 +298,8 @@ export async function createOrder(
           actor: "customer",
           isPublic: true,
         });
+        // The language of the latest order is the customer's preferred one.
+        if (customerId) await tx.update(schema.customers).set({ locale }).where(eq(schema.customers.id, customerId));
         if (customerId && v.saveAddress && v.fulfillment === "delivery") {
           await tx.insert(schema.customerAddresses).values({
             customerId,

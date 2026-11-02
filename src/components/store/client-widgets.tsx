@@ -6,7 +6,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { setFavoriteAction, syncFavoritesAction } from "@/app/actions";
 import { BagIcon, CloseIcon, HeartIcon, MenuIcon, SearchIcon } from "@/components/ui/icons";
 import { useT } from "@/i18n/client";
-import { fmt, localePath, splitLocale } from "@/i18n/config";
+import { fmt, localePath, splitLocale, type Locale } from "@/i18n/config";
 import { addToCart, cartStore, favoritesStore, pushRecent } from "./cart";
 
 let remoteFavorites = false;
@@ -195,26 +195,74 @@ export function MobileNav({ items, extra }: { items: NavItem[]; extra: NavItem[]
   );
 }
 
-/** Link to the same page in the other language (query string kept). */
+/** Language names in their own language, so everyone finds theirs. */
+const LANGUAGES: { code: Locale; name: string; short: string }[] = [
+  { code: "uz", name: "O‘zbekcha", short: "O‘z" },
+  { code: "ru", name: "Русский", short: "Ру" },
+  { code: "en", name: "English", short: "En" },
+];
+
+/** Language menu: the same page in another language (query string kept). */
 export function LanguageSwitch() {
   const { locale, t } = useT();
   const pathname = usePathname();
   const search = useSearchParams();
-  const other = locale === "uz" ? "ru" : "uz";
+  const [open, setOpen] = useState(false);
   const { path } = splitLocale(pathname);
   const qs = search.toString();
+  const current = LANGUAGES.find((l) => l.code === locale)!;
   return (
-    <Link
-      href={localePath(other, path) + (qs ? `?${qs}` : "")}
-      hrefLang={other}
-      lang={other}
-      title={t.layout.language.switchTo}
-      aria-label={t.layout.language.switchTo}
-      className="flex h-10 min-w-10 items-center justify-center rounded-full px-2 text-sm font-semibold text-wine hover:bg-wine/5"
+    <div
+      className="relative"
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") setOpen(false);
+      }}
     >
-      {t.layout.language.short}
-    </Link>
+      <button
+        type="button"
+        aria-haspopup="true"
+        aria-expanded={open}
+        aria-label={`${t.layout.language.label}: ${current.name}`}
+        onClick={() => setOpen((v) => !v)}
+        className="flex h-10 min-w-10 items-center justify-center gap-1 rounded-full px-2 text-sm font-semibold text-wine hover:bg-wine/5"
+      >
+        {current.short}
+        <svg aria-hidden="true" viewBox="0 0 12 12" className={`h-3 w-3 transition ${open ? "rotate-180" : ""}`}>
+          <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {open ? (
+        <ul className="absolute right-0 z-50 mt-1 min-w-36 overflow-hidden rounded-xl border border-line bg-white py-1 shadow-lg">
+          {LANGUAGES.map((l) => (
+            <li key={l.code}>
+              <Link
+                href={localePath(l.code, path) + (qs ? `?${qs}` : "")}
+                hrefLang={l.code}
+                lang={l.code}
+                aria-current={l.code === locale ? "true" : undefined}
+                onClick={() => {
+                  setOpen(false);
+                  rememberLanguage(l.code);
+                }}
+                className={`flex items-center justify-between gap-3 px-4 py-2 text-sm hover:bg-cream ${l.code === locale ? "font-semibold text-wine" : "text-charcoal"}`}
+              >
+                {l.name}
+                {l.code === locale ? <span aria-hidden="true">✓</span> : null}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
+}
+
+/** Saves the chosen language on the customer's account (if signed in), for messages sent to them later. */
+function rememberLanguage(code: Locale) {
+  void fetch("/api/language", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ locale: code }) }).catch(() => {});
 }
 
 export function TrackRecent({ id }: { id: number }) {

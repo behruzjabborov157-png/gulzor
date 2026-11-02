@@ -20,7 +20,7 @@ const KIND_LABEL: Record<Category["kind"], string> = {
   collection: "Kolleksiyalar",
 };
 
-type VRow = { key: string; id: number | null; name: string; nameRu: string; stemCount: string; price: string; compareAtPrice: string; stockQuantity: string; isActive: boolean };
+type VRow = { key: string; id: number | null; name: string; nameRu: string; nameEn: string; stemCount: string; price: string; compareAtPrice: string; stockQuantity: string; isActive: boolean };
 
 function FieldError({ error }: { error?: string }) {
   return error ? <p className="mt-1 text-sm text-danger">{error}</p> : null;
@@ -52,6 +52,7 @@ export function ProductForm({
           id: v.id,
           name: v.name,
           nameRu: v.nameRu ?? "",
+          nameEn: v.nameEn ?? "",
           stemCount: v.stemCount?.toString() ?? "",
           price: String(v.price),
           compareAtPrice: v.compareAtPrice?.toString() ?? "",
@@ -59,9 +60,9 @@ export function ProductForm({
           isActive: v.isActive,
         }))
       : [
-          { key: "n1", id: null, name: "Kichik", nameRu: "Маленький", stemCount: "", price: "", compareAtPrice: "", stockQuantity: "", isActive: true },
-          { key: "n2", id: null, name: "O‘rtacha", nameRu: "Средний", stemCount: "", price: "", compareAtPrice: "", stockQuantity: "", isActive: true },
-          { key: "n3", id: null, name: "Katta", nameRu: "Большой", stemCount: "", price: "", compareAtPrice: "", stockQuantity: "", isActive: true },
+          { key: "n1", id: null, name: "Kichik", nameRu: "Маленький", nameEn: "Small", stemCount: "", price: "", compareAtPrice: "", stockQuantity: "", isActive: true },
+          { key: "n2", id: null, name: "O‘rtacha", nameRu: "Средний", nameEn: "Medium", stemCount: "", price: "", compareAtPrice: "", stockQuantity: "", isActive: true },
+          { key: "n3", id: null, name: "Katta", nameRu: "Большой", nameEn: "Large", stemCount: "", price: "", compareAtPrice: "", stockQuantity: "", isActive: true },
         ],
   );
   const fileRef = useRef<HTMLInputElement>(null);
@@ -141,15 +142,16 @@ export function ProductForm({
         {mode === "variants" ? (
           <div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] text-sm">
+              <table className="w-full min-w-[760px] text-sm">
                 <thead className="text-left text-xs text-muted">
-                  <tr><th className="pb-2">Nomi</th><th className="pb-2">Nomi (rus.)</th><th className="pb-2">Gullar soni</th><th className="pb-2">Narx *</th><th className="pb-2">Avvalgi narx</th><th className="pb-2">Ombor</th><th className="pb-2">Faol</th><th /></tr>
+                  <tr><th className="pb-2">Nomi</th><th className="pb-2">Nomi (rus.)</th><th className="pb-2">Nomi (ingl.)</th><th className="pb-2">Gullar soni</th><th className="pb-2">Narx *</th><th className="pb-2">Avvalgi narx</th><th className="pb-2">Ombor</th><th className="pb-2">Faol</th><th /></tr>
                 </thead>
                 <tbody>
                   {rows.map((r, i) => (
                     <tr key={r.key}>
                       <td className="pr-2 pb-2"><input type="hidden" name="variant_id" value={r.id ?? ""} /><input name="variant_name" defaultValue={r.name} className="field py-2" aria-label="O‘lcham nomi" /></td>
                       <td className="pr-2 pb-2"><input name="variant_name_ru" defaultValue={r.nameRu} className="field py-2" aria-label="O‘lcham nomi (rus tilida)" /></td>
+                      <td className="pr-2 pb-2"><input name="variant_name_en" defaultValue={r.nameEn} className="field py-2" aria-label="O‘lcham nomi (ingliz tilida)" /></td>
                       <td className="pr-2 pb-2"><input name="variant_stems" defaultValue={r.stemCount} inputMode="numeric" className="field w-24 py-2" aria-label="Gullar soni" /></td>
                       <td className="pr-2 pb-2"><input name="variant_price" defaultValue={r.price} inputMode="numeric" className="field w-32 py-2" aria-label="Narx" /></td>
                       <td className="pr-2 pb-2"><input name="variant_compare" defaultValue={r.compareAtPrice} inputMode="numeric" className="field w-32 py-2" aria-label="Avvalgi narx" /></td>
@@ -161,7 +163,7 @@ export function ProductForm({
                 </tbody>
               </table>
             </div>
-            <button type="button" className="btn-secondary btn-sm mt-2" onClick={() => setRows((x) => [...x, { key: `n${Date.now()}`, id: null, name: "", nameRu: "", stemCount: "", price: "", compareAtPrice: "", stockQuantity: "", isActive: true }])}>
+            <button type="button" className="btn-secondary btn-sm mt-2" onClick={() => setRows((x) => [...x, { key: `n${Date.now()}`, id: null, name: "", nameRu: "", nameEn: "", stemCount: "", price: "", compareAtPrice: "", stockQuantity: "", isActive: true }])}>
               + O‘lcham qo‘shish
             </button>
             <FieldError error={err("variants")} />
@@ -289,6 +291,34 @@ export function ProductForm({
         <div className="grid gap-4 sm:grid-cols-2">
           {text("seoTitleRu", "SEO sarlavha (rus.)", p?.seoTitleRu, { maxLength: 70, lang: "ru" })}
           {text("seoDescriptionRu", "SEO tavsif (rus.)", p?.seoDescriptionRu, { maxLength: 170, lang: "ru" })}
+        </div>
+      </section>
+
+      <section className="card space-y-4 p-6">
+        <div>
+          <h2 className="text-2xl">Ingliz tilidagi versiya</h2>
+          <p className="mt-1 text-sm text-muted">Saytning ingliz tilidagi sahifasida (/en) ko‘rsatiladi. Bo‘sh qoldirilgan maydonlar o‘rniga o‘zbekcha matn chiqadi.</p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {text("nameEn", "Nomi (ingl.)", p?.nameEn, { maxLength: 120, lang: "en" })}
+          {text("sizeLabelEn", "O‘lcham tavsifi (ingl.)", p?.sizeLabelEn, { lang: "en" })}
+        </div>
+        {text("shortDescriptionEn", "Qisqa tavsif (ingl.)", p?.shortDescriptionEn, { maxLength: 200, lang: "en" })}
+        <div>
+          <label htmlFor="p-descriptionEn" className="label">To‘liq tavsif (ingl.)</label>
+          <textarea id="p-descriptionEn" name="descriptionEn" lang="en" defaultValue={p?.descriptionEn ?? ""} className="field min-h-28" />
+        </div>
+        <div>
+          <label htmlFor="p-careEn" className="label">Parvarish (ingl.)</label>
+          <textarea id="p-careEn" name="careInstructionsEn" lang="en" defaultValue={p?.careInstructionsEn ?? ""} className="field min-h-20" />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {text("flowerVarietiesEn", "Gul turlari (ingl., vergul bilan)", p?.flowerVarietiesEn.join(", "), { lang: "en" })}
+          {text("colorOptionsEn", "Rang variantlari (ingl., o‘zbekcha bilan bir xil tartibda)", p?.colorOptionsEn.join(", "), { lang: "en", placeholder: "Red, White, Pink" })}
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {text("seoTitleEn", "SEO sarlavha (ingl.)", p?.seoTitleEn, { maxLength: 70, lang: "en" })}
+          {text("seoDescriptionEn", "SEO tavsif (ingl.)", p?.seoDescriptionEn, { maxLength: 170, lang: "en" })}
         </div>
       </section>
 

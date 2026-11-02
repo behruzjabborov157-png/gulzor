@@ -1,17 +1,19 @@
-/** Formatting helpers (Uzbek Latin by default, Russian when asked). Pure — safe on client and server. */
+/** Formatting helpers (Uzbek Latin by default, Russian or English when asked). Pure — safe on client and server. */
 
-type Lang = "uz" | "ru";
+type Lang = "uz" | "ru" | "en";
 
 const NBSP = " ";
 
-/** 149000 -> "149 000 so‘m" (uz) / "149 000 сум" (ru) */
+const CURRENCY: Record<Lang, string> = { uz: "so‘m", ru: "сум", en: "UZS" };
+
+/** 149000 -> "149 000 so‘m" (uz) / "149 000 сум" (ru) / "149,000 UZS" (en) */
 export function formatUZS(amount: number, locale: Lang = "uz"): string {
   const n = Math.round(amount);
   const sign = n < 0 ? "−" : "";
   const digits = Math.abs(n)
     .toString()
-    .replace(/\B(?=(\d{3})+(?!\d))/g, NBSP);
-  return `${sign}${digits}${NBSP}${locale === "ru" ? "сум" : "so‘m"}`;
+    .replace(/\B(?=(\d{3})+(?!\d))/g, locale === "en" ? "," : NBSP);
+  return `${sign}${digits}${NBSP}${CURRENCY[locale]}`;
 }
 
 export const UZ_MONTHS = [
@@ -22,12 +24,15 @@ export const UZ_WEEKDAYS = ["yakshanba", "dushanba", "seshanba", "chorshanba", "
 /** Genitive month names, as used in dates ("26 октября"). */
 const RU_MONTHS = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
 const RU_WEEKDAYS = ["воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота"];
+const EN_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const EN_WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-/** "2026-10-26" -> "26-oktabr, dushanba" (uz) / "26 октября, понедельник" (ru) */
+/** "2026-10-26" -> "26-oktabr, dushanba" (uz) / "26 октября, понедельник" (ru) / "Monday, 26 October" (en) */
 export function formatDateISO(iso: string, withWeekday = true, locale: Lang = "uz"): string {
   const [y, m, d] = iso.split("-").map(Number);
   const wd = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
   if (locale === "ru") return `${d} ${RU_MONTHS[m - 1]}${withWeekday ? `, ${RU_WEEKDAYS[wd]}` : ""}`;
+  if (locale === "en") return `${withWeekday ? `${EN_WEEKDAYS[wd]}, ` : ""}${d} ${EN_MONTHS[m - 1]}`;
   return `${d}-${UZ_MONTHS[m - 1]}${withWeekday ? `, ${UZ_WEEKDAYS[wd]}` : ""}`;
 }
 

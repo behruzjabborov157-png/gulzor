@@ -1155,3 +1155,51 @@ test("places of Uzbekistan: SOATO import, district-by-district delivery, mahalla
     await db.update(schema.deliveryRegions).set({ isActive: false }).where(eq(schema.deliveryRegions.id, city.id));
   }
 });
+
+test("English: translated products and messages, the customer's language is saved, the bot speaks English", async () => {
+  const { quoteCart } = await import("@/lib/quote");
+  const { POST: languageApi } = await import("@/app/api/language/route");
+  const db = await getDb();
+  await db
+    .update(schema.products)
+    .set({ nameEn: "Test roses", colorOptions: ["Qizil"], colorOptionsRu: ["Красный"], colorOptionsEn: ["Red"], stockQuantity: null, price: 200_000 })
+    .where(eq(schema.products.id, productId));
+
+  const q = await quoteCart({ lines: [{ productId, quantity: 1, addons: [], color: "Qizil" }], fulfillment: "delivery", zoneId }, { locale: "en" });
+  assert.equal(q.lines[0].name, "Test roses");
+  assert.equal(q.lines[0].nameUz, "Test atirgullar", "orders keep the Uzbek original");
+  assert.equal(q.lines[0].colorLabel, "Red");
+  const bad = await createOrder(checkout({ customerPhone: "123" }), null, "en");
+  assert.ok(!bad.ok && /Invalid phone number/.test(bad.fieldErrors?.customerPhone ?? ""), JSON.stringify(bad));
+
+  const [c] = await db.insert(schema.customers).values({ name: "Lang", phone: "+998907770011", passwordHash: "x" }).returning();
+  assert.equal(c.locale, "uz");
+  const placed = await createOrder(checkout({ lines: [{ productId, quantity: 1, addons: [], color: "Qizil" }] }), c.id, "en");
+  assert.ok(placed.ok, JSON.stringify(placed));
+  const [after] = await db.select().from(schema.customers).where(eq(schema.customers.id, c.id));
+  assert.equal(after.locale, "en");
+  const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, placed.orderId));
+  assert.equal(o.locale, "en");
+
+  const post = (body: string, type = "application/json") => languageApi(new Request("http://x/api/language", { method: "POST", headers: { "Content-Type": type }, body }));
+  assert.equal((await post('{"locale":"en"}', "text/plain")).status, 415, "a plain cross-site form is refused");
+  assert.equal((await post('{"locale":"fr"}')).status, 400);
+
+  const calls: { method: string; body: Record<string, unknown> }[] = [];
+  setBotTransport(async (method, body) => {
+    calls.push({ method, body });
+    return { ok: true, result: { message_id: 99 } };
+  });
+  const chat = { id: 900088, type: "private" };
+  const from = { id: 900088, first_name: "En", language_code: "en" };
+  try {
+    await handleUpdate({ message: { message_id: 1, chat, from, text: "/start" } });
+    assert.match(String(calls.at(-1)?.body.text), /Choose a language/);
+    await handleUpdate({ callback_query: { id: "cb1", from, data: "L:en", message: { message_id: 1, chat } } });
+    assert.ok(calls.some((c) => /Welcome to Gulzor/.test(String(c.body.text))));
+    await handleUpdate({ message: { message_id: 2, chat, from, text: "🛒 Cart" } });
+    assert.match(String(calls.at(-1)?.body.text), /Your cart is empty/);
+  } finally {
+    setBotTransport(null);
+  }
+});

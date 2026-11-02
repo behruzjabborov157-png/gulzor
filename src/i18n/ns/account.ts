@@ -114,5 +114,64 @@ const ru: typeof uz = {
   },
 };
 
-const ns = { uz, ru };
+const en: typeof uz = {
+  title: "My account",
+  intro:
+    "An account is optional — you can order without signing up. It is handy for your order history, saved addresses and favorites.",
+  hello: "Hello, {name}!",
+  logout: "Sign out",
+  orders: "My orders",
+  noOrders: "No orders yet",
+  toCatalog: "Go to catalog",
+  orderLine: "{created} · delivery {date} · {status}",
+  repeat: "Order again",
+  addresses: "Saved addresses",
+  noAddresses: "Tick “Save the address to my account” when ordering and the address will appear here.",
+  remove: "Delete",
+  favoritesLink: "Favorites →",
+  // Auth forms
+  tabLogin: "Sign in",
+  tabRegister: "Sign up",
+  phone: "Phone number",
+  password: "Password",
+  checking: "Checking…",
+  login: "Sign in",
+  name: "Your name",
+  passwordHint: "At least 8 characters",
+  saving: "Saving…",
+  register: "Create account",
+  // Favorites
+  favorites: "Favorites",
+  favoritesEmpty: "Your favorites list is empty",
+  favoritesEmptyText: "Save the bouquets you like with the heart icon — you will find them here quickly later.",
+  deleteLink: "Delete account",
+  deleteAccount: {
+    title: "Delete account",
+    intro: "You can delete your account on the Gulzor website and Android app yourself at any time.",
+    deletedTitle: "Your account has been deleted",
+    deletedText: "Your account, saved addresses and favorites have been deleted. You have been signed out on all devices.",
+    whatDeleted: "Deleted immediately",
+    deletedList: ["Account: name, phone number and password (hash)", "Saved delivery addresses", "Favorites list of the account", "Sign-in sessions on all devices"],
+    whatKept: "Kept",
+    keptList: [
+      "Orders already placed (names, phone numbers and addresses of the customer and recipient, contents) — to fulfil them and for accounting. They are no longer linked to the account; you can ask the shop separately to delete them.",
+    ],
+    stepsTitle: "How to delete it",
+    steps: ["Sign in to your account (phone number and password).", "On this page, enter your password and tick the confirmation box.", "Press “Delete account permanently”."],
+    signIn: "Sign in",
+    noAccess: "If you forgot your password or cannot sign in, contact the shop — we will check that the account is yours and delete it.",
+    contactSoon: "Shop contacts will be added soon.",
+    signedInAs: "Account: {name}, {phone}",
+    password: "Current password",
+    confirm: "I understand: the account and its data will be deleted permanently and this cannot be undone.",
+    submit: "Delete account permanently",
+    deleting: "Deleting…",
+    confirmRequired: "Please confirm the deletion",
+    passwordRequired: "Enter your password",
+    wrongPassword: "Wrong password",
+    home: "Go to home page",
+  },
+};
+
+const ns = { uz, ru, en };
 export default ns;

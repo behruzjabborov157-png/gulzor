@@ -61,5 +61,37 @@ const ru: typeof uz = {
   credits: "Авторы фотографий и лицензии",
 };
 
-const ns = { uz, ru };
+const en: typeof uz = {
+  siteTitle: "Gulzor — flower delivery in Tashkent and online flower orders",
+  siteDescription:
+    "Gulzor is an online flower shop: bouquets, roses, tulips, flowers in boxes and gifts. Prices in UZS; you choose the delivery date and time.",
+  ogLocale: "en_US",
+  catalogTitle: "Order flowers online — bouquet prices",
+  catalogDescription:
+    "All flowers and bouquets: roses, tulips, chrysanthemums, flowers in boxes and baskets. Filter by price, flower and occasion.",
+  categoryTitle: "{name} — flower delivery in Tashkent",
+  categoryDescription: "{description} Prices in UZS, online ordering and delivery.",
+  productTitle: "{name} — price and ordering",
+  notFound: "Not found",
+  productNotFound: "Product not found",
+  deliveryTitle: "Flower delivery in Tashkent — prices and terms",
+  deliveryDescription:
+    "Flower delivery areas, fees, time slots and payment methods. The delivery fee is shown before you place the order.",
+  customTitle: "Order a custom bouquet",
+  customDescription:
+    "Describe the bouquet you want or send a reference photo — a florist will contact you to agree on the price and timing.",
+  trackTitle: "Track your order",
+  trackDescription: "Check the status of your flower order with the order number and phone number.",
+  cart: "Cart",
+  checkout: "Checkout",
+  order: "Order status",
+  favorites: "Favorites",
+  account: "My account",
+  deleteAccount: "Delete account",
+  privacy: "Privacy policy",
+  offer: "Terms of sale",
+  credits: "Photo credits and licenses",
+};
+
+const ns = { uz, ru, en };
 export default ns;

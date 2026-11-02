@@ -56,5 +56,34 @@ const ru: typeof uz = {
   request: "Оставить заявку",
 };
 
-const ns = { uz, ru };
+const en: typeof uz = {
+  title: "Delivery and payment",
+  intro: "We deliver only to the areas listed below. The delivery fee and available times are shown before you confirm the order.",
+  zones: "Areas and prices",
+  none: "Delivery areas have not been set up yet.",
+  colZone: "Area",
+  colFee: "Fee",
+  colFree: "Free",
+  colMin: "Minimum order",
+  colSameDay: "Same day",
+  freeFrom: "from {amount}",
+  sameDayUntil: "Yes, order by {time}",
+  no: "No",
+  sameDayNote:
+    "Same-day delivery depends on the order time, the preparation time of the bouquet and free time slots. When it is not possible, those slots cannot be selected at checkout.",
+  slots: "Time slots",
+  pickup: "Pickup",
+  pickupText: "You can pick up your order free of charge: {address}.",
+  pickupSoon: "the address will be published soon",
+  payment: "Payment methods",
+  noPayments: "Payment methods have not been set up yet.",
+  marketplacePayment:
+    "The methods above apply to orders from the Gulzor shop. Other shops deliver their orders themselves and take cash on delivery; their areas and prices are on the shop page.",
+  otherTitle: "Your area is not listed?",
+  otherText: "We will check separately whether delivery to another city or district is possible.",
+  telegram: "Message us on Telegram",
+  request: "Send a request",
+};
+
+const ns = { uz, ru, en };
 export default ns;

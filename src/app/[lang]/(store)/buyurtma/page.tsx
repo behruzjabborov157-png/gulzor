@@ -36,7 +36,7 @@ export default async function CheckoutPage() {
           zones: r.zones.map((z) => ({ id: z.id, floristId: z.floristId, name: z.name, description: z.description, fee: z.fee })),
           districts: r.districts,
         }))}
-        pickup={{ enabled: checkout.pickupEnabled, address: pick(locale, checkout.pickupAddress, checkout.pickupAddressRu) }}
+        pickup={{ enabled: checkout.pickupEnabled, address: pick(locale, checkout.pickupAddress, checkout.pickupAddressRu, checkout.pickupAddressEn) }}
         payments={availablePaymentMethods(checkout, locale)}
         shopPayments={availablePaymentMethods(checkout, locale, { platformShop: false })}
         platformFloristId={platformId}

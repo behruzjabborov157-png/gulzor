@@ -216,6 +216,10 @@ export async function saveCategoryAction(categoryId: number | null, _: FormState
     descriptionRu: String(form.get("descriptionRu") ?? "").trim() || null,
     seoTitleRu: String(form.get("seoTitleRu") ?? "").trim() || null,
     seoDescriptionRu: String(form.get("seoDescriptionRu") ?? "").trim() || null,
+    nameEn: String(form.get("nameEn") ?? "").trim() || null,
+    descriptionEn: String(form.get("descriptionEn") ?? "").trim() || null,
+    seoTitleEn: String(form.get("seoTitleEn") ?? "").trim() || null,
+    seoDescriptionEn: String(form.get("seoDescriptionEn") ?? "").trim() || null,
     imageUrl: String(form.get("imageUrl") ?? "").trim() || null,
     sortOrder: int(form.get("sortOrder")) || 0,
     isActive: form.get("isActive") === "on",
@@ -249,6 +253,7 @@ export async function saveRegionAction(regionId: number | null, _: FormState, fo
     sortOrder: int(form.get("sortOrder")) || 0,
     note: String(form.get("note") ?? "").trim(),
     nameRu: String(form.get("nameRu") ?? "").trim() || null,
+    nameEn: String(form.get("nameEn") ?? "").trim() || null,
     locationId,
   };
   if (regionId) {
@@ -285,6 +290,8 @@ export async function saveZoneAction(zoneId: number | null, _: FormState, form: 
     description: String(form.get("description") ?? "").trim(),
     nameRu: String(form.get("nameRu") ?? "").trim() || null,
     descriptionRu: String(form.get("descriptionRu") ?? "").trim() || null,
+    nameEn: String(form.get("nameEn") ?? "").trim() || null,
+    descriptionEn: String(form.get("descriptionEn") ?? "").trim() || null,
     fee,
     freeFrom,
     minOrder,
@@ -401,6 +408,8 @@ export async function saveSettingsAction(_: FormState, form: FormData): Promise<
     workingHours: s("workingHours"),
     workingHoursRu: s("workingHoursRu"),
     addressRu: s("addressRu"),
+    workingHoursEn: s("workingHoursEn"),
+    addressEn: s("addressEn"),
     legalName: s("legalName"),
   });
   await saveSetting("checkout", {
@@ -409,6 +418,8 @@ export async function saveSettingsAction(_: FormState, form: FormData): Promise<
     serviceFeeLabel: s("serviceFeeLabel") || "Xizmat haqi",
     serviceFeeLabelRu: s("serviceFeeLabelRu") || "Сервисный сбор",
     pickupAddressRu: s("pickupAddressRu"),
+    serviceFeeLabelEn: s("serviceFeeLabelEn") || "Service fee",
+    pickupAddressEn: s("pickupAddressEn"),
     pickupEnabled: form.get("pickupEnabled") === "on",
     pickupAddress: s("pickupAddress"),
     pickupPrepMinutes: n("pickupPrepMinutes", 60),
@@ -467,7 +478,7 @@ export async function importProductsAction(_: FormState, form: FormData): Promis
   for (const [i, row] of rows.slice(1).entries()) {
     if (row.every((c) => !c.trim())) continue;
     const r = Object.fromEntries(header.map((h, j) => [h, (row[j] ?? "").trim()]));
-    const ruCol = (k: string) => (header.includes(k) ? r[k] || null : undefined);
+    const optCol = (k: string) => (header.includes(k) ? r[k] || null : undefined);
     const line = i + 2;
     const slug = slugify(r.slug || r.name);
     const price = Number(r.price.replace(/\s/g, ""));
@@ -496,11 +507,15 @@ export async function importProductsAction(_: FormState, form: FormData): Promis
       description: r.description ?? "",
       careInstructions: r.care_instructions ?? "",
       flowerVarieties: (r.flower_varieties || "").split("|").map((x) => x.trim()).filter(Boolean),
-      // Russian columns are optional: only touch them when the CSV has them (older files must not wipe translations).
-      nameRu: ruCol("name_ru"),
-      shortDescriptionRu: ruCol("short_description_ru"),
-      descriptionRu: ruCol("description_ru"),
-      careInstructionsRu: ruCol("care_instructions_ru"),
+      // Translation columns are optional: only touch them when the CSV has them (older files must not wipe translations).
+      nameRu: optCol("name_ru"),
+      shortDescriptionRu: optCol("short_description_ru"),
+      descriptionRu: optCol("description_ru"),
+      careInstructionsRu: optCol("care_instructions_ru"),
+      nameEn: optCol("name_en"),
+      shortDescriptionEn: optCol("short_description_en"),
+      descriptionEn: optCol("description_en"),
+      careInstructionsEn: optCol("care_instructions_en"),
       stemCount: r.stem_count ? Number(r.stem_count) || null : null,
       sizeLabel: r.size_label || null,
       price,

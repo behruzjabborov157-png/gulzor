@@ -1,3 +1,4 @@
+import { LANGUAGE_NAME_UZ } from "@/i18n/config";
 import { getDb, schema } from "@/db";
 import { formatDateISO, formatPhone, formatUZS } from "@/lib/format";
 import { siteUrl } from "@/lib/settings";
@@ -73,7 +74,7 @@ export function orderMessage(o: OrderForMessage, heading = "🌸 Yangi buyurtma"
     opts.shop ? `<b>Do‘kon:</b> ${esc(opts.shop)}` : null,
     "",
     `<b>Mijoz:</b> ${esc(o.customerName)}, ${formatPhone(o.customerPhone)}`,
-    o.locale === "ru" ? "<b>Mijoz tili:</b> rus tili" : null,
+    o.locale !== "uz" ? `<b>Mijoz tili:</b> ${LANGUAGE_NAME_UZ[o.locale] ?? o.locale}` : null,
     o.telegramUserId
       ? `<b>Telegram:</b> <a href="tg://user?id=${o.telegramUserId}">${o.telegramUsername ? "@" + esc(o.telegramUsername) : esc(o.customerName)}</a> (Mini App orqali)`
       : null,
