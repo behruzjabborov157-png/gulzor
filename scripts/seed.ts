@@ -202,6 +202,10 @@ async function main() {
     }
   });
 
+  // Link the delivery cities to the imported places so checkout can ask for the district.
+  const { linkDeliveryRegions } = await import("@/lib/locations");
+  await linkDeliveryRegions(db);
+
   console.log(
     noDemo
       ? `Seeded ${CATEGORIES.length} categories, time slots and settings. Delivery zones are OFF — set real fees in /admin/yetkazib-berish, then add products.`

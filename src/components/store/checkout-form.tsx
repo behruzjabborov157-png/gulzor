@@ -2,6 +2,7 @@
 
 import { useTelegram } from "@/components/telegram";
 import { formatPhoneInput, PhoneInput } from "@/components/ui/phone-input";
+import { Combobox, type ComboItem } from "@/components/ui/combobox";
 import Link from "next/link";
 import { useState } from "react";
 import { checkoutAction } from "@/app/actions";
@@ -13,13 +14,23 @@ import { cartFlorist, cartStore, clearCart, toServerLines } from "./cart";
 import { Summary } from "./cart-view";
 import { prefsStore, useQuote } from "./use-quote";
 
-type Region = { id: number; name: string; zones: { id: number; floristId: number; name: string; description: string; fee: number }[] };
+type Region = {
+  id: number;
+  name: string;
+  zones: { id: number; floristId: number; name: string; description: string; fee: number }[];
+  /** Districts to choose from with the zones serving each; empty = the region asks no district (free text). */
+  districts: { id: number; name: string; zoneIds: number[] }[];
+};
 type SavedAddress = {
   id: number;
   label: string;
   recipientName: string;
   recipientPhone: string;
   zoneId: number | null;
+  districtId: number | null;
+  mahallaId: number | null;
+  latitude: number | null;
+  longitude: number | null;
   district: string;
   neighborhood: string;
   address: string;
@@ -100,6 +111,10 @@ export function CheckoutForm(props: CheckoutProps) {
     anonymous: false,
     fulfillment: "delivery" as "delivery" | "pickup",
     regionId: null as number | null,
+    districtId: null as number | null,
+    mahallaId: null as number | null,
+    mahallaCustom: false,
+    point: null as { latitude: number; longitude: number } | null,
     district: "",
     neighborhood: "",
     address: "",
@@ -149,7 +164,43 @@ export function CheckoutForm(props: CheckoutProps) {
     regions[0]?.id ??
     null;
   const region = regions.find((r) => r.id === regionId) ?? null;
-  const zoneId = region?.zones.some((z) => z.id === prefs.zoneId) ? prefs.zoneId : (region?.zones[0]?.id ?? null);
+  // Regions linked to the places list are served district by district: the district decides which zones apply.
+  const districts = (region?.districts ?? [])
+    .map((d) => ({ ...d, zoneIds: d.zoneIds.filter((id) => region!.zones.some((z) => z.id === id)) }))
+    .filter((d) => d.zoneIds.length);
+  const asksDistrict = districts.length > 0;
+  const district = asksDistrict ? (districts.find((d) => d.id === f.districtId) ?? null) : null;
+  const zoneOptions = district ? region!.zones.filter((z) => district.zoneIds.includes(z.id)) : (region?.zones ?? []);
+  const zoneId = zoneOptions.some((z) => z.id === prefs.zoneId) ? prefs.zoneId : (zoneOptions[0]?.id ?? null);
+
+  // Mahallas are loaded per district when it is chosen (never the whole country).
+  const [mahallas, setMahallas] = useState<Record<number, ComboItem[] | "loading" | "error">>({});
+  function loadMahallas(id: number | null) {
+    if (!id || mahallas[id]) return;
+    setMahallas((m) => ({ ...m, [id]: "loading" }));
+    fetch(`/api/locations?parent=${id}&lang=${locale}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: { items: ComboItem[] }) => setMahallas((m) => ({ ...m, [id]: d.items })))
+      .catch(() => setMahallas((m) => ({ ...m, [id]: "error" })));
+  }
+  const mahallaList = district ? mahallas[district.id] : undefined;
+  const mahallaItems = Array.isArray(mahallaList) ? mahallaList : [];
+  const mahallaChoice = !f.mahallaCustom && mahallaItems.length > 0;
+  const mahalla = mahallaChoice ? (mahallaItems.find((m) => m.id === f.mahallaId) ?? null) : null;
+
+  const [locState, setLocState] = useState<"idle" | "busy" | "denied">("idle");
+  function shareLocation() {
+    if (!navigator.geolocation) return setLocState("denied");
+    setLocState("busy");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        set("point", { latitude: Math.round(pos.coords.latitude * 1e6) / 1e6, longitude: Math.round(pos.coords.longitude * 1e6) / 1e6 });
+        setLocState("idle");
+      },
+      () => setLocState("denied"),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
+    );
+  }
 
   // useQuote re-requests only when the serialized input changes, so no memoization is needed here.
   const quoteInput =
@@ -159,6 +210,7 @@ export function CheckoutForm(props: CheckoutProps) {
           couponCode: prefs.couponCode || null,
           fulfillment: fulfillment,
           zoneId: fulfillment === "delivery" ? zoneId : null,
+          districtId: fulfillment === "delivery" && district ? district.id : null,
           date: f.date,
         }
       : null;
@@ -210,8 +262,12 @@ export function CheckoutForm(props: CheckoutProps) {
         recipientPhone: f.recipientPhone,
         anonymous: f.anonymous,
         zoneId: fulfillment === "delivery" ? zoneId : null,
-        district: f.district,
-        neighborhood: f.neighborhood,
+        districtId: district?.id ?? null,
+        mahallaId: mahalla?.id ?? null,
+        latitude: f.point?.latitude ?? null,
+        longitude: f.point?.longitude ?? null,
+        district: district ? district.name : f.district,
+        neighborhood: mahallaChoice ? (mahalla?.name ?? "") : f.neighborhood,
         address: f.address,
         apartment: f.apartment,
         landmark: f.landmark,
@@ -240,6 +296,7 @@ export function CheckoutForm(props: CheckoutProps) {
   }
 
   const slots = quote?.slots ?? [];
+  // A missing district is reported by the server on submit, like every other required field.
   const canReview = !!quote && quote.errors.length === 0 && slotId != null && !loading;
 
   return (
@@ -355,6 +412,10 @@ export function CheckoutForm(props: CheckoutProps) {
                           recipientName: a.recipientName,
                           recipientPhone: a.recipientPhone,
                           district: a.district,
+                          districtId: a.districtId,
+                          mahallaId: a.mahallaId,
+                          mahallaCustom: !a.mahallaId && !!a.neighborhood,
+                          point: a.latitude != null && a.longitude != null ? { latitude: a.latitude, longitude: a.longitude } : null,
                           neighborhood: a.neighborhood,
                           address: a.address,
                           apartment: a.apartment,
@@ -362,6 +423,7 @@ export function CheckoutForm(props: CheckoutProps) {
                           regionId: regions.find((r) => r.zones.some((z) => z.id === a.zoneId))?.id ?? p.regionId,
                         }));
                         if (a.zoneId) setPrefs((p) => ({ ...p, zoneId: a.zoneId }));
+                        loadMahallas(a.districtId);
                       }}
                     >
                       <option value="">{t.select}</option>
@@ -378,7 +440,7 @@ export function CheckoutForm(props: CheckoutProps) {
                     <select id="region" className="field" value={regionId ?? ""}
                       onChange={(e) => {
                         const id = Number(e.target.value);
-                        set("regionId", id);
+                        setF((p) => ({ ...p, regionId: id, districtId: null, mahallaId: null }));
                         setPrefs((p) => ({ ...p, zoneId: regions.find((r) => r.id === id)?.zones[0]?.id ?? null }));
                       }}
                     >
@@ -389,27 +451,90 @@ export function CheckoutForm(props: CheckoutProps) {
                       ))}
                     </select>
                   </Field>
-                  <Field id="zoneId" label={t.zone} error={fe("zoneId")}>
-                    <select {...inputProps("zoneId")} className="field" value={zoneId ?? ""} onChange={(e) => setPrefs((p) => ({ ...p, zoneId: Number(e.target.value) || null }))}>
-                      {region?.zones.map((z) => (
-                        <option key={z.id} value={z.id}>
-                          {z.name} — {uzs(z.fee)}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
+                  {asksDistrict ? (
+                    <Field id="districtId" label={t.districtPick} error={fe("districtId")}>
+                      <Combobox
+                        id="districtId"
+                        items={districts}
+                        value={district?.id ?? null}
+                        onChange={(id) => {
+                          setF((p) => ({ ...p, districtId: id, mahallaId: null }));
+                          loadMahallas(id);
+                        }}
+                        placeholder={t.select}
+                        noMatches={t.noMatches}
+                        invalid={!!fe("districtId")}
+                      />
+                    </Field>
+                  ) : null}
+                  {!asksDistrict || district ? (
+                    <Field id="zoneId" label={asksDistrict ? t.zoneFor : t.zone} error={fe("zoneId")}>
+                      {asksDistrict && zoneOptions.length === 1 ? (
+                        <p id="zoneId" className="field flex items-center bg-cream">
+                          {zoneOptions[0].name} — {uzs(zoneOptions[0].fee)}
+                        </p>
+                      ) : (
+                        <select {...inputProps("zoneId")} className="field" value={zoneId ?? ""} onChange={(e) => setPrefs((p) => ({ ...p, zoneId: Number(e.target.value) || null }))}>
+                          {zoneOptions.map((z) => (
+                            <option key={z.id} value={z.id}>
+                              {z.name} — {uzs(z.fee)}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </Field>
+                  ) : null}
                 </div>
-                {region?.zones.find((z) => z.id === zoneId)?.description ? (
+                {!asksDistrict && region?.zones.find((z) => z.id === zoneId)?.description ? (
                   <p className="-mt-2 text-xs text-muted">{fmt(t.includes, { list: region.zones.find((z) => z.id === zoneId)!.description })}</p>
                 ) : null}
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field id="district" label={t.district} error={fe("district")}>
-                    <input {...inputProps("district")} className="field" value={f.district} onChange={(e) => set("district", e.target.value)} maxLength={80} />
-                  </Field>
-                  <Field id="neighborhood" label={t.neighborhood} error={fe("neighborhood")}>
-                    <input {...inputProps("neighborhood")} className="field" value={f.neighborhood} onChange={(e) => set("neighborhood", e.target.value)} maxLength={80} />
-                  </Field>
-                </div>
+                {asksDistrict ? (
+                  district ? (
+                    <Field id="neighborhood" label={t.mahalla} error={fe("neighborhood")}>
+                      {mahallaChoice ? (
+                        <Combobox
+                          id="neighborhood"
+                          items={mahallaItems}
+                          value={mahalla?.id ?? null}
+                          onChange={(id) => set("mahallaId", id)}
+                          placeholder={t.mahallaSearch}
+                          noMatches={t.noMatches}
+                          invalid={!!fe("neighborhood")}
+                        />
+                      ) : (
+                        <input
+                          {...inputProps("neighborhood")}
+                          className="field"
+                          placeholder={t.mahallaCustom}
+                          disabled={mahallaList === "loading"}
+                          value={f.neighborhood}
+                          onChange={(e) => set("neighborhood", e.target.value)}
+                          maxLength={80}
+                        />
+                      )}
+                      {mahallaItems.length > 0 ? (
+                        <label className="mt-2 flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={f.mahallaCustom}
+                            onChange={(e) => setF((p) => ({ ...p, mahallaCustom: e.target.checked, mahallaId: null }))}
+                            className="h-4 w-4 accent-wine"
+                          />
+                          {t.mahallaNotListed}
+                        </label>
+                      ) : null}
+                    </Field>
+                  ) : null
+                ) : (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field id="district" label={t.district} error={fe("district")}>
+                      <input {...inputProps("district")} className="field" value={f.district} onChange={(e) => set("district", e.target.value)} maxLength={80} />
+                    </Field>
+                    <Field id="neighborhood" label={t.neighborhood} error={fe("neighborhood")}>
+                      <input {...inputProps("neighborhood")} className="field" value={f.neighborhood} onChange={(e) => set("neighborhood", e.target.value)} maxLength={80} />
+                    </Field>
+                  </div>
+                )}
                 <Field id="address" label={t.address} error={fe("address")}>
                   <input {...inputProps("address")} className="field" autoComplete="street-address" value={f.address} onChange={(e) => set("address", e.target.value)} maxLength={200} />
                 </Field>
@@ -420,6 +545,23 @@ export function CheckoutForm(props: CheckoutProps) {
                   <Field id="landmark" label={t.landmark} error={fe("landmark")}>
                     <input {...inputProps("landmark")} className="field" value={f.landmark} onChange={(e) => set("landmark", e.target.value)} maxLength={160} />
                   </Field>
+                </div>
+                <div>
+                  {f.point ? (
+                    <p className="flex flex-wrap items-center gap-3 text-sm">
+                      <span>{t.locationAdded}</span>
+                      <button type="button" className="text-muted underline" onClick={() => set("point", null)}>
+                        {t.locationRemove}
+                      </button>
+                    </p>
+                  ) : (
+                    <button type="button" className="btn-secondary btn-sm" onClick={shareLocation} disabled={locState === "busy"}>
+                      {locState === "busy" ? t.locating : t.myLocation}
+                    </button>
+                  )}
+                  <p className="mt-1 text-xs text-muted" role="status">
+                    {locState === "denied" ? t.locationDenied : t.locationHint}
+                  </p>
                 </div>
                 {props.customer ? (
                   <label className="flex items-center gap-2.5 text-sm">
@@ -567,7 +709,7 @@ export function CheckoutForm(props: CheckoutProps) {
               <p>
                 {fulfillment === "pickup"
                   ? fmt(t.pickupAt, { address: props.pickup.address })
-                  : `${quote.zone?.regionName ?? ""}, ${quote.zone?.name ?? ""}, ${[f.district, f.neighborhood, f.address, f.apartment].filter(Boolean).join(", ")}`}
+                  : [quote.zone?.regionName, district?.name ?? f.district, mahallaChoice ? mahalla?.name : f.neighborhood, f.address, f.apartment].filter(Boolean).join(", ")}
               </p>
               <p>
                 {formatDateISO(f.date, true, locale)}, {slots.find((s) => s.id === slotId)?.label}

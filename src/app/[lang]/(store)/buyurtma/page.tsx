@@ -30,7 +30,12 @@ export default async function CheckoutPage() {
     <div className="container-page pt-10">
       <h1 className="mb-8 text-4xl sm:text-5xl">{getDict(locale).checkout.title}</h1>
       <CheckoutForm
-        regions={regions.map((r) => ({ id: r.id, name: r.name, zones: r.zones.map((z) => ({ id: z.id, floristId: z.floristId, name: z.name, description: z.description, fee: z.fee })) }))}
+        regions={regions.map((r) => ({
+          id: r.id,
+          name: r.name,
+          zones: r.zones.map((z) => ({ id: z.id, floristId: z.floristId, name: z.name, description: z.description, fee: z.fee })),
+          districts: r.districts,
+        }))}
         pickup={{ enabled: checkout.pickupEnabled, address: pick(locale, checkout.pickupAddress, checkout.pickupAddressRu) }}
         payments={availablePaymentMethods(checkout, locale)}
         shopPayments={availablePaymentMethods(checkout, locale, { platformShop: false })}
@@ -43,6 +48,10 @@ export default async function CheckoutPage() {
           recipientName: a.recipientName,
           recipientPhone: a.recipientPhone,
           zoneId: a.zoneId,
+          districtId: a.districtId,
+          mahallaId: a.mahallaId,
+          latitude: a.latitude,
+          longitude: a.longitude,
           district: a.district,
           neighborhood: a.neighborhood,
           address: a.address,

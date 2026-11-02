@@ -4,13 +4,15 @@ import { AdminForm } from "@/components/admin/admin-form";
 import { getDb, schema } from "@/db";
 import { requireFlorist } from "@/lib/auth";
 import { floristZones } from "@/lib/florist-panel";
+import { CoverageFields } from "@/components/admin/coverage-fields";
+import { regionDistricts, zoneCoverage } from "@/lib/locations";
 
 export const metadata = { title: "Yetkazib berish" };
 
 type Zone = Awaited<ReturnType<typeof floristZones>>[number];
-type Region = { id: number; name: string };
+type Region = { id: number; name: string; districts: { id: number; name: string }[] };
 
-function ZoneFields({ z, regions, prefix }: { z: Zone | null; regions: Region[]; prefix: string }) {
+function ZoneFields({ z, regions, prefix, covered = [] }: { z: Zone | null; regions: Region[]; prefix: string; covered?: number[] }) {
   const id = (k: string) => `${prefix}-${k}`;
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -82,6 +84,13 @@ function ZoneFields({ z, regions, prefix }: { z: Zone | null; regions: Region[];
           <input type="checkbox" name="isActive" defaultChecked={z?.isActive ?? true} className="h-4 w-4 accent-wine" /> Faol
         </label>
       </div>
+      <div className="sm:col-span-2 lg:col-span-3">
+        {z ? (
+          <CoverageFields districts={regions.find((r) => r.id === z.regionId)?.districts ?? []} selected={covered} idPrefix={prefix} />
+        ) : (
+          <p className="text-xs text-muted">Qo‘shgandan keyin bu hudud qaysi tumanlarga yetkazishini belgilay olasiz.</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -89,13 +98,17 @@ function ZoneFields({ z, regions, prefix }: { z: Zone | null; regions: Region[];
 export default async function FloristZonesPage() {
   const me = await requireFlorist();
   const db = await getDb();
-  const [zones, regions] = await Promise.all([
+  const [zones, regionRows] = await Promise.all([
     floristZones(me.floristId),
     db
-      .select({ id: schema.deliveryRegions.id, name: schema.deliveryRegions.name })
+      .select({ id: schema.deliveryRegions.id, name: schema.deliveryRegions.name, locationId: schema.deliveryRegions.locationId })
       .from(schema.deliveryRegions)
       .where(eq(schema.deliveryRegions.isActive, true))
       .orderBy(asc(schema.deliveryRegions.sortOrder)),
+  ]);
+  const [regions, coverage] = await Promise.all([
+    Promise.all(regionRows.map(async (r) => ({ id: r.id, name: r.name, districts: (await regionDistricts(r.locationId)).map((d) => ({ id: d.id, name: d.name })) }))),
+    zoneCoverage(zones.map((z) => z.id)),
   ]);
   return (
     <div className="max-w-5xl space-y-6">
@@ -112,7 +125,7 @@ export default async function FloristZonesPage() {
             {z.name} {z.isActive ? null : <span className="badge bg-charcoal/10 text-muted">o‘chirilgan</span>}
           </h2>
           <AdminForm action={floristSaveZoneAction.bind(null, z.id)}>
-            <ZoneFields z={z} regions={regions} prefix={`z${z.id}`} />
+            <ZoneFields z={z} regions={regions} prefix={`z${z.id}`} covered={coverage.get(z.id) ?? []} />
           </AdminForm>
         </section>
       ))}

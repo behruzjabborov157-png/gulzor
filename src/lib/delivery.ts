@@ -3,6 +3,7 @@ import { getDb, schema } from "@/db";
 import { DEFAULT_LOCALE, pick, type Locale } from "@/i18n/config";
 import { addDaysISO, hhmmToMinutes, tashkentNow } from "@/lib/time";
 import { floristApproved } from "@/lib/florists";
+import { locationName, regionDistricts, zoneCoverage, zoneServes } from "@/lib/locations";
 
 export type Zone = typeof schema.deliveryZones.$inferSelect;
 export type Region = typeof schema.deliveryRegions.$inferSelect;
@@ -34,15 +35,28 @@ export async function getDeliveryConfig(locale: Locale = DEFAULT_LOCALE, florist
     .from(schema.timeSlots)
     .where(eq(schema.timeSlots.isActive, true))
     .orderBy(asc(schema.timeSlots.sortOrder), asc(schema.timeSlots.startTime));
+  const coverage = await zoneCoverage(zones.map((z) => z.id));
+  const districtsOf = new Map(await Promise.all(regions.map(async (r) => [r.id, await regionDistricts(r.locationId)] as const)));
   return {
     regions: regions
-      .map((r) => ({
-        ...r,
-        name: pick(locale, r.name, r.nameRu),
-        zones: zones
-          .filter((z) => z.regionId === r.id)
-          .map((z) => ({ ...z, name: pick(locale, z.name, z.nameRu), description: pick(locale, z.description, z.descriptionRu) })),
-      }))
+      .map((r) => {
+        const own = zones.filter((z) => z.regionId === r.id);
+        return {
+          ...r,
+          name: pick(locale, r.name, r.nameRu),
+          zones: own.map((z) => ({
+            ...z,
+            name: pick(locale, z.name, z.nameRu),
+            description: pick(locale, z.description, z.descriptionRu),
+            /** Covered districts; null = the whole region. */
+            districtIds: coverage.get(z.id) ?? null,
+          })),
+          /** Districts customers choose from (empty when the region is not linked to a place), each with the zones serving it. */
+          districts: (districtsOf.get(r.id) ?? [])
+            .map((d) => ({ id: d.id, name: locationName(d, locale), zoneIds: own.filter((z) => zoneServes(coverage, z.id, d.id)).map((z) => z.id) }))
+            .filter((d) => d.zoneIds.length),
+        };
+      })
       .filter((r) => r.zones.length),
     slots,
   };

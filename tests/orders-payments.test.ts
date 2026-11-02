@@ -1025,3 +1025,133 @@ test("hosting without a disk: images in the database, webhook secret derived fro
   assert.equal(a, webhookUrl("https://gulzor.onrender.com", "secret-one-1234567"));
   assert.notEqual(a, webhookUrl("https://gulzor.onrender.com", "secret-two-1234567"));
 });
+
+test("places of Uzbekistan: SOATO import, district-by-district delivery, mahalla check, map point, bot district step", async () => {
+  const { importLocations, linkDeliveryRegions, setZoneCoverage } = await import("@/lib/locations");
+  const { getDeliveryConfig } = await import("@/lib/delivery");
+  const { GET: locationsApi } = await import("@/app/api/locations/route");
+  const db = await getDb();
+
+  // Import: 14 regions (incl. Karakalpakstan and Tashkent city), 205 districts/cities, 9 471 mahallas; idempotent.
+  const first = await importLocations(db);
+  assert.equal(first.added, 14 + 205 + 9471);
+  const again = await importLocations(db);
+  assert.equal(again.added, 0, "a second import adds nothing (admin edits are kept)");
+  const byCode = async (code: string) => (await db.select().from(schema.locations).where(eq(schema.locations.code, code)))[0];
+  const tashkent = await byCode("1726");
+  assert.equal(tashkent.name, "Toshkent shahri");
+  assert.equal(tashkent.nameRu, "город Ташкент");
+  assert.equal((await byCode("1735")).nameEn, "Republic of Karakalpakstan");
+  const chilonzor = await byCode("1726294");
+  const yunusobod = await byCode("1726266");
+  assert.equal(chilonzor.name, "Chilonzor tumani");
+  assert.equal(chilonzor.nameCyrl, "Чилонзор тумани");
+  assert.equal(chilonzor.parentId, tashkent.id);
+  const mahallas = await db.select().from(schema.locations).where(eq(schema.locations.parentId, chilonzor.id));
+  assert.ok(mahallas.length > 20 && mahallas.every((m) => m.level === "mahalla" && m.latitude != null));
+  const [otherMahalla] = await db.select().from(schema.locations).where(eq(schema.locations.parentId, yunusobod.id)).limit(1);
+
+  // A delivery city named like a place is linked automatically.
+  const [city] = await db.insert(schema.deliveryRegions).values({ slug: "toshkent-shahri-test", name: "Toshkent shahri", sortOrder: -1 }).returning();
+  await linkDeliveryRegions(db);
+  assert.equal((await db.select().from(schema.deliveryRegions).where(eq(schema.deliveryRegions.id, city.id)))[0].locationId, tashkent.id);
+
+  // Zone A only serves Chilonzor; zone B (no districts ticked) serves the whole city.
+  await db.update(schema.products).set({ stockQuantity: null, price: 200_000 }).where(eq(schema.products.id, productId));
+  const [zoneA] = await db.insert(schema.deliveryZones).values({ floristId, regionId: city.id, name: "Chilonzor tezkor", fee: 20_000 }).returning();
+  const [zoneB] = await db.insert(schema.deliveryZones).values({ floristId, regionId: city.id, name: "Butun shahar", fee: 45_000 }).returning();
+  assert.deepEqual(await setZoneCoverage(zoneA.id, [chilonzor.id, otherMahalla.id /* not a district of the city: dropped */]), [chilonzor.id]);
+
+  const cfg = (await getDeliveryConfig("uz", floristId)).regions.find((r) => r.id === city.id)!;
+  assert.equal(cfg.districts.length, 12, "all 12 districts of Tashkent are offered");
+  assert.deepEqual(cfg.districts.find((d) => d.id === chilonzor.id)!.zoneIds.sort(), [zoneA.id, zoneB.id].sort());
+  assert.deepEqual(cfg.districts.find((d) => d.id === yunusobod.id)!.zoneIds, [zoneB.id]);
+  assert.equal(cfg.zones.find((z) => z.id === zoneA.id)!.districtIds?.length, 1);
+
+  // Server rules: the district is required, the zone must serve it, the mahalla must lie in it.
+  const base = { zoneId: zoneA.id, lines: [{ productId, quantity: 1, addons: [] }] };
+  const noDistrict = await createOrder(checkout(base), null);
+  assert.ok(!noDistrict.ok && noDistrict.errors.some((e) => /Tuman yoki shaharni tanlang/.test(e)), JSON.stringify(noDistrict));
+  const wrongZone = await createOrder(checkout({ ...base, districtId: yunusobod.id }), null);
+  assert.ok(!wrongZone.ok && wrongZone.errors.some((e) => /xizmat qilmaydi/.test(e)));
+  const foreignDistrict = await createOrder(checkout({ ...base, districtId: (await byCode("1703202")).id }), null);
+  assert.ok(!foreignDistrict.ok && foreignDistrict.errors.some((e) => /yetkazib berilmaydi/.test(e)));
+  const wrongMahalla = await createOrder(checkout({ ...base, districtId: chilonzor.id, mahallaId: otherMahalla.id }), null);
+  assert.ok(!wrongMahalla.ok && wrongMahalla.errors.some((e) => /tegishli emas/.test(e)));
+  const abroad = await createOrder(checkout({ ...base, districtId: chilonzor.id, latitude: 55.75, longitude: 37.61 }), null);
+  assert.equal(abroad.ok, false, "a map point outside Uzbekistan is refused");
+
+  const ok = await createOrder(
+    checkout({ ...base, districtId: chilonzor.id, mahallaId: mahallas[0].id, district: "ignored", neighborhood: "ignored", latitude: 41.2856, longitude: 69.2034 }),
+    null,
+  );
+  assert.ok(ok.ok, JSON.stringify(ok));
+  const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, ok.orderId));
+  assert.equal(o.deliveryFee, 20_000);
+  assert.equal(o.districtId, chilonzor.id);
+  assert.equal(o.district, "Chilonzor tumani", "names come from the list, not from the request");
+  assert.equal(o.mahallaId, mahallas[0].id);
+  assert.equal(o.neighborhood, mahallas[0].name);
+  assert.equal(o.latitude, 41.2856);
+
+  // A mahalla that is not listed can be typed; Yunusobod is served by zone B.
+  const typed = await createOrder(checkout({ zoneId: zoneB.id, districtId: yunusobod.id, neighborhood: "Yangi massiv", lines: base.lines }), null);
+  assert.ok(typed.ok, JSON.stringify(typed));
+  const [t2] = await db.select().from(schema.orders).where(eq(schema.orders.id, typed.orderId));
+  assert.equal(t2.mahallaId, null);
+  assert.equal(t2.neighborhood, "Yangi massiv");
+  assert.equal(t2.deliveryFee, 45_000);
+
+  // Public API: the mahallas of one district only; Russian falls back to the Cyrillic name.
+  const res = await locationsApi(new Request(`http://x/api/locations?parent=${chilonzor.id}&lang=ru`));
+  const body = (await res.json()) as { items: { id: number; name: string }[] };
+  assert.equal(body.items.length, mahallas.length);
+  for (const i of body.items) {
+    const m = mahallas.find((x) => x.id === i.id)!;
+    assert.equal(i.name, m.nameCyrl ?? m.name);
+  }
+  assert.equal((await locationsApi(new Request("http://x/api/locations?parent=abc"))).status, 400);
+
+  // Bot: city → district → zone, and the order carries the district.
+  const calls: { method: string; body: Record<string, unknown> }[] = [];
+  setBotTransport(async (method, body) => {
+    calls.push({ method, body });
+    return { ok: true, result: { message_id: 99 } };
+  });
+  const chat = { id: 900077, type: "private" };
+  const from = { id: 900077, first_name: "Tuman", username: "tuman_test", language_code: "uz" };
+  let n = 0;
+  const say = (m: Record<string, unknown>) => handleUpdate({ message: { message_id: ++n, chat, from, ...m } });
+  const tap = (data: string) => handleUpdate({ callback_query: { id: `cb${++n}`, from, data, message: { message_id: n, chat } } });
+  const buttons = () =>
+    calls.flatMap((c) => ((c.body.reply_markup as { inline_keyboard?: { callback_data?: string }[][] })?.inline_keyboard ?? []).flat().map((b) => b.callback_data));
+  try {
+    await say({ text: "/start" });
+    await tap("L:uz");
+    await tap(`P:${productId}`);
+    await tap(`A:${productId}`);
+    await tap("O");
+    await say({ contact: { phone_number: "998901112233", user_id: from.id } });
+    await tap("RS:1");
+    assert.ok(buttons().includes(`RG:${city.id}:1`), "a linked city asks for the district");
+    await tap(`RG:${city.id}:1`);
+    assert.ok(buttons().includes(`DS:${city.id}:${chilonzor.id}`));
+    await tap(`DS:${city.id}:${chilonzor.id}`);
+    assert.ok(buttons().includes(`Z:${zoneA.id}:${chilonzor.id}`), "both zones serving Chilonzor are offered");
+    await tap(`Z:${zoneA.id}:${chilonzor.id}`);
+    await say({ text: "Bunyodkor 5" });
+    await tap("SKX");
+    await tap(`D:${tomorrow}`);
+    await tap(`T:${slotId}`);
+    await say({ text: "-" });
+    await tap("Y:cash");
+    const task = await tap("OK");
+    assert.ok(task?.notifyOrderId, JSON.stringify(calls.slice(-2)));
+    const [bo] = await db.select().from(schema.orders).where(eq(schema.orders.id, task!.notifyOrderId));
+    assert.equal(bo.districtId, chilonzor.id);
+    assert.equal(bo.deliveryFee, 20_000);
+  } finally {
+    setBotTransport(null);
+    await db.update(schema.deliveryRegions).set({ isActive: false }).where(eq(schema.deliveryRegions.id, city.id));
+  }
+});

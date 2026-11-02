@@ -24,6 +24,10 @@ async function main() {
     await migrate(db as never, { migrationsFolder });
   }
   console.log(`Migrations applied (${databaseKind()}).`);
+  // Places of Uzbekistan (regions, districts, mahallas): loaded once into an empty table.
+  const { ensureLocations } = await import("@/lib/locations");
+  const loaded = await ensureLocations(db);
+  if (loaded) console.log(`Locations imported: ${loaded.added} (data/locations/uz-soato.json).`);
   await closeDb();
 }
 

@@ -88,6 +88,10 @@ test("cart and checkout in Russian, with Russian validation messages", async () 
   await page.getByLabel("Ваше имя *").fill("Тест Покупатель");
   await page.getByLabel("Ваш телефон *").fill("901112233");
   await page.getByLabel("Цветы получу я сам(а)").check();
+  await page.getByRole("combobox", { name: "Район / город *" }).fill("Chilonzor");
+  await page.getByRole("option", { name: "Чилонзор тумани" }).click();
+  await page.getByLabel("Моей махалли нет в списке").check();
+  await page.getByPlaceholder("Махалля, массив или посёлок").fill("Квартал 9");
   await page.getByLabel("Улица, дом *").fill("ул. Амира Темура, 15");
   await page.locator("label").filter({ hasText: "12:00 – 15:00" }).click();
   await page.getByRole("button", { name: "Продолжить" }).click();

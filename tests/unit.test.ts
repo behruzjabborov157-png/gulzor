@@ -178,3 +178,21 @@ test("cart: one shop per order", () => {
   assert.equal(conflictsWithCart([line(1)], { floristId: 2 }), true); // another shop
   assert.equal(conflictsWithCart([line(undefined)], { floristId: 2 }), false); // unknown shop: the server decides
 });
+
+test("Uzbek Cyrillic → Latin transliteration and script-independent search keys", async () => {
+  const { cyrillicToLatin, locationSearchKey } = await import("@/lib/translit");
+  const cases: [string, string][] = [
+    ["Чилонзор тумани", "Chilonzor tumani"],
+    ["Мирзо Улуғбек тумани", "Mirzo Ulug‘bek tumani"],
+    ["Ўрта Чирчиқ тумани", "O‘rta Chirchiq tumani"],
+    ["Шайхонтоҳур тумани", "Shayxontohur tumani"],
+    ["Янгиер", "Yangiyer"], // е after a vowel → ye
+    ["Еркин МФЙ", "Yerkin MFY"], // е at word start → ye; an all-caps word stays in capitals
+    ["Цементчи", "Sementchi"],
+    ["Өрнек", "Órnek"], // Karakalpak letters
+    ["Yo'lchilar", "Yo‘lchilar"], // already Latin: only the apostrophe is unified
+  ];
+  for (const [cyrl, lat] of cases) assert.equal(cyrillicToLatin(cyrl), lat, cyrl);
+  assert.equal(locationSearchKey("Мирзо Улуғбек"), locationSearchKey("mirzo ulug'bek"));
+  assert.equal(locationSearchKey("Чилонзор", null, ""), "chilonzor");
+});

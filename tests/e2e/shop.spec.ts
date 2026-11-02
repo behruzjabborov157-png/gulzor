@@ -150,7 +150,14 @@ test("checkout validates input, then creates the order", async () => {
   await page.getByLabel("Telefon raqamingiz *").fill("90 123 45 67");
   await page.getByLabel("Qabul qiluvchi ismi *").fill("Malika");
   await page.getByLabel("Qabul qiluvchi telefoni *").fill("+998 (93) 765-43-21");
-  await page.getByLabel("Tuman").fill("Mirobod");
+  // District and mahalla come from the places list (searchable, Latin or Cyrillic).
+  await page.getByRole("combobox", { name: "Tuman / shahar *" }).fill("миробод");
+  await page.getByRole("option", { name: "Mirobod tumani" }).click();
+  const mahalla = page.getByRole("combobox", { name: "Mahalla" });
+  await mahalla.click();
+  await expect(page.getByRole("listbox").getByRole("option").first()).toBeVisible();
+  await page.getByRole("listbox").getByRole("option").first().click();
+  await expect(mahalla).not.toHaveValue("");
   await page.getByLabel("Ko‘cha, uy *").fill("Amir Temur ko‘chasi, 15");
   await page.getByLabel("Mo‘ljal").fill("Test buyurtma — yetkazilmaydi");
   await page.getByLabel("Otkritka uchun matn").fill("Tug‘ilgan kuningiz muborak!");

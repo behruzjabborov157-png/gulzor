@@ -6,6 +6,7 @@ import { getDict, priceErrorText } from "@/i18n/dict";
 import { isOrderable, stockState, toPricing, type StockState } from "@/lib/catalog";
 import { bookedSlotCounts, computeSlots, dateWindow, getDeliveryConfig, type SlotOption } from "@/lib/delivery";
 import { formatUZS } from "@/lib/format";
+import { locationName, regionDistricts, zoneCoverage, zoneServes } from "@/lib/locations";
 import { couponDiscount, deliveryFeeFor, MAX_ADDON_QUANTITY, MAX_LINE_QUANTITY, priceLine, type PricedAddon } from "@/lib/pricing";
 import { getSettings } from "@/lib/settings";
 import { isISODate } from "@/lib/time";
@@ -28,6 +29,8 @@ export const quoteInputSchema = z.object({
   couponCode: z.string().trim().max(40).optional().nullable(),
   fulfillment: z.enum(["delivery", "pickup"]).optional(),
   zoneId: z.number().int().positive().optional().nullable(),
+  /** District / city from `locations`; required when the delivery region is linked to a place. */
+  districtId: z.number().int().positive().optional().nullable(),
   date: z.string().optional().nullable(),
   slotId: z.number().int().positive().optional().nullable(),
 });
@@ -80,6 +83,8 @@ export type Quote = {
     freeFrom: number | null;
     minOrder: number | null;
   } | null;
+  /** The chosen district (when the delivery region asks for one). */
+  district: { id: number; name: string; nameUz: string } | null;
   /** The (single) florist fulfilling this order, or null when the cart is empty or mixes florists. */
   florist: { id: number; slug: string; name: string; isPlatform: boolean } | null;
   slots: SlotOption[];
@@ -245,6 +250,7 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
 
   /* ---- Delivery ---- */
   let zone: Quote["zone"] = null;
+  let district: Quote["district"] = null;
   let deliveryFee = 0;
   if (input.fulfillment === "delivery" && input.zoneId) {
     const [row] = await db
@@ -269,6 +275,16 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
         minOrder: row.z.minOrder,
       };
       deliveryFee = deliveryFeeFor(row.z, afterDiscount);
+      // Linked delivery regions are served district by district: the zone must cover the chosen one.
+      const districts = await regionDistricts(row.r.locationId);
+      if (districts.length) {
+        const d = input.districtId ? districts.find((x) => x.id === input.districtId) : undefined;
+        if (input.districtId && !d) errors.push(t.districtUnavailable);
+        else if (!d) {
+          if (opts.forCheckout) errors.push(t.districtRequired);
+        } else if (!zoneServes(await zoneCoverage([row.z.id]), row.z.id, d.id)) errors.push(t.zoneNotServing);
+        else district = { id: d.id, name: locationName(d, locale), nameUz: d.name };
+      }
       if (row.z.minOrder != null && afterDiscount < row.z.minOrder) {
         errors.push(fmt(t.zoneMinOrder, { amount: uzs(row.z.minOrder) }));
       }
@@ -323,6 +339,7 @@ export async function quoteCart(input: QuoteInput, opts: { forCheckout?: boolean
     serviceFeeLabel: pick(locale, checkout.serviceFeeLabel, checkout.serviceFeeLabelRu),
     total,
     zone,
+    district,
     florist,
     slots,
     prepMinutes,

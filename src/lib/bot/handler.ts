@@ -52,6 +52,8 @@ type Draft = {
   rPhone?: string;
   fulfillment?: "delivery" | "pickup";
   zoneId?: number;
+  /** District from `locations`, for delivery regions that are served district by district. */
+  districtId?: number;
   address?: string;
   lat?: number;
   lon?: number;
@@ -386,16 +388,69 @@ async function askFulfillment(s: Session, t: BotTexts) {
   await send(s.chatId, t.askFulfillment, { inline_keyboard: [[{ text: t.delivery, callback_data: "F:d" }], [{ text: t.pickup, callback_data: "F:p" }]] });
 }
 
-async function askZone(s: Session, t: BotTexts) {
-  const locale = s.locale!;
-  // Each shop delivers itself: only the zones of the shop this cart belongs to.
+/** Delivery regions of the cart's shop (each shop delivers itself). */
+async function shopRegions(s: Session) {
   const shop = await cartShop(s);
-  const { regions } = await getDeliveryConfig(locale, shop?.id);
-  const zones = regions.flatMap((r) => r.zones.map((z) => ({ id: z.id, label: `${r.name} — ${z.name}`, fee: z.fee })));
-  if (!zones.length) return send(s.chatId, t.noZones, mainMenu(t));
-  await send(s.chatId, t.askZone, {
-    inline_keyboard: zones.map((z) => [{ text: fmt(t.zoneFee, { zone: z.label, fee: formatUZS(z.fee, locale) }), callback_data: `Z:${z.id}` }]),
-  });
+  return (await getDeliveryConfig(s.locale!, shop?.id)).regions;
+}
+
+const DISTRICTS_PER_PAGE = 16;
+
+/**
+ * Where to deliver. Regions linked to the places list are asked district by district (region → district → zone);
+ * the others list their zones directly, as before.
+ */
+async function askZone(s: Session, t: BotTexts, edit?: Message): Promise<unknown> {
+  const locale = s.locale!;
+  const regions = await shopRegions(s);
+  if (!regions.length) return send(s.chatId, t.noZones, mainMenu(t));
+  const byDistrict = regions.filter((r) => r.districts.length);
+  if (regions.length === 1 && byDistrict.length === 1) return askDistrict(s, t, regions[0].id, 1, edit);
+  const kb = regions.flatMap((r) =>
+    r.districts.length
+      ? [[{ text: `📍 ${r.name}`, callback_data: `RG:${r.id}:1` }]]
+      : r.zones.map((z) => [{ text: fmt(t.zoneFee, { zone: `${r.name} — ${z.name}`, fee: formatUZS(z.fee, locale) }), callback_data: `Z:${z.id}` }]),
+  );
+  await show(s.chatId, byDistrict.length ? t.askRegion : t.askZone, { inline_keyboard: kb }, edit);
+}
+
+async function askDistrict(s: Session, t: BotTexts, regionId: number, page: number, edit?: Message): Promise<unknown> {
+  const regions = await shopRegions(s);
+  const region = regions.find((r) => r.id === regionId);
+  if (!region?.districts.length) return askZone(s, t, edit);
+  const pages = Math.ceil(region.districts.length / DISTRICTS_PER_PAGE);
+  const p = Math.min(Math.max(1, page), pages);
+  const slice = region.districts.slice((p - 1) * DISTRICTS_PER_PAGE, p * DISTRICTS_PER_PAGE);
+  const kb = rows(slice.map((d) => ({ text: d.name, callback_data: `DS:${region.id}:${d.id}` })), 2);
+  const nav = [];
+  if (p > 1) nav.push({ text: t.prev, callback_data: `RG:${region.id}:${p - 1}` });
+  if (p < pages) nav.push({ text: t.next, callback_data: `RG:${region.id}:${p + 1}` });
+  if (nav.length) kb.push(nav);
+  if (regions.length > 1) kb.push([{ text: t.backToRegions, callback_data: "RG:0:1" }]);
+  await show(s.chatId, fmt(t.askDistrict, { region: region.name, page: p, pages }), { inline_keyboard: kb }, edit);
+}
+
+async function pickDistrict(s: Session, t: BotTexts, regionId: number, districtId: number, edit?: Message) {
+  const locale = s.locale!;
+  const region = (await shopRegions(s)).find((r) => r.id === regionId);
+  const district = region?.districts.find((d) => d.id === districtId);
+  if (!region || !district) return askZone(s, t, edit);
+  s.draft.districtId = district.id;
+  const zones = region.zones.filter((z) => district.zoneIds.includes(z.id));
+  if (zones.length === 1) return chooseZone(s, t, zones[0].id, district.id);
+  await show(
+    s.chatId,
+    fmt(t.askDistrictZone, { district: district.name }),
+    { inline_keyboard: zones.map((z) => [{ text: fmt(t.zoneFee, { zone: z.name, fee: formatUZS(z.fee, locale) }), callback_data: `Z:${z.id}:${district.id}` }]) },
+    edit,
+  );
+}
+
+async function chooseZone(s: Session, t: BotTexts, zoneId: number, districtId: number | undefined) {
+  s.draft.zoneId = zoneId;
+  s.draft.districtId = districtId;
+  s.step = "address";
+  await send(s.chatId, t.askAddress, cancelKeyboard(t, { text: t.shareLocation, request_location: true }));
 }
 
 async function askDate(s: Session, t: BotTexts, edit?: Message) {
@@ -414,6 +469,7 @@ function quoteInput(s: Session) {
     lines: s.cart.map((l) => ({ ...l, addons: [] })),
     fulfillment: d.fulfillment,
     zoneId: d.fulfillment === "delivery" ? (d.zoneId ?? null) : null,
+    districtId: d.fulfillment === "delivery" ? (d.districtId ?? null) : null,
     date: d.date ?? null,
     slotId: d.slotId ?? null,
   };
@@ -454,6 +510,7 @@ function orderPayload(s: Session) {
     recipientPhone: d.self === false ? (d.rPhone ?? "") : "",
     anonymous: false,
     zoneId: d.fulfillment === "delivery" ? (d.zoneId ?? null) : null,
+    districtId: d.fulfillment === "delivery" ? (d.districtId ?? null) : null,
     district: "",
     neighborhood: "",
     address: d.fulfillment === "delivery" ? (d.address ?? "") : "",
@@ -498,7 +555,7 @@ async function showSummary(s: Session, t: BotTexts) {
     fmt(t.sumRecipient, { name: d.self === false ? d.rName! : d.name!, phone: formatPhone(d.self === false ? d.rPhone! : d.phone!) }),
     d.fulfillment === "pickup"
       ? fmt(t.sumPickup, { address: pick(locale, checkout.pickupAddress, checkout.pickupAddressRu) })
-      : fmt(t.sumAddress, { address: [q.zone?.name, d.address, d.extra].filter(Boolean).join(", ") }),
+      : fmt(t.sumAddress, { address: [q.zone?.regionName, q.district?.name ?? q.zone?.name, d.address, d.extra].filter(Boolean).join(", ") }),
     fmt(t.sumWhen, { date: formatDateISO(d.date!, true, locale), slot: slot?.label ?? "" }),
     d.card ? fmt(t.sumCard, { text: d.card }) : null,
     fmt(t.sumPayment, { method: method?.label ?? d.payment ?? "" }),
@@ -831,9 +888,22 @@ async function onCallback(cb: Callback): Promise<AfterTask | null> {
           toast = t.stale;
           break;
         }
-        s.draft.zoneId = num(a);
-        s.step = "address";
-        await send(s.chatId, t.askAddress, cancelKeyboard(t, { text: t.shareLocation, request_location: true }));
+        await chooseZone(s, t, num(a), b ? num(b) : undefined);
+        break;
+      case "RG":
+        if (!s.draft.sid) {
+          toast = t.stale;
+          break;
+        }
+        if (num(a) === 0) await askZone(s, t, msg);
+        else await askDistrict(s, t, num(a), num(b) || 1, msg);
+        break;
+      case "DS":
+        if (!s.draft.sid) {
+          toast = t.stale;
+          break;
+        }
+        await pickDistrict(s, t, num(a), num(b), msg);
         break;
       case "SKX":
         if (s.step !== "extra") break;

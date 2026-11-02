@@ -65,6 +65,8 @@ test("inside Telegram: app is initialised, name and phone come from Telegram, th
   await expect(page.getByLabel("Telefon raqamingiz *")).toHaveValue("+998 90 111 22 44");
 
   await page.getByLabel("Gullarni o‘zim qabul qilaman").check();
+  await page.getByRole("combobox", { name: "Tuman / shahar *" }).fill("Yunus");
+  await page.getByRole("option", { name: "Yunusobod tumani" }).click();
   await page.getByLabel("Ko‘cha, uy *").fill("Test buyurtma — Telegram Mini App");
   await page.getByRole("button", { name: "Ertaga" }).click();
   await page.locator("label").filter({ hasText: "12:00 – 15:00" }).click();

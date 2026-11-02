@@ -4,6 +4,7 @@ import { hashPassword } from "@/lib/auth";
 import { isPlainEmail } from "@/lib/email";
 import { normalizePhone, slugify } from "@/lib/format";
 import { changeOrderStatus, ORDER_TRANSITIONS, type Order } from "@/lib/orders";
+import { setZoneCoverage } from "@/lib/locations";
 
 /*
  * Everything a florist may do, always scoped to its own shop. Pages and server actions in /florist only call
@@ -192,8 +193,11 @@ export function floristZones(floristId: number) {
   return getDb().then((db) => db.select().from(schema.deliveryZones).where(eq(schema.deliveryZones.floristId, floristId)).orderBy(schema.deliveryZones.sortOrder, schema.deliveryZones.id));
 }
 
-/** Creates or updates one of the florist's zones. Another shop's zone id is treated as not found. */
-export async function saveFloristZone(floristId: number, zoneId: number | null, z: ZoneInput): Promise<ChangeResult> {
+/**
+ * Creates or updates one of the florist's zones. Another shop's zone id is treated as not found.
+ * districtIds (null = unchanged) are the districts the zone serves; see setZoneCoverage.
+ */
+export async function saveFloristZone(floristId: number, zoneId: number | null, z: ZoneInput, districtIds: number[] | null = null): Promise<ChangeResult> {
   if (z.name.trim().length < 2) return { ok: false, message: "Hudud nomini kiriting" };
   if (!Number.isInteger(z.fee) || z.fee < 0) return { ok: false, message: "Yetkazish narxi noto‘g‘ri" };
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(z.sameDayCutoff)) return { ok: false, message: "Vaqt HH:MM ko‘rinishida bo‘lsin" };
@@ -201,16 +205,18 @@ export async function saveFloristZone(floristId: number, zoneId: number | null, 
   const [region] = await db.select({ id: schema.deliveryRegions.id }).from(schema.deliveryRegions).where(eq(schema.deliveryRegions.id, z.regionId));
   if (!region) return { ok: false, message: "Shaharni tanlang" };
   const values = { ...z, name: z.name.trim().slice(0, 80), description: z.description.trim().slice(0, 300) };
+  let id: number;
   if (zoneId) {
-    const res = await db
-      .update(schema.deliveryZones)
-      .set(values)
-      .where(and(eq(schema.deliveryZones.id, zoneId), eq(schema.deliveryZones.floristId, floristId)))
-      .returning({ id: schema.deliveryZones.id });
-    if (!res.length) return { ok: false, message: "Hudud topilmadi" };
+    const [before] = await db.select({ regionId: schema.deliveryZones.regionId }).from(schema.deliveryZones).where(and(eq(schema.deliveryZones.id, zoneId), eq(schema.deliveryZones.floristId, floristId)));
+    if (!before) return { ok: false, message: "Hudud topilmadi" };
+    await db.update(schema.deliveryZones).set(values).where(eq(schema.deliveryZones.id, zoneId));
+    id = zoneId;
+    // Moved to another city: the ticked districts belonged to the old one.
+    if (before.regionId !== z.regionId) districtIds = [];
   } else {
-    await db.insert(schema.deliveryZones).values({ ...values, floristId });
+    [{ id }] = await db.insert(schema.deliveryZones).values({ ...values, floristId }).returning({ id: schema.deliveryZones.id });
   }
+  if (districtIds) await setZoneCoverage(id, districtIds);
   return { ok: true };
 }
 

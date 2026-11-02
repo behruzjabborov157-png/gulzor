@@ -22,6 +22,7 @@ import { formInt, saveProductForm } from "@/lib/product-save";
 import { notifyFloristApplication } from "@/lib/telegram";
 import { unlinkFloristChat } from "@/lib/florist-notify";
 import { UploadError } from "@/lib/storage";
+import { coverageFromForm } from "@/lib/locations";
 import { addOrderPhoto, floristDisputeNote, replyToReview } from "@/lib/trust";
 
 /*
@@ -110,7 +111,7 @@ export async function floristSaveZoneAction(zoneId: number | null, _: FormState,
     sameDayCutoff: text(form, "sameDayCutoff") || "18:00",
     minLeadMinutes: z.number().int().min(0).max(10_080).catch(120).parse(num("minLeadMinutes")),
     isActive: form.get("isActive") === "on",
-  });
+  }, coverageFromForm(form));
   if (!res.ok) return { ok: false, message: res.message };
   revalidatePath("/florist/hududlar");
   return { ok: true, message: "Saqlandi" };

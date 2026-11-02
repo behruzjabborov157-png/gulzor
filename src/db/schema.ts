@@ -1,5 +1,6 @@
 import { relations } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   boolean,
   customType,
   date,
@@ -227,6 +228,37 @@ export const productVariants = pgTable(
 /* Delivery                                                            */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Administrative places of Uzbekistan: region → district/city → settlement → mahalla.
+ * Regions, districts and mahallas are imported from data/locations (SOATO); admins add settlements and anything
+ * missing. Never deleted once used: deactivate instead (orders keep the names they were placed with).
+ */
+export const locationLevel = pgEnum("location_level", ["region", "district", "settlement", "mahalla"]);
+
+export const locations = pgTable(
+  "locations",
+  {
+    id: serial("id").primaryKey(),
+    parentId: integer("parent_id").references((): AnyPgColumn => locations.id, { onDelete: "restrict" }),
+    level: locationLevel("level").notNull(),
+    /** SOATO code for regions and districts, "m:<id>" for imported mahallas; null for places added by an admin. */
+    code: text("code"),
+    /** Uzbek (Latin). */
+    name: text("name").notNull(),
+    nameCyrl: text("name_cyrl"),
+    nameRu: text("name_ru"),
+    nameEn: text("name_en"),
+    latitude: doublePrecision("latitude"),
+    longitude: doublePrecision("longitude"),
+    /** All names in Latin, lower case, without apostrophes (see locationSearchKey). */
+    searchText: text("search_text").notNull().default(""),
+    isActive: boolean("is_active").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("locations_code_idx").on(t.code), index("locations_parent_idx").on(t.parentId), index("locations_level_idx").on(t.level)],
+);
+
 export const deliveryRegions = pgTable(
   "delivery_regions",
   {
@@ -234,6 +266,8 @@ export const deliveryRegions = pgTable(
     slug: text("slug").notNull(),
     name: text("name").notNull(),
     nameRu: text("name_ru"),
+    /** The region or city in `locations` this delivery area is; its districts are offered at checkout. */
+    locationId: integer("location_id").references(() => locations.id, { onDelete: "set null" }),
     isActive: boolean("is_active").notNull().default(true),
     sortOrder: integer("sort_order").notNull().default(0),
     note: text("note").notNull().default(""),
@@ -266,6 +300,20 @@ export const deliveryZones = pgTable("delivery_zones", {
   isActive: boolean("is_active").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
 }, (t) => [index("delivery_zones_florist_idx").on(t.floristId)]);
+
+/** Districts (or cities) a zone delivers to. A zone without rows covers its whole delivery region. */
+export const zoneLocations = pgTable(
+  "zone_locations",
+  {
+    zoneId: integer("zone_id")
+      .notNull()
+      .references(() => deliveryZones.id, { onDelete: "cascade" }),
+    locationId: integer("location_id")
+      .notNull()
+      .references(() => locations.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.zoneId, t.locationId] }), index("zone_locations_location_idx").on(t.locationId)],
+);
 
 export const timeSlots = pgTable("time_slots", {
   id: serial("id").primaryKey(),
@@ -369,11 +417,15 @@ export const customerAddresses = pgTable("customer_addresses", {
   recipientPhone: text("recipient_phone").notNull(),
   regionId: integer("region_id").references(() => deliveryRegions.id, { onDelete: "set null" }),
   zoneId: integer("zone_id").references(() => deliveryZones.id, { onDelete: "set null" }),
+  districtId: integer("district_id").references(() => locations.id, { onDelete: "set null" }),
+  mahallaId: integer("mahalla_id").references(() => locations.id, { onDelete: "set null" }),
   district: text("district").notNull().default(""),
   neighborhood: text("neighborhood").notNull().default(""),
   address: text("address").notNull(),
   apartment: text("apartment").notNull().default(""),
   landmark: text("landmark").notNull().default(""),
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -428,6 +480,9 @@ export const orders = pgTable(
     zoneId: integer("zone_id"),
     regionName: text("region_name"),
     zoneName: text("zone_name"),
+    /** Chosen from `locations`; the text columns below keep the names as they were at order time. */
+    districtId: integer("district_id").references(() => locations.id, { onDelete: "set null" }),
+    mahallaId: integer("mahalla_id").references(() => locations.id, { onDelete: "set null" }),
     district: text("district").notNull().default(""),
     neighborhood: text("neighborhood").notNull().default(""),
     address: text("address").notNull().default(""),
@@ -453,7 +508,7 @@ export const orders = pgTable(
     /** Set only for orders placed in the Telegram Mini App, from signature-verified initData. */
     telegramUserId: text("telegram_user_id"),
     telegramUsername: text("telegram_username"),
-    /** Delivery point shared as a Telegram location (bot orders); shown to the courier as a map link. */
+    /** Delivery point (a Telegram location or the checkout's "my location"); shown to the courier as a map link. */
     latitude: doublePrecision("latitude"),
     longitude: doublePrecision("longitude"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

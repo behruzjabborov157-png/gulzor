@@ -2,14 +2,41 @@ import { asc } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { saveRegionAction, saveSlotAction, saveZoneAction } from "@/app/admin/actions";
 import { AdminForm, C, F } from "@/components/admin/admin-form";
+import { CoverageFields } from "@/components/admin/coverage-fields";
+import { regionDistricts, regionPickerOptions, zoneCoverage } from "@/lib/locations";
 import { requireOwner } from "@/lib/auth";
 import { formatUZS } from "@/lib/format";
 
 export const metadata = { title: "Yetkazib berish" };
 
 type Zone = typeof schema.deliveryZones.$inferSelect;
+type Picker = Awaited<ReturnType<typeof regionPickerOptions>>;
 
-function ZoneFields({ z, regionId }: { z?: Zone; regionId: number }) {
+/** Which region or city of the places list a delivery area is (its districts are then offered at checkout). */
+function LocationSelect({ picker, value }: { picker: Picker; value: number | null }) {
+  return (
+    <div className="sm:col-span-2">
+      <label className="mb-1 block text-xs font-medium text-muted">
+        Joylashuv (tumanlar shu yerdan olinadi)
+        <select name="locationId" defaultValue={value ?? ""} className="field mt-1 px-3 py-2">
+          <option value="">— bog‘lanmagan (tuman so‘ralmaydi) —</option>
+          {picker.map((r) => (
+            <optgroup key={r.id} label={r.name}>
+              <option value={r.id}>{r.name} — barcha tumanlari</option>
+              {r.districts.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
+}
+
+function ZoneFields({ z, regionId, districts, covered }: { z?: Zone; regionId: number; districts: { id: number; name: string }[]; covered: number[] }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <input type="hidden" name="regionId" value={regionId} />
@@ -27,6 +54,9 @@ function ZoneFields({ z, regionId }: { z?: Zone; regionId: number }) {
         <C label="Shu kuni yetkazish mumkin" name="sameDayEnabled" defaultChecked={z?.sameDayEnabled ?? true} />
         <C label="Faol" name="isActive" defaultChecked={z?.isActive ?? true} />
       </div>
+      <div className="sm:col-span-2 lg:col-span-4">
+        <CoverageFields districts={districts} selected={covered} idPrefix={`z${z?.id ?? `new${regionId}`}`} />
+      </div>
     </div>
   );
 }
@@ -38,6 +68,11 @@ export default async function DeliveryAdmin() {
     db.select().from(schema.deliveryRegions).orderBy(asc(schema.deliveryRegions.sortOrder)),
     db.select().from(schema.deliveryZones).orderBy(asc(schema.deliveryZones.sortOrder)),
     db.select().from(schema.timeSlots).orderBy(asc(schema.timeSlots.sortOrder), asc(schema.timeSlots.startTime)),
+  ]);
+  const [picker, coverage, districtsOf] = await Promise.all([
+    regionPickerOptions(),
+    zoneCoverage(zones.map((z) => z.id)),
+    Promise.all(regions.map(async (r) => [r.id, (await regionDistricts(r.locationId)).map((d) => ({ id: d.id, name: d.name }))] as const)).then((e) => new Map(e)),
   ]);
 
   return (
@@ -64,7 +99,8 @@ export default async function DeliveryAdmin() {
                   <F label="Slug" name="slug" defaultValue={r.slug} />
                   <F label="Tartib" name="sortOrder" defaultValue={r.sortOrder} />
                   <div className="flex items-end pb-2"><C label="Faol" name="isActive" defaultChecked={r.isActive} /></div>
-                  <div className="sm:col-span-4"><F label="Ichki izoh" name="note" defaultValue={r.note} /></div>
+                  <LocationSelect picker={picker} value={r.locationId} />
+                  <div className="sm:col-span-2"><F label="Ichki izoh" name="note" defaultValue={r.note} /></div>
                 </div>
               </AdminForm>
             </div>
@@ -73,12 +109,12 @@ export default async function DeliveryAdmin() {
             {zones.filter((z) => z.regionId === r.id).map((z) => (
               <details key={z.id} className="rounded-xl border border-line">
                 <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
-                  <span><strong>{z.name}</strong> · {formatUZS(z.fee)}{z.freeFrom ? ` · ${formatUZS(z.freeFrom)}dan bepul` : ""}{z.isActive ? "" : " · o‘chirilgan"}</span>
+                  <span><strong>{z.name}</strong>{coverage.get(z.id) ? ` · ${coverage.get(z.id)!.length} ta tuman` : ""} · {formatUZS(z.fee)}{z.freeFrom ? ` · ${formatUZS(z.freeFrom)}dan bepul` : ""}{z.isActive ? "" : " · o‘chirilgan"}</span>
                   <span className="text-xs text-wine">Tahrirlash</span>
                 </summary>
                 <div className="border-t border-line p-4">
                   <AdminForm action={saveZoneAction.bind(null, z.id)}>
-                    <ZoneFields z={z} regionId={r.id} />
+                    <ZoneFields z={z} regionId={r.id} districts={districtsOf.get(r.id) ?? []} covered={coverage.get(z.id) ?? []} />
                   </AdminForm>
                 </div>
               </details>
@@ -87,7 +123,7 @@ export default async function DeliveryAdmin() {
               <summary className="cursor-pointer px-4 py-3 text-sm text-wine">+ Hudud qo‘shish</summary>
               <div className="border-t border-line p-4">
                 <AdminForm action={saveZoneAction.bind(null, null)} submitLabel="Qo‘shish" resetOnSuccess>
-                  <ZoneFields regionId={r.id} />
+                  <ZoneFields regionId={r.id} districts={districtsOf.get(r.id) ?? []} covered={[]} />
                 </AdminForm>
               </div>
             </details>
@@ -104,6 +140,7 @@ export default async function DeliveryAdmin() {
             <F label="Slug" name="slug" placeholder="avtomatik" />
             <F label="Tartib" name="sortOrder" defaultValue={0} />
             <div className="flex items-end pb-2"><C label="Faol" name="isActive" /></div>
+            <LocationSelect picker={picker} value={null} />
           </div>
         </AdminForm>
       </section>

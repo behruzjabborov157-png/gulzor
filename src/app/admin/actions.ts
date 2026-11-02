@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { redirect } from "next/navigation";
@@ -35,6 +35,8 @@ import { UploadError } from "@/lib/storage";
 import { addOrderPhoto, moderateReview, resolveDispute } from "@/lib/trust";
 import { profileFromForm, updateFloristProfile } from "@/lib/florist-panel";
 import { saveProductForm } from "@/lib/product-save";
+import { coverageFromForm, getLocation, inUzbekistan, searchTextFor, setZoneCoverage } from "@/lib/locations";
+import { fixUzApostrophes } from "@/lib/translit";
 
 /* ------------------------------------------------------------------ */
 /* Auth                                                                */
@@ -235,6 +237,11 @@ export async function saveRegionAction(regionId: number | null, _: FormState, fo
   const name = String(form.get("name") ?? "").trim();
   if (name.length < 2) return { ok: false, message: "Nomini kiriting" };
   const db = await getDb();
+  const locationId = int(form.get("locationId")) || null;
+  if (locationId) {
+    const loc = await getLocation(locationId);
+    if (!loc || (loc.level !== "region" && loc.level !== "district")) return { ok: false, message: "Joylashuvni ro‘yxatdan tanlang" };
+  }
   const values = {
     name,
     slug: slugify(String(form.get("slug") ?? "") || name),
@@ -242,9 +249,17 @@ export async function saveRegionAction(regionId: number | null, _: FormState, fo
     sortOrder: int(form.get("sortOrder")) || 0,
     note: String(form.get("note") ?? "").trim(),
     nameRu: String(form.get("nameRu") ?? "").trim() || null,
+    locationId,
   };
-  if (regionId) await db.update(schema.deliveryRegions).set(values).where(eq(schema.deliveryRegions.id, regionId));
-  else await db.insert(schema.deliveryRegions).values(values);
+  if (regionId) {
+    const [before] = await db.select({ locationId: schema.deliveryRegions.locationId }).from(schema.deliveryRegions).where(eq(schema.deliveryRegions.id, regionId));
+    await db.update(schema.deliveryRegions).set(values).where(eq(schema.deliveryRegions.id, regionId));
+    // Another place means other districts: ticked districts of the old place no longer apply.
+    if (before && before.locationId !== locationId) {
+      const zoneIds = (await db.select({ id: schema.deliveryZones.id }).from(schema.deliveryZones).where(eq(schema.deliveryZones.regionId, regionId))).map((z) => z.id);
+      if (zoneIds.length) await db.delete(schema.zoneLocations).where(inArray(schema.zoneLocations.zoneId, zoneIds));
+    }
+  } else await db.insert(schema.deliveryRegions).values(values);
   revalidatePath("/admin/yetkazib-berish");
   return { ok: true, message: "Saqlandi" };
 }
@@ -279,8 +294,11 @@ export async function saveZoneAction(zoneId: number | null, _: FormState, form: 
     isActive: form.get("isActive") === "on",
     sortOrder: int(form.get("sortOrder")) || 0,
   };
+  let id = zoneId;
   if (zoneId) await db.update(schema.deliveryZones).set(values).where(eq(schema.deliveryZones.id, zoneId));
-  else await db.insert(schema.deliveryZones).values({ ...values, floristId: await platformFloristId() });
+  else [{ id }] = await db.insert(schema.deliveryZones).values({ ...values, floristId: await platformFloristId() }).returning({ id: schema.deliveryZones.id });
+  const coverage = coverageFromForm(form);
+  if (coverage && id) await setZoneCoverage(id, coverage);
   revalidatePath("/admin/yetkazib-berish");
   return { ok: true, message: "Saqlandi" };
 }
@@ -648,4 +666,60 @@ export async function resolveDisputeAction(disputeId: number, _: FormState, form
   }
   revalidatePath("/admin/murojaatlar");
   return { ok: true, message: "Saqlandi — mijoz qarorni buyurtma sahifasida ko‘radi" };
+}
+
+/* ------------------------------------------------------------------ */
+/* Places (regions, districts, settlements, mahallas)                  */
+/* ------------------------------------------------------------------ */
+
+const CHILD_LEVEL: Record<string, ("district" | "settlement" | "mahalla")[]> = {
+  region: ["district"],
+  district: ["settlement", "mahalla"],
+  settlement: ["mahalla"],
+  mahalla: [],
+};
+
+/** Edits a place, or with locationId = null adds one under parentId. Places are never deleted, only deactivated. */
+export async function saveLocationAction(locationId: number | null, parentId: number | null, _: FormState, form: FormData): Promise<FormState> {
+  const owner = await requireOwner();
+  const text = (k: string, max = 120) => String(form.get(k) ?? "").trim().slice(0, max);
+  const name = fixUzApostrophes(text("name"));
+  if (name.length < 2) return { ok: false, message: "Nomini (lotincha) kiriting" };
+  const coord = (k: string) => {
+    const raw = text(k, 20).replace(",", ".");
+    return raw ? Number(raw) : null;
+  };
+  const latitude = coord("latitude");
+  const longitude = coord("longitude");
+  if ((latitude == null) !== (longitude == null) || (latitude != null && (Number.isNaN(latitude) || Number.isNaN(longitude!) || !inUzbekistan(latitude, longitude!)))) {
+    return { ok: false, message: "Koordinatalar O‘zbekiston hududida bo‘lsin (masalan 41.3111 va 69.2797) yoki ikkalasi bo‘sh" };
+  }
+  const names = { name, nameCyrl: text("nameCyrl") || null, nameRu: text("nameRu") || null, nameEn: text("nameEn") || null };
+  const values = {
+    ...names,
+    latitude,
+    longitude,
+    searchText: searchTextFor(names),
+    isActive: form.get("isActive") === "on",
+    sortOrder: int(form.get("sortOrder")) || 0,
+    updatedAt: new Date(),
+  };
+  const db = await getDb();
+  if (locationId) {
+    const res = await db.update(schema.locations).set(values).where(eq(schema.locations.id, locationId)).returning({ id: schema.locations.id });
+    if (!res.length) return { ok: false, message: "Joy topilmadi" };
+    await audit(owner, "location.update", "location", locationId, { name, isActive: values.isActive });
+  } else {
+    const parent = parentId ? await getLocation(parentId) : null;
+    const level = String(form.get("level") ?? "");
+    const allowed = parent ? CHILD_LEVEL[parent.level] : ["region"];
+    if (!(allowed as string[]).includes(level)) return { ok: false, message: "Bu yerga bunday turdagi joy qo‘shib bo‘lmaydi" };
+    const [row] = await db
+      .insert(schema.locations)
+      .values({ ...values, parentId: parent?.id ?? null, level: level as "region" | "district" | "settlement" | "mahalla" })
+      .returning({ id: schema.locations.id });
+    await audit(owner, "location.create", "location", row.id, { name, level, parentId });
+  }
+  revalidatePath("/admin/joylashuvlar");
+  return { ok: true, message: "Saqlandi" };
 }

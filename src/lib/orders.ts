@@ -5,6 +5,7 @@ import { getDb, schema } from "@/db";
 import { DEFAULT_LOCALE, fmt, type Locale } from "@/i18n/config";
 import { getDict } from "@/i18n/dict";
 import { normalizePhone } from "@/lib/format";
+import { getLocation, inUzbekistan, isWithin } from "@/lib/locations";
 import { availablePaymentMethods } from "@/lib/payments/config";
 import { notifyFloristNewOrder } from "@/lib/florist-notify";
 import { adjustStock, cartLineSchema, quoteCart, StockError, type Quote } from "@/lib/quote";
@@ -71,6 +72,11 @@ export function makeCheckoutSchema(locale: Locale = DEFAULT_LOCALE) {
     recipientPhone: z.string().trim().max(30).default(""),
     anonymous: z.boolean().default(false),
     zoneId: z.number().int().positive().nullable().optional(),
+    districtId: z.number().int().positive().nullable().optional(),
+    mahallaId: z.number().int().positive().nullable().optional(),
+    /** "My location" from the browser: optional, only used as a map link for the courier. */
+    latitude: z.number().min(-90).max(90).nullable().optional(),
+    longitude: z.number().min(-180).max(180).nullable().optional(),
     district: text(80),
     neighborhood: text(80),
     address: text(200),
@@ -94,6 +100,9 @@ export function makeCheckoutSchema(locale: Locale = DEFAULT_LOCALE) {
     if (v.fulfillment === "delivery") {
       if (!v.zoneId) ctx.addIssue({ code: "custom", path: ["zoneId"], message: e.checkout.zone });
       if (v.address.length < 5) ctx.addIssue({ code: "custom", path: ["address"], message: e.checkout.address });
+      if (v.latitude != null && v.longitude != null && !inUzbekistan(v.latitude, v.longitude)) {
+        ctx.addIssue({ code: "custom", path: ["address"], message: e.checkout.location });
+      }
     }
   });
 }
@@ -140,10 +149,21 @@ export async function createOrder(
 
   // Authoritative server-side recalculation of every price, fee and availability.
   const quote = await quoteCart(
-    { lines: v.lines, couponCode: v.couponCode, fulfillment: v.fulfillment, zoneId: v.zoneId, date: v.date, slotId: v.slotId },
+    { lines: v.lines, couponCode: v.couponCode, fulfillment: v.fulfillment, zoneId: v.zoneId, districtId: v.districtId, date: v.date, slotId: v.slotId },
     { forCheckout: true, locale },
   );
-  if (quote.errors.length) return { ok: false, errors: quote.errors, quote };
+  if (quote.errors.length) {
+    // Point at the field too, so the form highlights the district picker.
+    const districtError = getDict(locale).errors.quote.districtRequired;
+    return { ok: false, errors: quote.errors, quote, ...(quote.errors.includes(districtError) ? { fieldErrors: { districtId: districtError } } : {}) };
+  }
+  // A mahalla from the list must lie in the chosen district; otherwise the typed name is kept as is.
+  const delivery = v.fulfillment === "delivery";
+  const mahalla = delivery && v.mahallaId && quote.district ? await getLocation(v.mahallaId) : null;
+  if (mahalla && (!mahalla.isActive || !(await isWithin(mahalla.id, quote.district!.id)))) {
+    return { ok: false, errors: [e.mahalla], fieldErrors: { neighborhood: e.mahalla }, quote };
+  }
+  const point = opts.location ?? (delivery && v.latitude != null && v.longitude != null ? { latitude: v.latitude, longitude: v.longitude } : null);
   // quoteCart guarantees exactly one approved florist when there are no errors.
   const floristId = quote.florist!.id;
   // Payment methods depend on the shop: marketplace shops are paid in cash on delivery.
@@ -211,8 +231,8 @@ export async function createOrder(
             idempotencyKey: v.submissionId ?? null,
             telegramUserId: tgUser ? String(tgUser.id) : null,
             telegramUsername: tgUser?.username ?? null,
-            latitude: opts.location?.latitude ?? null,
-            longitude: opts.location?.longitude ?? null,
+            latitude: point?.latitude ?? null,
+            longitude: point?.longitude ?? null,
             customerId,
             paymentMethod: v.paymentMethod,
             fulfillment: v.fulfillment,
@@ -226,8 +246,10 @@ export async function createOrder(
             regionName: quote.zone?.regionNameUz ?? null,
             zoneName: quote.zone?.nameUz ?? null,
             locale,
-            district: v.fulfillment === "delivery" ? v.district : "",
-            neighborhood: v.fulfillment === "delivery" ? v.neighborhood : "",
+            districtId: delivery ? (quote.district?.id ?? null) : null,
+            mahallaId: mahalla?.id ?? null,
+            district: delivery ? (quote.district?.nameUz ?? v.district) : "",
+            neighborhood: delivery ? (mahalla?.name ?? v.neighborhood) : "",
             address: v.fulfillment === "delivery" ? v.address : checkout.pickupAddress,
             apartment: v.fulfillment === "delivery" ? v.apartment : "",
             landmark: v.fulfillment === "delivery" ? v.landmark : "",
@@ -284,8 +306,12 @@ export async function createOrder(
             recipientPhone,
             regionId: quote.zone?.regionId ?? null,
             zoneId: quote.zone?.id ?? null,
-            district: v.district,
-            neighborhood: v.neighborhood,
+            districtId: quote.district?.id ?? null,
+            mahallaId: mahalla?.id ?? null,
+            district: quote.district?.nameUz ?? v.district,
+            neighborhood: mahalla?.name ?? v.neighborhood,
+            latitude: point?.latitude ?? null,
+            longitude: point?.longitude ?? null,
             address: v.address,
             apartment: v.apartment,
             landmark: v.landmark,
