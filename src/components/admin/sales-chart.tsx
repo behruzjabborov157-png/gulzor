@@ -1,11 +1,13 @@
-import { formatDateISO, formatUZS } from "@/lib/format";
+import { panelT } from "@/i18n/panel/server";
+
 
 /**
  * Daily revenue — single series, so no legend (the heading names it).
  * Thin bars with 2px gaps and rounded data-ends, recessive grid, a hover tooltip
  * per bar (bigger hit area than the mark) and a table view for screen readers.
  */
-export function SalesChart({ series }: { series: { date: string; revenue: number; orders: number }[] }) {
+export async function SalesChart({ series }: { series: { date: string; revenue: number; orders: number }[] }) {
+  const tt = await panelT();
   const max = Math.max(...series.map((s) => s.revenue), 0);
   const niceMax = max === 0 ? 100_000 : niceCeil(max);
   const ticks = [0, niceMax / 2, niceMax];
@@ -20,19 +22,19 @@ export function SalesChart({ series }: { series: { date: string; revenue: number
             <span className="absolute -top-2 -left-14 w-12 text-right text-[10px] text-muted">{shortUZS(t)}</span>
           </div>
         ))}
-        <div className="relative flex h-full items-end" role="img" aria-label="Kunlik tushum ustunli diagrammasi">
+        <div className="relative flex h-full items-end" role="img" aria-label={tt("Kunlik tushum ustunli diagrammasi")}>
           {series.map((s) => {
             const h = niceMax ? (s.revenue / niceMax) * 100 : 0;
             return (
               <div key={s.date} className="group relative flex h-full items-end justify-center" style={{ width: `${W}%` }}>
                 <div
                   className="w-[calc(100%-2px)] max-w-6 rounded-t-[4px] bg-wine transition-opacity group-hover:opacity-80"
-                  style={{ height: s.revenue > 0 ? `max(${h}%, 2px)` : 0 }}
+                  style={{ height: s.revenue > 0 ? tt("max({h}%, 2px)", { h: h }) : 0 }}
                 />
                 <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden -translate-x-1/2 rounded-lg bg-charcoal px-2.5 py-1.5 text-[11px] whitespace-nowrap text-ivory shadow group-hover:block">
-                  <p className="font-semibold">{formatDateISO(s.date, false)}</p>
-                  <p>{formatUZS(s.revenue)}</p>
-                  <p className="text-ivory/70">{s.orders} ta buyurtma</p>
+                  <p className="font-semibold">{tt.date(s.date, false)}</p>
+                  <p>{tt.uzs(s.revenue)}</p>
+                  <p className="text-ivory/70">{tt("{orders} ta buyurtma", { orders: s.orders })}</p>
                 </div>
               </div>
             );
@@ -40,25 +42,25 @@ export function SalesChart({ series }: { series: { date: string; revenue: number
         </div>
       </div>
       <div className="mt-2 flex justify-between pl-14 text-[10px] text-muted">
-        <span>{formatDateISO(series[0].date, false)}</span>
-        <span>{formatDateISO(series[series.length - 1].date, false)}</span>
+        <span>{tt.date(series[0].date, false)}</span>
+        <span>{tt.date(series[series.length - 1].date, false)}</span>
       </div>
       <details className="mt-3 text-sm">
-        <summary className="cursor-pointer text-muted">Jadval ko‘rinishi</summary>
+        <summary className="cursor-pointer text-muted">{tt("Jadval ko‘rinishi")}</summary>
         <table className="mt-2 w-full text-left text-xs">
           <thead>
             <tr className="text-muted">
-              <th className="py-1 font-medium">Sana</th>
-              <th className="py-1 font-medium">Buyurtmalar</th>
-              <th className="py-1 text-right font-medium">Tushum</th>
+              <th className="py-1 font-medium">{tt("Sana")}</th>
+              <th className="py-1 font-medium">{tt("Buyurtmalar")}</th>
+              <th className="py-1 text-right font-medium">{tt("Tushum")}</th>
             </tr>
           </thead>
           <tbody>
             {series.map((s) => (
               <tr key={s.date} className="border-t border-line">
-                <td className="py-1">{formatDateISO(s.date, false)}</td>
+                <td className="py-1">{tt.date(s.date, false)}</td>
                 <td className="py-1">{s.orders}</td>
-                <td className="py-1 text-right">{formatUZS(s.revenue)}</td>
+                <td className="py-1 text-right">{tt.uzs(s.revenue)}</td>
               </tr>
             ))}
           </tbody>

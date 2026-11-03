@@ -1,10 +1,13 @@
+import { panelT } from "@/i18n/panel/server";
 import { asc, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { saveCategoryAction } from "@/app/admin/actions";
 import { AdminForm, C, F } from "@/components/admin/admin-form";
 import { requireAdmin } from "@/lib/auth";
 
-export const metadata = { title: "Kategoriyalar" };
+export async function generateMetadata() {
+  return { title: (await panelT())("Kategoriyalar") };
+}
 
 const KINDS = [
   ["flower", "Gul turi"],
@@ -13,36 +16,38 @@ const KINDS = [
   ["collection", "Kolleksiya"],
 ] as const;
 
-function Fields({ c }: { c?: typeof schema.categories.$inferSelect }) {
+async function Fields({ c }: { c?: typeof schema.categories.$inferSelect }) {
+  const tt = await panelT();
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <F label="Nomi *" name="name" defaultValue={c?.name} required />
-      <F label="Slug" name="slug" defaultValue={c?.slug} placeholder="avtomatik" />
+      <F label={tt("Nomi *")} name="name" defaultValue={c?.name} required />
+      <F label={tt("Slug")} name="slug" defaultValue={c?.slug} placeholder={tt("avtomatik")} />
       <div>
-        <label className="mb-1 block text-xs font-medium text-muted">Turi</label>
-        <select name="kind" defaultValue={c?.kind ?? "flower"} className="field px-3 py-2" aria-label="Turi">
+        <label className="mb-1 block text-xs font-medium text-muted">{tt("Turi")}</label>
+        <select name="kind" defaultValue={c?.kind ?? "flower"} className="field px-3 py-2" aria-label={tt("Turi")}>
           {KINDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
       </div>
-      <F label="Tartib" name="sortOrder" defaultValue={c?.sortOrder ?? 0} inputMode="numeric" />
-      <div className="sm:col-span-2"><F label="Tavsif" name="description" defaultValue={c?.description} /></div>
-      <F label="Rasm URL (/images/... yoki /media/...)" name="imageUrl" defaultValue={c?.imageUrl} />
-      <div className="flex items-end pb-2"><C label="Faol" name="isActive" defaultChecked={c?.isActive ?? true} /></div>
-      <F label="SEO sarlavha" name="seoTitle" defaultValue={c?.seoTitle} />
-      <div className="sm:col-span-3"><F label="SEO tavsif" name="seoDescription" defaultValue={c?.seoDescription} /></div>
-      <F label="Nomi (rus.)" name="nameRu" defaultValue={c?.nameRu} lang="ru" />
-      <div className="sm:col-span-3"><F label="Tavsif (rus.)" name="descriptionRu" defaultValue={c?.descriptionRu} lang="ru" /></div>
-      <F label="SEO sarlavha (rus.)" name="seoTitleRu" defaultValue={c?.seoTitleRu} lang="ru" />
-      <div className="sm:col-span-3"><F label="SEO tavsif (rus.)" name="seoDescriptionRu" defaultValue={c?.seoDescriptionRu} lang="ru" /></div>
-      <F label="Nomi (ingl.)" name="nameEn" defaultValue={c?.nameEn} lang="en" />
-      <div className="sm:col-span-3"><F label="Tavsif (ingl.)" name="descriptionEn" defaultValue={c?.descriptionEn} lang="en" /></div>
-      <F label="SEO sarlavha (ingl.)" name="seoTitleEn" defaultValue={c?.seoTitleEn} lang="en" />
-      <div className="sm:col-span-3"><F label="SEO tavsif (ingl.)" name="seoDescriptionEn" defaultValue={c?.seoDescriptionEn} lang="en" /></div>
+      <F label={tt("Tartib")} name="sortOrder" defaultValue={c?.sortOrder ?? 0} inputMode="numeric" />
+      <div className="sm:col-span-2"><F label={tt("Tavsif")} name="description" defaultValue={c?.description} /></div>
+      <F label={tt("Rasm URL (/images/... yoki /media/...)")} name="imageUrl" defaultValue={c?.imageUrl} />
+      <div className="flex items-end pb-2"><C label={tt("Faol")} name="isActive" defaultChecked={c?.isActive ?? true} /></div>
+      <F label={tt("SEO sarlavha")} name="seoTitle" defaultValue={c?.seoTitle} />
+      <div className="sm:col-span-3"><F label={tt("SEO tavsif")} name="seoDescription" defaultValue={c?.seoDescription} /></div>
+      <F label={tt("Nomi (rus.)")} name="nameRu" defaultValue={c?.nameRu} lang="ru" />
+      <div className="sm:col-span-3"><F label={tt("Tavsif (rus.)")} name="descriptionRu" defaultValue={c?.descriptionRu} lang="ru" /></div>
+      <F label={tt("SEO sarlavha (rus.)")} name="seoTitleRu" defaultValue={c?.seoTitleRu} lang="ru" />
+      <div className="sm:col-span-3"><F label={tt("SEO tavsif (rus.)")} name="seoDescriptionRu" defaultValue={c?.seoDescriptionRu} lang="ru" /></div>
+      <F label={tt("Nomi (ingl.)")} name="nameEn" defaultValue={c?.nameEn} lang="en" />
+      <div className="sm:col-span-3"><F label={tt("Tavsif (ingl.)")} name="descriptionEn" defaultValue={c?.descriptionEn} lang="en" /></div>
+      <F label={tt("SEO sarlavha (ingl.)")} name="seoTitleEn" defaultValue={c?.seoTitleEn} lang="en" />
+      <div className="sm:col-span-3"><F label={tt("SEO tavsif (ingl.)")} name="seoDescriptionEn" defaultValue={c?.seoDescriptionEn} lang="en" /></div>
     </div>
   );
 }
 
 export default async function CategoriesAdmin() {
+  const tt = await panelT();
   await requireAdmin();
   const db = await getDb();
   const rows = await db
@@ -52,10 +57,10 @@ export default async function CategoriesAdmin() {
 
   return (
     <div className="max-w-5xl space-y-6">
-      <h1 className="text-4xl">Kategoriyalar</h1>
+      <h1 className="text-4xl">{tt("Kategoriyalar")}</h1>
       <section className="card p-5">
-        <h2 className="mb-3 text-2xl">Yangi kategoriya</h2>
-        <AdminForm action={saveCategoryAction.bind(null, null)} submitLabel="Qo‘shish" resetOnSuccess>
+        <h2 className="mb-3 text-2xl">{tt("Yangi kategoriya")}</h2>
+        <AdminForm action={saveCategoryAction.bind(null, null)} submitLabel={tt("Qo‘shish")} resetOnSuccess>
           <Fields />
         </AdminForm>
       </section>
@@ -66,8 +71,8 @@ export default async function CategoriesAdmin() {
             {rows.filter((r) => r.c.kind === kind).map(({ c, n }) => (
               <details key={c.id} className="card">
                 <summary className="flex cursor-pointer items-center justify-between px-5 py-3 text-sm">
-                  <span><strong>{c.name}</strong> <span className="text-muted">/{c.slug} · {n} mahsulot{c.isActive ? "" : " · o‘chirilgan"}</span></span>
-                  <span className="text-xs text-wine">Tahrirlash</span>
+                  <span><strong>{c.name}</strong> <span className="text-muted">{tt("{n} mahsulot · /{slug}{p}", { slug: c.slug, n: n, p: c.isActive ? "" : tt(" · o‘chirilgan") })}</span></span>
+                  <span className="text-xs text-wine">{tt("Tahrirlash")}</span>
                 </summary>
                 <div className="border-t border-line p-5">
                   <AdminForm action={saveCategoryAction.bind(null, c.id)}>

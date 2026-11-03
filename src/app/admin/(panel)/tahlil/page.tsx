@@ -1,9 +1,12 @@
+import { panelT } from "@/i18n/panel/server";
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
-import { formatUZS } from "@/lib/format";
+
 import { shopMetrics } from "@/lib/trust";
 
-export const metadata = { title: "Tahlil" };
+export async function generateMetadata() {
+  return { title: (await panelT())("Tahlil") };
+}
 
 const PERIODS = [7, 30, 90];
 
@@ -17,6 +20,7 @@ function minutes(m: number | null) {
 
 /** Per-shop operating numbers: volume, how fast shops confirm, how often they refuse, complaints and ratings. */
 export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<{ davr?: string }> }) {
+  const tt = await panelT();
   await requireAdmin();
   const sp = await searchParams;
   const days = PERIODS.includes(Number(sp.davr)) ? Number(sp.davr) : 30;
@@ -26,36 +30,31 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     { orders: 0, delivered: 0, refused: 0, goods: 0, commission: 0, disputes: 0 },
   );
   const cards = [
-    { label: "Buyurtmalar", value: String(total.orders) },
-    { label: "Yetkazilgan", value: `${total.delivered} (${pct(total.delivered, total.orders)})` },
-    { label: "Rad / bekor", value: `${total.refused} (${pct(total.refused, total.orders)})` },
-    { label: "Yetkazilgan mahsulotlar summasi", value: formatUZS(total.goods) },
-    { label: "Komissiya", value: formatUZS(total.commission) },
-    { label: "Murojaatlar", value: String(total.disputes) },
+    { label: tt("Buyurtmalar"), value: String(total.orders) },
+    { label: tt("Yetkazilgan"), value: `${total.delivered} (${pct(total.delivered, total.orders)})` },
+    { label: tt("Rad / bekor"), value: `${total.refused} (${pct(total.refused, total.orders)})` },
+    { label: tt("Yetkazilgan mahsulotlar summasi"), value: tt.uzs(total.goods) },
+    { label: tt("Komissiya"), value: tt.uzs(total.commission) },
+    { label: tt("Murojaatlar"), value: String(total.disputes) },
   ];
 
   return (
     <div className="max-w-6xl space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="mb-2 text-4xl">Tahlil</h1>
-          <p className="max-w-3xl text-sm text-muted">
-            Oxirgi {days} kunda berilgan buyurtmalar bo‘yicha. «Qabul qilish vaqti» — buyurtmadan do‘kon qabul qilguncha o‘tgan vaqtning medianasi.
-            Reyting — e’lon qilingan barcha sharhlar bo‘yicha.
-          </p>
+          <h1 className="mb-2 text-4xl">{tt("Tahlil")}</h1>
+          <p className="max-w-3xl text-sm text-muted">{tt("Oxirgi {days} kunda berilgan buyurtmalar bo‘yicha. «Qabul qilish vaqti» — buyurtmadan do‘kon qabul qilguncha o‘tgan vaqtning medianasi. Reyting — e’lon qilingan barcha sharhlar bo‘yicha.", { days: days })}</p>
         </div>
-        <nav aria-label="Davr" className="flex gap-2">
+        <nav aria-label={tt("Davr")} className="flex gap-2">
           {PERIODS.map((p) => (
-            <Link key={p} href={`/admin/tahlil?davr=${p}`} className={`chip ${p === days ? "chip-active" : ""}`}>
-              {p} kun
-            </Link>
+            <Link key={p} href={`/admin/tahlil?davr=${p}`} className={`chip ${p === days ? "chip-active" : ""}`}>{tt("{p} kun", { p: p })}</Link>
           ))}
         </nav>
       </div>
       <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map((c) => (
-          <div key={c.label} className="card p-5">
-            <dt className="text-sm text-muted">{c.label}</dt>
+          <div key={tt(c.label)} className="card p-5">
+            <dt className="text-sm text-muted">{tt(c.label)}</dt>
             <dd className="mt-1 font-display text-3xl text-plum">{c.value}</dd>
           </div>
         ))}
@@ -64,15 +63,15 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         <table className="w-full min-w-[960px] text-left text-sm">
           <thead className="border-b border-line bg-ivory text-xs text-muted">
             <tr>
-              <th className="px-4 py-3 font-medium">Do‘kon</th>
-              <th className="px-4 py-3 text-right font-medium">Buyurtma</th>
-              <th className="px-4 py-3 text-right font-medium">Yetkazilgan</th>
-              <th className="px-4 py-3 text-right font-medium">Rad etilgan</th>
-              <th className="px-4 py-3 text-right font-medium">Bekor</th>
-              <th className="px-4 py-3 text-right font-medium">Qabul qilish vaqti</th>
-              <th className="px-4 py-3 text-right font-medium">Murojaat</th>
-              <th className="px-4 py-3 text-right font-medium">Reyting</th>
-              <th className="px-4 py-3 text-right font-medium">Summa</th>
+              <th className="px-4 py-3 font-medium">{tt("Do‘kon")}</th>
+              <th className="px-4 py-3 text-right font-medium">{tt("Buyurtma")}</th>
+              <th className="px-4 py-3 text-right font-medium">{tt("Yetkazilgan")}</th>
+              <th className="px-4 py-3 text-right font-medium">{tt("Rad etilgan")}</th>
+              <th className="px-4 py-3 text-right font-medium">{tt("Bekor")}</th>
+              <th className="px-4 py-3 text-right font-medium">{tt("Qabul qilish vaqti")}</th>
+              <th className="px-4 py-3 text-right font-medium">{tt("Murojaat")}</th>
+              <th className="px-4 py-3 text-right font-medium">{tt("Reyting")}</th>
+              <th className="px-4 py-3 text-right font-medium">{tt("Summa")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
@@ -82,7 +81,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
                   <Link href={`/admin/floristlar/${r.floristId}`} className="text-wine hover:underline">
                     {r.name}
                   </Link>
-                  {r.isPlatform ? <span className="ml-1.5 text-[10px] text-muted">Gulzor</span> : null}
+                  {r.isPlatform ? <span className="ml-1.5 text-[10px] text-muted">{tt("Gulzor")}</span> : null}
                 </td>
                 <td className="px-4 py-3 text-right">{r.orders}</td>
                 <td className="px-4 py-3 text-right">{r.delivered}</td>
@@ -93,7 +92,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
                 <td className="px-4 py-3 text-right">{minutes(r.medianConfirmMinutes)}</td>
                 <td className={`px-4 py-3 text-right ${r.disputes ? "font-semibold text-danger" : ""}`}>{r.disputes}</td>
                 <td className="px-4 py-3 text-right">{r.rating != null ? `${r.rating.toLocaleString("uz-UZ")} ★ (${r.reviews})` : "—"}</td>
-                <td className="px-4 py-3 text-right">{formatUZS(r.goods)}</td>
+                <td className="px-4 py-3 text-right">{tt.uzs(r.goods)}</td>
               </tr>
             ))}
           </tbody>

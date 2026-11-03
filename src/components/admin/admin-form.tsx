@@ -1,5 +1,6 @@
 "use client";
 
+import { usePanelT } from "@/i18n/panel/client";
 import { submitWithoutReset } from "@/lib/use-form-submit";
 import { useActionState, useEffect, useId, useRef } from "react";
 import type { FormState } from "@/lib/form-state";
@@ -19,6 +20,7 @@ export function AdminForm({
   /** Clear the fields after a successful save (for “add new” forms). */
   resetOnSuccess?: boolean;
 }) {
+  const tt = usePanelT();
   const [state, formAction, pending] = useActionState<FormState, FormData>(action, {});
   const ref = useRef<HTMLFormElement>(null);
   useEffect(() => {
@@ -28,9 +30,9 @@ export function AdminForm({
     <form ref={ref} onSubmit={submitWithoutReset(formAction)} className={className}>
       {children}
       <div className="mt-3 flex flex-wrap items-center gap-3">
-        <button className="btn-primary btn-sm" disabled={pending}>{pending ? "Saqlanmoqda…" : submitLabel}</button>
+        <button className="btn-primary btn-sm" disabled={pending}>{pending ? tt("Saqlanmoqda…") : submitLabel}</button>
         {state.message ? (
-          <span role="status" className={`text-sm ${state.ok ? "text-success" : "text-danger"}`}>{state.message}</span>
+          <span role="status" className={`text-sm ${state.ok ? "text-success" : "text-danger"}`}>{tt(state.message)}</span>
         ) : null}
       </div>
     </form>

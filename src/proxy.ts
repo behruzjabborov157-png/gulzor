@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+const PANEL_COOKIE = "gulzor_panel_lang"; // same as src/i18n/panel/core.ts (not imported: it pulls in the dictionaries)
+
 /**
  * 1. Language routing: Uzbek pages keep clean URLs (/katalog) and are rewritten internally to
  *    /uz/katalog; Russian pages live under /ru/…, English ones under /en/…; /uz/… redirects to the clean URL.
@@ -21,7 +23,9 @@ export function proxy(request: NextRequest) {
   }
 
   const prefixed = pathname.match(/^\/(ru|en)(?=\/|$)/)?.[1] as "ru" | "en" | undefined;
-  const locale = prefixed ?? "uz";
+  // Panels have no language in the URL: the admin's own choice is kept in a cookie.
+  const panelLang = isAdmin ? request.cookies.get(PANEL_COOKIE)?.value : undefined;
+  const locale = prefixed ?? (panelLang === "ru" || panelLang === "en" ? panelLang : "uz");
 
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const isDev = process.env.NODE_ENV === "development";

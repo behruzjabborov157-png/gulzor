@@ -1,11 +1,14 @@
+import { panelT } from "@/i18n/panel/server";
 import Link from "next/link";
 import { issueStatementsAction, setStatementPaidAction } from "@/app/admin/actions";
 import { AdminForm } from "@/components/admin/admin-form";
 import { requireOwner } from "@/lib/auth";
 import { addMonths, currentPeriod, listStatements, unbilledByFlorist } from "@/lib/commission";
-import { formatDateTime, formatUZS } from "@/lib/format";
+import { formatDateTime } from "@/lib/format";
 
-export const metadata = { title: "Komissiya" };
+export async function generateMetadata() {
+  return { title: (await panelT())("Komissiya") };
+}
 
 const FILTERS = [
   { key: "", label: "Barchasi" },
@@ -15,6 +18,7 @@ const FILTERS = [
 
 /** Monthly commission statements for marketplace shops: issue, then record the shop's payment. */
 export default async function CommissionPage({ searchParams }: { searchParams: Promise<{ holat?: string }> }) {
+  const tt = await panelT();
   await requireOwner();
   const sp = await searchParams;
   const status = sp.holat === "paid" || sp.holat === "unpaid" ? sp.holat : undefined;
@@ -26,21 +30,20 @@ export default async function CommissionPage({ searchParams }: { searchParams: P
   return (
     <div className="max-w-6xl space-y-6">
       <div>
-        <h1 className="mb-2 text-4xl">Komissiya</h1>
+        <h1 className="mb-2 text-4xl">{tt("Komissiya")}</h1>
         <p className="max-w-3xl text-sm text-muted">
-          Mijozlar do‘konlarga to‘g‘ridan-to‘g‘ri to‘laydi. Har oy tugagach, har bir do‘konga yetkazilgan buyurtmalari bo‘yicha komissiya hisobi
-          chiqariladi; do‘kon to‘lagach, shu yerda «To‘landi» deb belgilaysiz. Kechikib yetkazilgan buyurtma keyingi hisobga tushadi.
+          {tt("Mijozlar do‘konlarga to‘g‘ridan-to‘g‘ri to‘laydi. Har oy tugagach, har bir do‘konga yetkazilgan buyurtmalari bo‘yicha komissiya hisobi chiqariladi; do‘kon to‘lagach, shu yerda «To‘landi» deb belgilaysiz. Kechikib yetkazilgan buyurtma keyingi hisobga tushadi.")}
         </p>
       </div>
 
       <section className="card p-6" aria-labelledby="issue-h">
         <h2 id="issue-h" className="mb-1 text-2xl">
-          Oylik hisob chiqarish
+          {tt("Oylik hisob chiqarish")}
         </h2>
-        <p className="mb-4 text-sm text-muted">Tanlangan oy oxirigacha yetkazilgan va hali hisobga kirmagan buyurtmalar olinadi. Do‘konlarga xabar yuboriladi.</p>
-        <AdminForm action={issueStatementsAction} submitLabel="Hisob chiqarish">
+        <p className="mb-4 text-sm text-muted">{tt("Tanlangan oy oxirigacha yetkazilgan va hali hisobga kirmagan buyurtmalar olinadi. Do‘konlarga xabar yuboriladi.")}</p>
+        <AdminForm action={issueStatementsAction} submitLabel={tt("Hisob chiqarish")}>
           <label htmlFor="period" className="label">
-            Oy
+            {tt("Oy")}
           </label>
           <select id="period" name="period" defaultValue={last} className="field max-w-[12rem] py-2">
             {months.map((m) => (
@@ -54,22 +57,22 @@ export default async function CommissionPage({ searchParams }: { searchParams: P
 
       <section className="card overflow-x-auto" aria-labelledby="unbilled-h">
         <h2 id="unbilled-h" className="px-6 pt-6 text-2xl">
-          Hali hisobga kirmagan
+          {tt("Hali hisobga kirmagan")}
         </h2>
         <table className="mt-3 w-full min-w-[560px] text-left text-sm">
           <thead className="border-y border-line bg-ivory text-xs text-muted">
             <tr>
-              <th className="px-6 py-3 font-medium">Do‘kon</th>
-              <th className="px-4 py-3 text-right font-medium">Yetkazilgan buyurtma</th>
-              <th className="px-4 py-3 text-right font-medium">Mahsulotlar summasi</th>
-              <th className="px-6 py-3 text-right font-medium">Komissiya</th>
+              <th className="px-6 py-3 font-medium">{tt("Do‘kon")}</th>
+              <th className="px-4 py-3 text-right font-medium">{tt("Yetkazilgan buyurtma")}</th>
+              <th className="px-4 py-3 text-right font-medium">{tt("Mahsulotlar summasi")}</th>
+              <th className="px-6 py-3 text-right font-medium">{tt("Komissiya")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
             {unbilled.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-6 py-8 text-center text-muted">
-                  Hisobga kirmagan buyurtma yo‘q
+                  {tt("Hisobga kirmagan buyurtma yo‘q")}
                 </td>
               </tr>
             ) : (
@@ -81,8 +84,8 @@ export default async function CommissionPage({ searchParams }: { searchParams: P
                     </Link>
                   </td>
                   <td className="px-4 py-3 text-right">{u.orders}</td>
-                  <td className="px-4 py-3 text-right">{formatUZS(u.goods)}</td>
-                  <td className="px-6 py-3 text-right font-semibold">{formatUZS(u.commission)}</td>
+                  <td className="px-4 py-3 text-right">{tt.uzs(u.goods)}</td>
+                  <td className="px-6 py-3 text-right font-semibold">{tt.uzs(u.commission)}</td>
                 </tr>
               ))
             )}
@@ -93,16 +96,16 @@ export default async function CommissionPage({ searchParams }: { searchParams: P
       <section aria-labelledby="statements-h">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
           <h2 id="statements-h" className="text-2xl">
-            Hisoblar
+            {tt("Hisoblar")}
           </h2>
           <p className="text-sm">
-            To‘lanmagan jami: <b>{formatUZS(owed)}</b>
+            {tt("To‘lanmagan jami:")}{" "}<b>{tt.uzs(owed)}</b>
           </p>
         </div>
-        <nav aria-label="Holat bo‘yicha" className="mb-4 flex flex-wrap gap-2">
+        <nav aria-label={tt("Holat bo‘yicha")} className="mb-4 flex flex-wrap gap-2">
           {FILTERS.map((f) => (
             <Link key={f.key || "all"} href={f.key ? `/admin/komissiya?holat=${f.key}` : "/admin/komissiya"} className={`chip ${(status ?? "") === f.key ? "chip-active" : ""}`}>
-              {f.label}
+              {tt(f.label)}
             </Link>
           ))}
         </nav>
@@ -110,19 +113,19 @@ export default async function CommissionPage({ searchParams }: { searchParams: P
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="border-b border-line bg-ivory text-xs text-muted">
               <tr>
-                <th className="px-4 py-3 font-medium">Oy</th>
-                <th className="px-4 py-3 font-medium">Do‘kon</th>
-                <th className="px-4 py-3 text-right font-medium">Buyurtma</th>
-                <th className="px-4 py-3 text-right font-medium">Mahsulotlar</th>
-                <th className="px-4 py-3 text-right font-medium">Komissiya</th>
-                <th className="px-4 py-3 font-medium">Holat</th>
+                <th className="px-4 py-3 font-medium">{tt("Oy")}</th>
+                <th className="px-4 py-3 font-medium">{tt("Do‘kon")}</th>
+                <th className="px-4 py-3 text-right font-medium">{tt("Buyurtma")}</th>
+                <th className="px-4 py-3 text-right font-medium">{tt("Mahsulotlar")}</th>
+                <th className="px-4 py-3 text-right font-medium">{tt("Komissiya")}</th>
+                <th className="px-4 py-3 font-medium">{tt("Holat")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
               {rows.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-center text-muted">
-                    Hali hisob chiqarilmagan
+                    {tt("Hali hisob chiqarilmagan")}
                   </td>
                 </tr>
               ) : (
@@ -135,26 +138,26 @@ export default async function CommissionPage({ searchParams }: { searchParams: P
                       </Link>
                     </td>
                     <td className="px-4 py-3 text-right">{s.orderCount}</td>
-                    <td className="px-4 py-3 text-right">{formatUZS(s.goodsTotal)}</td>
-                    <td className="px-4 py-3 text-right font-semibold">{formatUZS(s.commissionTotal)}</td>
+                    <td className="px-4 py-3 text-right">{tt.uzs(s.goodsTotal)}</td>
+                    <td className="px-4 py-3 text-right font-semibold">{tt.uzs(s.commissionTotal)}</td>
                     <td className="px-4 py-3">
                       {s.status === "paid" ? (
                         <div>
-                          <span className="badge bg-sage-light text-wine">To‘langan</span>
+                          <span className="badge bg-sage-light text-wine">{tt("To‘langan")}</span>
                           <p className="mt-1 text-xs text-muted">
                             {s.paidAt ? formatDateTime(s.paidAt) : ""}
                             {s.paidNote ? ` · ${s.paidNote}` : ""}
                           </p>
-                          <AdminForm action={setStatementPaidAction.bind(null, s.id, false)} submitLabel="Bekor qilish">
+                          <AdminForm action={setStatementPaidAction.bind(null, s.id, false)} submitLabel={tt("Bekor qilish")}>
                             {null}
                           </AdminForm>
                         </div>
                       ) : (
-                        <AdminForm action={setStatementPaidAction.bind(null, s.id, true)} submitLabel="To‘landi">
+                        <AdminForm action={setStatementPaidAction.bind(null, s.id, true)} submitLabel={tt("To‘landi")}>
                           <label htmlFor={`note-${s.id}`} className="sr-only">
-                            Izoh
+                            {tt("Izoh")}
                           </label>
-                          <input id={`note-${s.id}`} name="note" placeholder="Izoh (masalan, to‘lov raqami)" maxLength={300} className="field max-w-xs py-1.5 text-sm" />
+                          <input id={`note-${s.id}`} name="note" placeholder={tt("Izoh (masalan, to‘lov raqami)")} maxLength={300} className="field max-w-xs py-1.5 text-sm" />
                         </AdminForm>
                       )}
                     </td>

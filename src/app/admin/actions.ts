@@ -2,6 +2,7 @@
 
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { panelT } from "@/i18n/panel/server";
 import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -466,7 +467,7 @@ export async function importProductsAction(_: FormState, form: FormData): Promis
   if (rows.length < 2) return { ok: false, message: "Faylda ma’lumot yo‘q" };
   const header = rows[0].map((h) => h.trim());
   const missing = ["slug", "name", "price"].filter((c) => !header.includes(c));
-  if (missing.length) return { ok: false, message: `Ustunlar yetishmaydi: ${missing.join(", ")}. Shablon: ${PRODUCT_CSV_COLUMNS.join(", ")}` };
+  if (missing.length) return { ok: false, message: (await panelT())("Ustunlar yetishmaydi: {missing}. Shablon: {columns}", { missing: missing.join(", "), columns: PRODUCT_CSV_COLUMNS.join(", ") }) };
 
   const db = await getDb();
   const cats = await db.select({ id: schema.categories.id, slug: schema.categories.slug }).from(schema.categories);
@@ -557,7 +558,7 @@ export async function importProductsAction(_: FormState, form: FormData): Promis
   revalidatePath("/admin/mahsulotlar");
   return {
     ok: errors.length === 0,
-    message: `Yaratildi: ${created}, yangilandi: ${updated}.${errors.length ? ` Xatolar (${errors.length}): ${errors.slice(0, 10).join("; ")}` : ""}`,
+    message: (await panelT())("Yaratildi: {created}, yangilandi: {updated}.", { created, updated }) + (errors.length ? ` ${errors.length}: ${errors.slice(0, 10).join("; ")}` : ""),
   };
 }
 
@@ -624,7 +625,7 @@ export async function issueStatementsAction(_: FormState, form: FormData): Promi
     ),
   );
   revalidatePath("/admin/komissiya");
-  return { ok: true, message: res.issued.length ? `${res.issued.length} ta do‘konga hisob chiqarildi` : "Hisoblanadigan yangi buyurtma yo‘q" };
+  return { ok: true, message: res.issued.length ? (await panelT())("{n} ta do‘konga hisob chiqarildi", { n: res.issued.length }) : "Hisoblanadigan yangi buyurtma yo‘q" };
 }
 
 export async function setStatementPaidAction(statementId: number, paid: boolean, _: FormState, form: FormData): Promise<FormState> {

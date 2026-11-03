@@ -1,26 +1,30 @@
+import { panelT } from "@/i18n/panel/server";
 import Link from "next/link";
 import Image from "next/image";
 import { requireFlorist } from "@/lib/auth";
 import { floristProducts } from "@/lib/florist-panel";
-import { formatUZS } from "@/lib/format";
 
-export const metadata = { title: "Mahsulotlar" };
+
+export async function generateMetadata() {
+  return { title: (await panelT())("Mahsulotlar") };
+}
 
 const STATUS: Record<string, string> = { active: "Faol", draft: "Qoralama", archived: "Arxiv" };
 
 export default async function FloristProductsPage() {
+  const tt = await panelT();
   const me = await requireFlorist();
   const products = await floristProducts(me.floristId);
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-4xl">Mahsulotlar</h1>
+        <h1 className="text-4xl">{tt("Mahsulotlar")}</h1>
         <Link href="/florist/mahsulotlar/yangi" className="btn-primary btn-sm">
-          + Yangi mahsulot
+          {tt("+ Yangi mahsulot")}
         </Link>
       </div>
       {products.length === 0 ? (
-        <p className="card p-8 text-center text-muted">Hali mahsulot yo‘q. Birinchi guldastangizni rasm bilan qo‘shing.</p>
+        <p className="card p-8 text-center text-muted">{tt("Hali mahsulot yo‘q. Birinchi guldastangizni rasm bilan qo‘shing.")}</p>
       ) : (
         <ul className="card divide-y divide-line">
           {products.map((p) => (
@@ -33,8 +37,8 @@ export default async function FloristProductsPage() {
                   {p.name}
                 </Link>
                 <span className="block text-xs text-muted">
-                  {STATUS[p.status]} · {p.pricingMode === "fixed" ? formatUZS(p.price) : p.pricingMode === "variants" ? "o‘lchamlar bo‘yicha" : "dona hisobida"}
-                  {p.stockQuantity != null ? ` · qoldiq: ${p.stockQuantity}` : ""}
+                  {tt(STATUS[p.status])} · {p.pricingMode === "fixed" ? tt.uzs(p.price) : p.pricingMode === "variants" ? tt("o‘lchamlar bo‘yicha") : tt("dona hisobida")}
+                  {p.stockQuantity != null ? tt(" · qoldiq: {stockQuantity}", { stockQuantity: p.stockQuantity }) : ""}
                 </span>
               </span>
             </li>

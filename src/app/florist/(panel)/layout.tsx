@@ -1,14 +1,18 @@
+import { panelT } from "@/i18n/panel/server";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { floristLogoutAction } from "@/app/florist/actions";
 import { FloristNav } from "@/components/florist/nav";
+import { PanelLanguage } from "@/components/admin/panel-language";
 import { Logo } from "@/components/ui/primitives";
 import { getDb, schema } from "@/db";
 import { requireFlorist } from "@/lib/auth";
 import { floristOverview } from "@/lib/florist-panel";
 
-export const metadata: Metadata = { title: { default: "Florist paneli", template: "%s — Gulzor florist" }, robots: { index: false, follow: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: { default: (await panelT())("Florist paneli"), template: "%s — Gulzor florist" }, robots: { index: false, follow: false } };
+}
 export const dynamic = "force-dynamic";
 
 const STATUS_NOTE: Record<string, { tone: string; text: string }> = {
@@ -22,6 +26,7 @@ const STATUS_NOTE: Record<string, { tone: string; text: string }> = {
 
 /** Florist panel shell. Every page below runs requireFlorist(): only a florist account bound to a shop gets in. */
 export default async function FloristLayout({ children }: { children: React.ReactNode }) {
+  const tt = await panelT();
   const me = await requireFlorist();
   const db = await getDb();
   const [shop] = await db.select().from(schema.florists).where(eq(schema.florists.id, me.floristId));
@@ -32,7 +37,7 @@ export default async function FloristLayout({ children }: { children: React.Reac
       <aside className="border-b border-line bg-white lg:border-r lg:border-b-0">
         <div className="lg:sticky lg:top-0 lg:max-h-dvh lg:overflow-y-auto">
           <div className="flex items-center justify-between px-5 py-4 lg:block lg:py-6">
-            <Link href="/florist" aria-label="Florist paneli">
+            <Link href="/florist" aria-label={tt("Florist paneli")}>
               <Logo />
             </Link>
             <p className="text-xs text-muted lg:mt-2">
@@ -43,11 +48,12 @@ export default async function FloristLayout({ children }: { children: React.Reac
           <div className="flex items-center gap-4 px-5 pb-4 lg:block lg:py-4">
             {shop.status === "approved" ? (
               <Link href={`/dokon/${shop.slug}`} className="block text-sm text-muted hover:text-wine" target="_blank">
-                Do‘kon sahifasi ↗
+                {tt("Do‘kon sahifasi ↗")}
               </Link>
             ) : null}
+            <PanelLanguage className="lg:mt-3" />
             <form action={floristLogoutAction} className="lg:mt-3">
-              <button className="text-sm text-danger hover:underline">Chiqish</button>
+              <button className="text-sm text-danger hover:underline">{tt("Chiqish")}</button>
             </form>
           </div>
         </div>
@@ -55,8 +61,8 @@ export default async function FloristLayout({ children }: { children: React.Reac
       <main className="min-w-0 px-4 py-6 sm:px-8 lg:py-10">
         {note ? (
           <div role="status" className={`mb-6 rounded-xl border px-4 py-3 text-sm ${note.tone}`}>
-            {note.text}
-            {shop.statusReason ? <span className="mt-1 block">Sabab: {shop.statusReason}</span> : null}
+            {tt(note.text)}
+            {shop.statusReason ? <span className="mt-1 block">{tt("Sabab: {statusReason}", { statusReason: shop.statusReason })}</span> : null}
           </div>
         ) : null}
         {children}

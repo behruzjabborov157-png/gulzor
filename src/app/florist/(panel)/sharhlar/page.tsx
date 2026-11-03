@@ -1,15 +1,19 @@
+import { panelT } from "@/i18n/panel/server";
 import { floristReviewReplyAction } from "@/app/florist/actions";
 import { AdminForm } from "@/components/admin/admin-form";
 import { requireFlorist } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
 import { listReviews } from "@/lib/trust";
 
-export const metadata = { title: "Sharhlar" };
+export async function generateMetadata() {
+  return { title: (await panelT())("Sharhlar") };
+}
 
 const STATUS: Record<string, string> = { pending: "Gulzor tekshiruvida", approved: "E’lon qilingan", rejected: "E’lon qilinmagan" };
 
 /** Reviews of the shop's own delivered orders; the shop can answer publicly. */
 export default async function FloristReviewsPage() {
+  const tt = await panelT();
   const me = await requireFlorist();
   const rows = await listReviews({ floristId: me.floristId });
   const published = rows.filter((x) => x.r.status === "approved");
@@ -17,13 +21,10 @@ export default async function FloristReviewsPage() {
 
   return (
     <div className="max-w-4xl space-y-6">
-      <h1 className="text-4xl">Sharhlar</h1>
-      <p className="text-sm text-muted">
-        Sharhni faqat buyurtmasi yetkazilgan mijoz qoldira oladi. Gulzor tekshirgach, do‘kon sahifangizda chiqadi. Javobingiz ham ochiq ko‘rinadi.
-        {avg != null ? ` O‘rtacha baho: ${avg.toLocaleString("uz-UZ")} (${published.length} ta).` : ""}
-      </p>
+      <h1 className="text-4xl">{tt("Sharhlar")}</h1>
+      <p className="text-sm text-muted">{tt("Sharhni faqat buyurtmasi yetkazilgan mijoz qoldira oladi. Gulzor tekshirgach, do‘kon sahifangizda chiqadi. Javobingiz ham ochiq ko‘rinadi. {p}", { p: avg != null ? ` O‘rtacha baho: ${avg.toLocaleString("uz-UZ")} (${published.length} ta).` : "" })}</p>
       {rows.length === 0 ? (
-        <p className="card p-8 text-center text-muted">Hali sharh yo‘q.</p>
+        <p className="card p-8 text-center text-muted">{tt("Hali sharh yo‘q.")}</p>
       ) : (
         <ul className="space-y-4">
           {rows.map(({ r, number }) => (
@@ -34,17 +35,17 @@ export default async function FloristReviewsPage() {
                     {"★".repeat(r.rating)}
                     <span className="text-line">{"★".repeat(5 - r.rating)}</span>
                   </span>{" "}
-                  <b>{r.authorName}</b> · buyurtma {number}
+                  <b>{r.authorName}</b>{" "}{tt("· buyurtma")}{" "}{number}
                 </span>
                 <span className="text-muted">
-                  {formatDateTime(r.createdAt)} · {STATUS[r.status]}
+                  {formatDateTime(r.createdAt)} · {tt(STATUS[r.status])}
                 </span>
               </p>
-              {r.text ? <p className="mt-2 whitespace-pre-line">{r.text}</p> : null}
+              {r.text ? <p className="mt-2 whitespace-pre-line">{tt(r.text)}</p> : null}
               {r.status !== "rejected" ? (
-                <AdminForm action={floristReviewReplyAction.bind(null, r.id)} submitLabel="Javobni saqlash" className="mt-3">
+                <AdminForm action={floristReviewReplyAction.bind(null, r.id)} submitLabel={tt("Javobni saqlash")} className="mt-3">
                   <label htmlFor={`reply-${r.id}`} className="label">
-                    Do‘kon javobi (ochiq ko‘rinadi)
+                    {tt("Do‘kon javobi (ochiq ko‘rinadi)")}
                   </label>
                   <textarea id={`reply-${r.id}`} name="reply" defaultValue={r.floristReply ?? ""} rows={2} maxLength={1000} className="field" />
                 </AdminForm>

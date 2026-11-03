@@ -1,3 +1,4 @@
+import { panelT } from "@/i18n/panel/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { asc, eq } from "drizzle-orm";
@@ -5,9 +6,12 @@ import { getDb, schema } from "@/db";
 import { ProductForm } from "@/components/admin/product-form";
 import { requireAdmin } from "@/lib/auth";
 
-export const metadata = { title: "Mahsulot" };
+export async function generateMetadata() {
+  return { title: (await panelT())("Mahsulot") };
+}
 
 export default async function ProductEditPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saqlandi?: string }> }) {
+  const tt = await panelT();
   await requireAdmin();
   const { id } = await params;
   const { saqlandi } = await searchParams;
@@ -17,8 +21,8 @@ export default async function ProductEditPage({ params, searchParams }: { params
   if (id === "yangi") {
     return (
       <div className="max-w-4xl">
-        <Link href="/admin/mahsulotlar" className="text-sm text-muted hover:text-wine">← Mahsulotlar</Link>
-        <h1 className="mt-2 mb-6 text-4xl">Yangi mahsulot</h1>
+        <Link href="/admin/mahsulotlar" className="text-sm text-muted hover:text-wine">{tt("← Mahsulotlar")}</Link>
+        <h1 className="mt-2 mb-6 text-4xl">{tt("Yangi mahsulot")}</h1>
         <ProductForm product={null} variants={[]} categoryIds={[]} categories={categories} />
       </div>
     );
@@ -33,12 +37,12 @@ export default async function ProductEditPage({ params, searchParams }: { params
 
   return (
     <div className="max-w-4xl">
-      <Link href="/admin/mahsulotlar" className="text-sm text-muted hover:text-wine">← Mahsulotlar</Link>
+      <Link href="/admin/mahsulotlar" className="text-sm text-muted hover:text-wine">{tt("← Mahsulotlar")}</Link>
       <div className="mt-2 mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-4xl">{product.name}</h1>
-        {product.status === "active" ? <Link href={`/gul/${product.slug}`} target="_blank" className="text-sm text-wine underline">Saytda ko‘rish ↗</Link> : null}
+        {product.status === "active" ? <Link href={`/gul/${product.slug}`} target="_blank" className="text-sm text-wine underline">{tt("Saytda ko‘rish ↗")}</Link> : null}
       </div>
-      {saqlandi ? <p className="mb-4 rounded-xl bg-success/5 px-4 py-3 text-sm text-success" role="status">Mahsulot yaratildi.</p> : null}
+      {saqlandi ? <p className="mb-4 rounded-xl bg-success/5 px-4 py-3 text-sm text-success" role="status">{tt("Mahsulot yaratildi.")}</p> : null}
       <ProductForm product={product} variants={variants} categoryIds={pcs.map((x) => x.categoryId)} categories={categories} />
     </div>
   );

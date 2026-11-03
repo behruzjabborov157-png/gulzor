@@ -1,3 +1,4 @@
+import { panelT } from "@/i18n/panel/server";
 import { asc, eq } from "drizzle-orm";
 import { floristSaveZoneAction } from "@/app/florist/actions";
 import { AdminForm } from "@/components/admin/admin-form";
@@ -7,18 +8,21 @@ import { floristZones } from "@/lib/florist-panel";
 import { CoverageFields } from "@/components/admin/coverage-fields";
 import { regionDistricts, zoneCoverage } from "@/lib/locations";
 
-export const metadata = { title: "Yetkazib berish" };
+export async function generateMetadata() {
+  return { title: (await panelT())("Yetkazib berish") };
+}
 
 type Zone = Awaited<ReturnType<typeof floristZones>>[number];
 type Region = { id: number; name: string; districts: { id: number; name: string }[] };
 
-function ZoneFields({ z, regions, prefix, covered = [] }: { z: Zone | null; regions: Region[]; prefix: string; covered?: number[] }) {
+async function ZoneFields({ z, regions, prefix, covered = [] }: { z: Zone | null; regions: Region[]; prefix: string; covered?: number[] }) {
+  const tt = await panelT();
   const id = (k: string) => `${prefix}-${k}`;
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <div>
         <label htmlFor={id("region")} className="label">
-          Shahar
+          {tt("Shahar")}
         </label>
         <select id={id("region")} name="regionId" defaultValue={z?.regionId ?? regions[0]?.id} className="field py-2.5">
           {regions.map((r) => (
@@ -30,71 +34,71 @@ function ZoneFields({ z, regions, prefix, covered = [] }: { z: Zone | null; regi
       </div>
       <div>
         <label htmlFor={id("name")} className="label">
-          Hudud nomi *
+          {tt("Hudud nomi *")}
         </label>
-        <input id={id("name")} name="name" defaultValue={z?.name ?? ""} required minLength={2} maxLength={80} className="field py-2.5" placeholder="Masalan: Markaziy tumanlar" />
+        <input id={id("name")} name="name" defaultValue={z?.name ?? ""} required minLength={2} maxLength={80} className="field py-2.5" placeholder={tt("Masalan: Markaziy tumanlar")} />
       </div>
       <div>
         <label htmlFor={id("nameRu")} className="label">
-          Nomi (rus.)
+          {tt("Nomi (rus.)")}
         </label>
         <input id={id("nameRu")} name="nameRu" defaultValue={z?.nameRu ?? ""} maxLength={80} className="field py-2.5" />
       </div>
       <div>
         <label htmlFor={id("nameEn")} className="label">
-          Nomi (ingl.)
+          {tt("Nomi (ingl.)")}
         </label>
         <input id={id("nameEn")} name="nameEn" defaultValue={z?.nameEn ?? ""} maxLength={80} className="field py-2.5" />
       </div>
       <div className="sm:col-span-2 lg:col-span-3">
         <label htmlFor={id("desc")} className="label">
-          Qaysi tumanlar / mahallalar
+          {tt("Qaysi tumanlar / mahallalar")}
         </label>
         <input id={id("desc")} name="description" defaultValue={z?.description ?? ""} maxLength={300} className="field py-2.5" />
       </div>
       <div>
         <label htmlFor={id("fee")} className="label">
-          Yetkazish narxi, so‘m *
+          {tt("Yetkazish narxi, so‘m *")}
         </label>
         <input id={id("fee")} name="fee" inputMode="numeric" defaultValue={z?.fee ?? ""} required className="field py-2.5" />
       </div>
       <div>
         <label htmlFor={id("free")} className="label">
-          Shu summadan bepul
+          {tt("Shu summadan bepul")}
         </label>
         <input id={id("free")} name="freeFrom" inputMode="numeric" defaultValue={z?.freeFrom ?? ""} className="field py-2.5" />
       </div>
       <div>
         <label htmlFor={id("min")} className="label">
-          Minimal buyurtma
+          {tt("Minimal buyurtma")}
         </label>
         <input id={id("min")} name="minOrder" inputMode="numeric" defaultValue={z?.minOrder ?? ""} className="field py-2.5" />
       </div>
       <div>
         <label htmlFor={id("cut")} className="label">
-          Bugungi buyurtma — soat nechagacha
+          {tt("Bugungi buyurtma — soat nechagacha")}
         </label>
         <input id={id("cut")} name="sameDayCutoff" defaultValue={z?.sameDayCutoff ?? "16:00"} pattern="[0-2][0-9]:[0-5][0-9]" className="field py-2.5" />
       </div>
       <div>
         <label htmlFor={id("lead")} className="label">
-          Tayyorlash + yo‘l, daqiqa
+          {tt("Tayyorlash + yo‘l, daqiqa")}
         </label>
         <input id={id("lead")} name="minLeadMinutes" inputMode="numeric" defaultValue={z?.minLeadMinutes ?? 120} className="field py-2.5" />
       </div>
       <div className="flex flex-col justify-end gap-2 text-sm">
         <label className="flex items-center gap-2">
-          <input type="checkbox" name="sameDayEnabled" defaultChecked={z?.sameDayEnabled ?? true} className="h-4 w-4 accent-wine" /> Shu kuni yetkazish mumkin
+          <input type="checkbox" name="sameDayEnabled" defaultChecked={z?.sameDayEnabled ?? true} className="h-4 w-4 accent-wine" />{" "}{tt("Shu kuni yetkazish mumkin")}
         </label>
         <label className="flex items-center gap-2">
-          <input type="checkbox" name="isActive" defaultChecked={z?.isActive ?? true} className="h-4 w-4 accent-wine" /> Faol
+          <input type="checkbox" name="isActive" defaultChecked={z?.isActive ?? true} className="h-4 w-4 accent-wine" />{" "}{tt("Faol")}
         </label>
       </div>
       <div className="sm:col-span-2 lg:col-span-3">
         {z ? (
           <CoverageFields districts={regions.find((r) => r.id === z.regionId)?.districts ?? []} selected={covered} idPrefix={prefix} />
         ) : (
-          <p className="text-xs text-muted">Qo‘shgandan keyin bu hudud qaysi tumanlarga yetkazishini belgilay olasiz.</p>
+          <p className="text-xs text-muted">{tt("Qo‘shgandan keyin bu hudud qaysi tumanlarga yetkazishini belgilay olasiz.")}</p>
         )}
       </div>
     </div>
@@ -102,6 +106,7 @@ function ZoneFields({ z, regions, prefix, covered = [] }: { z: Zone | null; regi
 }
 
 export default async function FloristZonesPage() {
+  const tt = await panelT();
   const me = await requireFlorist();
   const db = await getDb();
   const [zones, regionRows] = await Promise.all([
@@ -119,25 +124,24 @@ export default async function FloristZonesPage() {
   return (
     <div className="max-w-5xl space-y-6">
       <div>
-        <h1 className="text-4xl">Yetkazib berish</h1>
+        <h1 className="text-4xl">{tt("Yetkazib berish")}</h1>
         <p className="mt-2 text-sm text-muted">
-          Buyurtmalarni o‘zingiz yetkazasiz: qaysi hududlarga va qancha narxda. Mijoz faqat shu hududlarni tanlay oladi. Hududni o‘chirish o‘rniga “Faol”
-          belgisini olib tashlang — eski buyurtmalar tarixi saqlanadi.
+          {tt("Buyurtmalarni o‘zingiz yetkazasiz: qaysi hududlarga va qancha narxda. Mijoz faqat shu hududlarni tanlay oladi. Hududni o‘chirish o‘rniga “Faol” belgisini olib tashlang — eski buyurtmalar tarixi saqlanadi.")}
         </p>
       </div>
       {zones.map((z) => (
         <section key={z.id} className="card p-5" aria-label={z.name}>
           <h2 className="mb-3 font-sans text-base font-semibold">
-            {z.name} {z.isActive ? null : <span className="badge bg-charcoal/10 text-muted">o‘chirilgan</span>}
+            {z.name} {z.isActive ? null : <span className="badge bg-charcoal/10 text-muted">{tt("o‘chirilgan")}</span>}
           </h2>
           <AdminForm action={floristSaveZoneAction.bind(null, z.id)}>
             <ZoneFields z={z} regions={regions} prefix={`z${z.id}`} covered={coverage.get(z.id) ?? []} />
           </AdminForm>
         </section>
       ))}
-      <section className="card border-dashed p-5" aria-label="Yangi hudud">
-        <h2 className="mb-3 font-sans text-base font-semibold">+ Yangi hudud</h2>
-        <AdminForm action={floristSaveZoneAction.bind(null, null)} submitLabel="Qo‘shish" resetOnSuccess>
+      <section className="card border-dashed p-5" aria-label={tt("Yangi hudud")}>
+        <h2 className="mb-3 font-sans text-base font-semibold">{tt("+ Yangi hudud")}</h2>
+        <AdminForm action={floristSaveZoneAction.bind(null, null)} submitLabel={tt("Qo‘shish")} resetOnSuccess>
           <ZoneFields z={null} regions={regions} prefix="new" />
         </AdminForm>
       </section>

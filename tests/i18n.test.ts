@@ -5,6 +5,8 @@ import { fmt, LOCALES, localePath, pick, pickAt, pickList, splitLocale } from "@
 import { getDict } from "@/i18n/dict";
 import { BOT_TEXTS } from "@/lib/bot/texts";
 import { formatDateISO, formatUZS } from "@/lib/format";
+import { makeT, panelDict } from "@/i18n/panel/core";
+import { panelKeys } from "../scripts/panel-keys.mjs";
 
 type Tree = { [k: string]: unknown };
 
@@ -69,4 +71,25 @@ test("money and dates follow the language", () => {
   assert.equal(formatDateISO("2026-10-26", true, "en"), "Monday, 26 October");
   assert.equal(formatDateISO("2026-10-26", false, "en"), "26 October");
   assert.equal(fmt(getDict("en").common.priceFrom, { price: "1" }), "from 1");
+});
+
+test("admin and florist panels: every text in the code has Russian and English, with the same placeholders", () => {
+  const keys = panelKeys();
+  assert.ok(keys.length > 600);
+  for (const locale of ["ru", "en"] as const) {
+    const dict = panelDict(locale);
+    assert.deepEqual(keys.filter((k) => !dict[k]), [], `${locale}: missing translations`);
+    for (const [k, v] of Object.entries(dict)) assert.deepEqual(placeholders(v), placeholders(k), `${locale}: ${k}`);
+  }
+  const cyrillic = Object.entries(panelDict("en")).filter(([k, v]) => /[Ѐ-ӿ]/.test(v) && !/[Ѐ-ӿ]/.test(k));
+  assert.deepEqual(cyrillic, []);
+});
+
+test("panel translator: known text, parameters, unknown text and formatting", () => {
+  const t = makeT(panelDict("en"), "en");
+  assert.equal(t("Buyurtmalar"), "Orders");
+  assert.equal(t("Salom, {name}", { name: "Ali" }), "Hello, Ali");
+  assert.equal(t("Mijoz yozgan matn"), "Mijoz yozgan matn");
+  assert.equal(t.uzs(1000).replace(/ /g, " "), "1,000 UZS");
+  assert.equal(makeT(panelDict("uz"))("Buyurtmalar"), "Buyurtmalar");
 });

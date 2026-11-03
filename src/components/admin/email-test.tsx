@@ -1,15 +1,17 @@
 "use client";
 
+import { usePanelT } from "@/i18n/panel/client";
 import { useActionState } from "react";
 import { testEmailAction } from "@/app/admin/actions";
 import type { FormState } from "@/lib/form-state";
 
 export function EmailTest() {
+  const tt = usePanelT();
   const [state, action, pending] = useActionState<FormState, FormData>(async () => testEmailAction(), {});
   return (
     <form action={action} className="flex flex-wrap items-center gap-2">
-      <button className="btn-secondary btn-sm" disabled={pending}>{pending ? "Yuborilmoqda…" : "Test email yuborish"}</button>
-      {state.message ? <span role="status" className={`text-sm ${state.ok ? "text-success" : "text-danger"}`}>{state.message}</span> : null}
+      <button className="btn-secondary btn-sm" disabled={pending}>{pending ? tt("Yuborilmoqda…") : tt("Test email yuborish")}</button>
+      {state.message ? <span role="status" className={`text-sm ${state.ok ? "text-success" : "text-danger"}`}>{tt(state.message)}</span> : null}
     </form>
   );
 }

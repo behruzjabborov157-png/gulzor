@@ -1,3 +1,4 @@
+import { panelT } from "@/i18n/panel/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, eq } from "drizzle-orm";
@@ -6,16 +7,19 @@ import { ProductForm } from "@/components/admin/product-form";
 import { getDb, schema } from "@/db";
 import { requireFlorist } from "@/lib/auth";
 
-export const metadata = { title: "Mahsulot" };
+export async function generateMetadata() {
+  return { title: (await panelT())("Mahsulot") };
+}
 
 export default async function FloristProductPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saqlandi?: string }> }) {
+  const tt = await panelT();
   const me = await requireFlorist();
   const [{ id }, { saqlandi }] = await Promise.all([params, searchParams]);
   const db = await getDb();
   const categories = await db.select().from(schema.categories).where(eq(schema.categories.isActive, true)).orderBy(asc(schema.categories.kind), asc(schema.categories.sortOrder));
   const back = (
     <Link href="/florist/mahsulotlar" className="text-sm text-muted hover:text-wine">
-      ← Mahsulotlar
+      {tt("← Mahsulotlar")}
     </Link>
   );
 
@@ -23,7 +27,7 @@ export default async function FloristProductPage({ params, searchParams }: { par
     return (
       <div className="max-w-4xl">
         {back}
-        <h1 className="mt-2 mb-6 text-4xl">Yangi mahsulot</h1>
+        <h1 className="mt-2 mb-6 text-4xl">{tt("Yangi mahsulot")}</h1>
         <ProductForm product={null} variants={[]} categoryIds={[]} categories={categories} saveAction={floristSaveProductAction} floristMode />
       </div>
     );
@@ -45,7 +49,7 @@ export default async function FloristProductPage({ params, searchParams }: { par
       <h1 className="mt-2 mb-6 text-4xl">{product.name}</h1>
       {saqlandi ? (
         <p role="status" className="mb-4 rounded-xl border border-success/30 bg-success/5 px-4 py-3 text-sm text-success">
-          Mahsulot saqlandi.
+          {tt("Mahsulot saqlandi.")}
         </p>
       ) : null}
       <ProductForm

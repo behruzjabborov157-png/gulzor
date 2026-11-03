@@ -27,6 +27,13 @@ const RU_WEEKDAYS = ["воскресенье", "понедельник", "вто
 const EN_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const EN_WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
+/** Month names for a language (January first). */
+export function monthNames(locale: Lang = "uz"): string[] {
+  if (locale === "uz") return UZ_MONTHS;
+  const f = new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-GB", { month: "long", timeZone: "UTC" });
+  return Array.from({ length: 12 }, (_, i) => f.format(new Date(Date.UTC(2026, i, 1))));
+}
+
 /** "2026-10-26" -> "26-oktabr, dushanba" (uz) / "26 октября, понедельник" (ru) / "Monday, 26 October" (en) */
 export function formatDateISO(iso: string, withWeekday = true, locale: Lang = "uz"): string {
   const [y, m, d] = iso.split("-").map(Number);
