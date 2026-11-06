@@ -29,8 +29,8 @@ const uz = {
   removeCoupon: "Promokodni olib tashlash",
   apply: "Qo‘llash",
   calculatingShort: "Hisoblanmoqda…",
-  checkout: "Rasmiylashtirish",
-  serverCheck: "Narxlar server tomonidan qayta tekshiriladi.",
+  checkout: "Buyurtma berish",
+  serverCheck: "Yakuniy summa buyurtmani tasdiqlashda yana tekshiriladi.",
 };
 
 const ru: typeof uz = {
@@ -65,7 +65,7 @@ const ru: typeof uz = {
   apply: "Применить",
   calculatingShort: "Считаем…",
   checkout: "Оформить заказ",
-  serverCheck: "Цены перепроверяются на сервере.",
+  serverCheck: "Итоговая сумма ещё раз проверяется при подтверждении заказа.",
 };
 
 const en: typeof uz = {
@@ -99,8 +99,8 @@ const en: typeof uz = {
   removeCoupon: "Remove promo code",
   apply: "Apply",
   calculatingShort: "Calculating…",
-  checkout: "Checkout",
-  serverCheck: "Prices are re-checked by the server.",
+  checkout: "Place order",
+  serverCheck: "The final total is checked again when you confirm the order.",
 };
 
 const ns = { uz, ru, en };

@@ -56,7 +56,7 @@ test("inside Telegram: app is initialised, name and phone come from Telegram, th
   await page.getByRole("button", { name: /— savatga qo‘shish$/ }).first().click();
   await page.getByRole("dialog", { name: "Savatga qo‘shildi" }).getByRole("link", { name: "Savatga o‘tish" }).click();
   await page.getByLabel("Yetkazib berish hududi").selectOption({ index: 1 });
-  await page.getByRole("link", { name: "Rasmiylashtirish" }).click();
+  await page.getByRole("link", { name: "Buyurtma berish" }).click();
   await expect(page.getByRole("heading", { name: "Buyurtmani rasmiylashtirish" })).toBeVisible();
 
   // Name prefilled from Telegram; phone shared with one tap.

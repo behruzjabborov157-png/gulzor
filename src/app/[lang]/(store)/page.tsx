@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ProductCard, ProductGrid } from "@/components/store/product-card";
 import { Newsletter, RecentlyViewed } from "@/components/store/widgets";
-import { CheckIcon, ClockIcon, GiftIcon, InstagramIcon, TelegramIcon, TruckIcon } from "@/components/ui/icons";
+import { CheckIcon, ClockIcon, GiftIcon, TelegramIcon, TruckIcon } from "@/components/ui/icons";
 import { SectionHeading } from "@/components/ui/primitives";
 import { fmt, localePath } from "@/i18n/config";
 import { getDict } from "@/i18n/dict";
@@ -14,6 +14,7 @@ import { getDeliveryConfig } from "@/lib/delivery";
 import { formatUZS } from "@/lib/format";
 import { availablePaymentMethods } from "@/lib/payments/config";
 import { getSettings, telegramLink } from "@/lib/settings";
+import { tashkentNow } from "@/lib/time";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { alternates: alternates(await getLocale(), "/") };
@@ -21,17 +22,6 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /** Editorial (mood) photos — Unsplash, credited on /rasm-mualliflari. Never used as product photos. */
 const ED = (name: string) => `/images/editorial/${name}.webp`;
-const GALLERY: [string, string][] = [
-  ["peonies-dark", "aspect-square"],
-  ["wrapped-pink-roses", "aspect-[3/4]"],
-  ["fuchsia-gerbera", "aspect-[4/3]"],
-  ["kraft-tulips", "aspect-[4/5]"],
-  ["rose-dome", "aspect-[3/2]"],
-  ["white-roses-kraft", "aspect-[3/4]"],
-  ["orange-tulips", "aspect-[5/6]"],
-  ["peonies-soft", "aspect-[3/4]"],
-];
-
 /** Arch frame — a nod to the pointed arches of Uzbek architecture; used sparingly as the brand's signature shape. */
 const ARCH = "rounded-t-[999px] rounded-b-[1.25rem]";
 
@@ -57,6 +47,7 @@ export default async function HomePage() {
   ]);
   const { store, checkout } = settings;
   const minPrice = cheapest.items[0]?.price;
+  const autumn = [9, 10, 11].includes(Number(tashkentNow().date.slice(5, 7)));
   const tg = telegramLink(store.telegramUsername);
   const contactHref = tg ?? (store.phone ? `tel:${store.phone}` : null);
   const methods = availablePaymentMethods(checkout, locale).map((m) => m.label);
@@ -90,7 +81,12 @@ export default async function HomePage() {
                 {t.hero.ctaCollection}
               </Link>
             </div>
-            <ul className="mt-12 grid max-w-xl gap-4 border-t border-ivory/15 pt-6 text-sm text-ivory/80 sm:grid-cols-3">
+            {minPrice ? (
+              <p className="mt-6 text-sm text-ivory/70 sm:hidden">
+                {t.hero.priceFrom}: <span className="font-semibold text-ivory">{fmt(dict.common.priceFrom, { price: uzs(minPrice) })}</span>
+              </p>
+            ) : null}
+            <ul className="mt-8 grid max-w-xl gap-4 border-t border-ivory/15 pt-6 text-sm text-ivory/80 sm:mt-12 sm:grid-cols-3">
               <li className="flex items-center gap-2.5">
                 <ClockIcon className="shrink-0 text-coral" /> {t.hero.perkTime}
               </li>
@@ -103,7 +99,7 @@ export default async function HomePage() {
             </ul>
           </div>
 
-          <div className="relative mx-auto w-full max-w-md lg:max-w-none">
+          <div className="relative mx-auto hidden w-full max-w-md sm:block lg:max-w-none">
             <div className={`relative aspect-[4/5] overflow-hidden ${ARCH} animate-slow-zoom bg-plum-soft shadow-[0_40px_80px_-30px_rgb(0_0_0/0.7)]`}>
               <Image
                 src={ED("hero-red-roses")}
@@ -252,8 +248,8 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* 7. Seasonal collection */}
-      {seasonal.items.length ? (
+      {/* 7. Seasonal collection (autumn: shown September–November only) */}
+      {autumn && seasonal.items.length ? (
         <section className="container-page mt-28" aria-labelledby="season-h">
           <div className="grid items-center gap-10 lg:grid-cols-[1fr_1.1fr] lg:gap-16">
             <div className="order-2 lg:order-1">
@@ -340,36 +336,6 @@ export default async function HomePage() {
             <ProductGrid items={gifts.items} locale={locale} />
           </div>
         ) : null}
-      </section>
-
-      {/* 10. Gallery (mood photos, credited) */}
-      <section className="container-page mt-28" aria-labelledby="gallery-h">
-        <div className="mb-10 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between" data-reveal>
-          <div>
-            <p className="eyebrow mb-3">{t.gallery.eyebrow}</p>
-            <h2 id="gallery-h" className="display-lg text-plum">
-              {t.gallery.title}
-            </h2>
-            <p className="mt-3 text-muted">{t.gallery.text}</p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            {store.instagramUrl ? (
-              <a href={store.instagramUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm">
-                <InstagramIcon size={16} /> {t.gallery.instagram}
-              </a>
-            ) : null}
-            <Link href={lp("/rasm-mualliflari")} className="btn-secondary btn-sm">
-              {t.gallery.credits}
-            </Link>
-          </div>
-        </div>
-        <div className="columns-2 gap-3 sm:gap-5 lg:columns-4">
-          {GALLERY.map(([name, aspect], i) => (
-            <div key={name} className={`relative mb-3 overflow-hidden rounded-[var(--radius-card)] bg-cream sm:mb-5 ${aspect}`} data-reveal="image" style={{ "--i": i % 4 } as React.CSSProperties}>
-              <Image src={ED(name)} alt="" fill sizes="(max-width: 1024px) 50vw, 25vw" className="object-cover transition duration-[1200ms] hover:scale-[1.05]" />
-            </div>
-          ))}
-        </div>
       </section>
 
       {/* 11. Delivery coverage */}

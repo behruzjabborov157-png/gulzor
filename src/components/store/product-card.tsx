@@ -43,6 +43,7 @@ export function ProductCard({
               {orderable && p.isNew ? <span className="badge bg-ivory text-wine">{t.badge.new}</span> : null}
               {orderable && p.isPremium ? <span className="badge bg-plum text-ivory">{t.badge.premium}</span> : null}
               {p.stock === "made_to_order" ? <span className="badge bg-petal text-plum">{t.badge.madeToOrder}</span> : null}
+              {p.isDemo ? <span className="badge bg-ivory/90 text-muted">{t.badge.demo}</span> : null}
             </div>
           </div>
         </Link>
@@ -55,12 +56,12 @@ export function ProductCard({
             {p.name}
           </Link>
         </h3>
-        {p.florist && !dark ? (
+        {/* Only marketplace shops are named on cards; Gulzor's own products need no label. */}
+        {p.florist && !p.florist.isPlatform && !dark ? (
           <p className="mt-1">
             <FloristLink florist={p.florist} locale={locale} compact />
           </p>
         ) : null}
-        {p.isDemo ? <p className={`mt-1 text-[11px] tracking-wide ${dark ? "text-ivory/60" : "text-muted"}`}>{t.demoProduct}</p> : null}
         <Price value={p.price} compareAt={p.compareAtPrice} from={p.hasOptions} locale={locale} dark={dark} className="mt-1.5 text-[15px]" />
       </div>
     </article>

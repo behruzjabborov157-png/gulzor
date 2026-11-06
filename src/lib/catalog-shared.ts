@@ -22,5 +22,5 @@ export type ProductCard = {
   isDemo: boolean;
   isAddon: boolean;
   /** The shop that sells and delivers it (marketplace). */
-  florist: { id: number; slug: string; name: string } | null;
+  florist: { id: number; slug: string; name: string; isPlatform?: boolean } | null;
 };

@@ -48,7 +48,7 @@ function compareFor(prod: Product, variants: Variant[]): number | null {
   return prod.compareAtPrice;
 }
 
-export type CardFlorist = { id: number; slug: string; name: string };
+export type CardFlorist = { id: number; slug: string; name: string; isPlatform?: boolean };
 
 export function toCard(prod: Product, variants: Variant[], locale: Locale = DEFAULT_LOCALE, florist: CardFlorist | null = null): ProductCard {
   const price = fromPrice(toPricing(prod, variants));
@@ -166,7 +166,7 @@ export async function withVariants(rows: Product[], locale: Locale = DEFAULT_LOC
   const fs = await db.select().from(schema.florists).where(inArray(schema.florists.id, fIds));
   const florist = (id: number): CardFlorist | null => {
     const f = fs.find((x) => x.id === id);
-    return f ? { id: f.id, slug: f.slug, name: pick(locale, f.name, f.nameRu, f.nameEn) } : null;
+    return f ? { id: f.id, slug: f.slug, name: pick(locale, f.name, f.nameRu, f.nameEn), isPlatform: f.isPlatform } : null;
   };
   return rows.map((r) => toCard(r, vs.filter((v) => v.productId === r.id), locale, florist(r.floristId)));
 }

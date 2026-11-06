@@ -26,7 +26,7 @@ test("routing: /ru is Russian, /uz redirects to clean Uzbek URLs, hreflang is se
   await expect(page.locator("html")).toHaveAttribute("lang", "ru");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Цветы скажут больше, чем слова.");
   await expect(page.getByRole("navigation", { name: "Категории" }).getByRole("link", { name: "Розы" })).toHaveAttribute("href", "/ru/katalog/atirgullar");
-  await expect(page.getByText(/от 85\s000\sсум/).first()).toBeVisible();
+  await expect(page.getByText(/от 85\s000\sсум/).last()).toBeVisible();
 
   await page.goto("/gul/qizil-atirgullar-guldastasi");
   await expect(page.locator("html")).toHaveAttribute("lang", "uz");

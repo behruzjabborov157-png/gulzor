@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MinusIcon, PlusIcon } from "@/components/ui/icons";
 import { useT } from "@/i18n/client";
 import { fmt } from "@/i18n/config";
@@ -105,6 +105,17 @@ export function ProductConfigurator({
     }
     addToCart(line);
   }
+
+  // The sticky bar shows only while the main button is not visible (below it, or not yet scrolled to).
+  const mainButton = useRef<HTMLButtonElement>(null);
+  const [stickyBar, setStickyBar] = useState(false);
+  useEffect(() => {
+    const el = mainButton.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([e]) => setStickyBar(!e.isIntersecting && e.boundingClientRect.top > 0), { threshold: 0 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -256,9 +267,25 @@ export function ProductConfigurator({
       </div>
 
       {orderable ? (
-        <button type="button" onClick={submit} disabled={!priced.ok} className="btn-primary w-full py-4 text-base">
-          {editKey ? t.updateCart : t.addToCart}
-        </button>
+        <>
+          <button ref={mainButton} type="button" onClick={submit} disabled={!priced.ok} className="btn-primary w-full py-4 text-base">
+            {editKey ? t.updateCart : t.addToCart}
+          </button>
+          {/* Phones: the button is far below the photo, so a bar keeps it at hand until the real one is on screen. */}
+          {stickyBar ? (
+            <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-ivory/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_-12px_rgb(0_0_0/0.25)] backdrop-blur lg:hidden">
+              <div className="mx-auto flex max-w-xl items-center gap-3">
+                <p className="min-w-0 flex-1">
+                  <span className="block text-xs text-muted">{t.total}</span>
+                  <span className="font-display text-xl text-wine">{priced.ok ? uzs(priced.lineTotal) : "—"}</span>
+                </p>
+                <button type="button" onClick={submit} disabled={!priced.ok} className="btn-primary px-6 py-3">
+                  {editKey ? t.updateCart : t.addToCart}
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </>
       ) : (
         <p className="rounded-xl border border-line bg-white px-4 py-3 text-sm">{t.unavailable}</p>
       )}
