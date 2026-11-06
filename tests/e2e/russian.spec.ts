@@ -38,12 +38,12 @@ test("routing: /ru is Russian, /uz redirects to clean Uzbek URLs, hreflang is se
 test("language switch keeps the page and query", async () => {
   await page.evaluate(() => localStorage.clear());
   await page.goto("/katalog/atirgullar?saralash=price_asc");
-  await page.getByRole("button", { name: /^Til: / }).click();
+  await page.getByRole("button", { name: /— Til: / }).click();
   await page.getByRole("link", { name: "Русский" }).click();
   await expect(page).toHaveURL(/\/ru\/katalog\/atirgullar\?saralash=price_asc$/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Розы");
   await expect(page.locator("#f-sort")).toHaveValue("price_asc");
-  await page.getByRole("button", { name: /^Язык: / }).click();
+  await page.getByRole("button", { name: /— Язык: / }).click();
   await page.getByRole("link", { name: "O‘zbekcha" }).click();
   await expect(page).toHaveURL(/\/katalog\/atirgullar\?saralash=price_asc$/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Atirgullar");

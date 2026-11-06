@@ -367,6 +367,8 @@ export async function syncTelegramCartAction(initData: string, lines: unknown, s
   const user = telegramUserFromInitData(initData);
   const parsed = syncLinesSchema.safeParse(lines);
   if (!user || !parsed.success || (stamp != null && !Number.isFinite(stamp))) return null;
+  // Every call prices the cart: a generous limit per Telegram user keeps a script from hammering it.
+  if (!(await rateLimit(`tgcart:${user.id}`, 120, 600))) return null;
   const res = await syncTelegramCart(user.id, parsed.data, stamp);
   return { stamp: res.stamp, lines: await describeLines(res.lines, await getLocale()) };
 }

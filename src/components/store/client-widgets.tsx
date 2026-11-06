@@ -225,7 +225,7 @@ export function LanguageSwitch() {
         type="button"
         aria-haspopup="true"
         aria-expanded={open}
-        aria-label={`${t.layout.language.label}: ${current.name}`}
+        aria-label={`${current.short} — ${t.layout.language.label}: ${current.name}`}
         onClick={() => setOpen((v) => !v)}
         className="flex h-10 min-w-10 items-center justify-center gap-1 rounded-full px-2 text-sm font-semibold text-wine hover:bg-wine/5"
       >

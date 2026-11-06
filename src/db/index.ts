@@ -31,7 +31,15 @@ async function connect(): Promise<DB> {
   }
   const { default: postgres } = await import("postgres");
   const { drizzle } = await import("drizzle-orm/postgres-js");
-  const client = postgres(process.env.DATABASE_URL!, { max: 10, prepare: false });
+  const client = postgres(process.env.DATABASE_URL!, {
+    max: 10,
+    prepare: false,
+    // Hosted Postgres (Neon) drops idle connections and may sleep: close ours first and fail fast instead of
+    // hanging a request on a dead socket; the next query opens a fresh connection.
+    idle_timeout: 20,
+    max_lifetime: 30 * 60,
+    connect_timeout: 10,
+  });
   holder.close = () => client.end();
   return drizzle({ client, schema }) as unknown as DB;
 }

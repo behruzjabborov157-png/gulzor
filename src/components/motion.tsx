@@ -22,21 +22,33 @@ export function RevealObserver() {
       },
       { rootMargin: "0px 0px -8% 0px", threshold: 0.08 },
     );
-    const scan = () => {
-      document.querySelectorAll("[data-reveal]:not([data-revealed])").forEach((el) => {
-        // Anything already on screen at load is shown immediately, without waiting for a scroll.
-        const r = el.getBoundingClientRect();
-        if (r.top < window.innerHeight && r.bottom > 0 && !root.hasAttribute("data-reveal-ready")) el.setAttribute("data-revealed", "");
-        else io.observe(el);
-      });
-    };
-    scan();
+    const fresh = () => document.querySelectorAll("[data-reveal]:not([data-revealed]):not([data-reveal-watched])");
+    // At load, anything already on screen is shown at once (all measured in one pass, before anything is hidden).
+    const initial = [...fresh()];
+    const rects = initial.map((el) => el.getBoundingClientRect());
+    initial.forEach((el, i) => {
+      el.setAttribute("data-reveal-watched", "");
+      if (rects[i].top < window.innerHeight && rects[i].bottom > 0) el.setAttribute("data-revealed", "");
+      else io.observe(el);
+    });
     root.setAttribute("data-reveal-ready", "");
-    const mo = new MutationObserver(() => scan());
+    // Elements added later (client navigation, streaming) are handed to the observer, at most once per frame.
+    let queued = 0;
+    const mo = new MutationObserver(() => {
+      if (queued) return;
+      queued = requestAnimationFrame(() => {
+        queued = 0;
+        fresh().forEach((el) => {
+          el.setAttribute("data-reveal-watched", "");
+          io.observe(el);
+        });
+      });
+    });
     mo.observe(document.body, { childList: true, subtree: true });
     return () => {
       io.disconnect();
       mo.disconnect();
+      cancelAnimationFrame(queued);
       root.removeAttribute("data-reveal-ready");
     };
   }, []);

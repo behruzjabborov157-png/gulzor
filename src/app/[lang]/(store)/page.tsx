@@ -105,7 +105,7 @@ export default async function HomePage() {
                 src={ED("hero-red-roses")}
                 alt={t.hero.imageAlt}
                 fill
-                priority
+                preload
                 sizes="(max-width: 1024px) 90vw, 42vw"
                 className="parallax object-cover object-[50%_35%]"
               />

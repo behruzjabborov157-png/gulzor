@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import Link from "next/link";
 import { ProductGrid } from "@/components/store/product-card";
 import { FilterIcon } from "@/components/ui/icons";
@@ -9,6 +10,10 @@ import { getDeliveryConfig } from "@/lib/delivery";
 import { listApprovedFlorists } from "@/lib/florists";
 import { formatUZS } from "@/lib/format";
 import { AutoSubmit } from "./auto-submit";
+
+/** Closes the filter box on phones (it is open in the HTML so that desktop and no-JavaScript visitors see it). */
+const COLLAPSE_FILTERS_ON_PHONES =
+  "(function(){var d=document.currentScript&&document.currentScript.previousElementSibling;if(d&&d.tagName==='DETAILS'&&matchMedia('(max-width:1023px)').matches)d.open=false})()";
 
 export type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -53,6 +58,7 @@ export async function CatalogView({
   const lp = (p: string) => localePath(locale, p);
   const f = parseCatalogParams(searchParams);
   const cats = [base?.slug, f.flower, f.occasion, f.type].filter((x): x is string => !!x);
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   const [shops, { regions: cities }] = await Promise.all([listApprovedFlorists(locale), getDeliveryConfig(locale)]);
   const shop = f.shop ? shops.find((x) => x.slug === f.shop) : undefined;
   const city = f.city ? cities.find((x) => x.slug === f.city) : undefined;
@@ -228,9 +234,14 @@ export async function CatalogView({
               </div>
             </form>
           </details>
+          {active.length === 0 ? (
+            // Runs while the page is parsed, so phones never see the open form jump closed.
+            <script nonce={nonce} dangerouslySetInnerHTML={{ __html: COLLAPSE_FILTERS_ON_PHONES }} />
+          ) : null}
         </aside>
 
         <section aria-label={t.products} aria-live="polite">
+          <h2 className="sr-only">{t.products}</h2>
           <div className="mb-5 flex flex-wrap items-center gap-2">
             <p className="mr-2 text-sm text-muted">{fmt(t.count, { n: result.total })}</p>
             {active.map((a) => (

@@ -67,7 +67,18 @@ export function ProductImage({
       </div>
     );
   }
-  return <Image src={src} alt={alt} fill sizes={sizes} priority={priority} className={`object-cover ${className}`} />;
+  // Next 16: several images may be the LCP depending on the screen, so eager + high priority instead of preload.
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      fill
+      sizes={sizes}
+      loading={priority ? "eager" : undefined}
+      fetchPriority={priority ? "high" : undefined}
+      className={`object-cover ${className}`}
+    />
+  );
 }
 
 export function SectionHeading({

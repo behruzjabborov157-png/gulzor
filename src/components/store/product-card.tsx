@@ -26,7 +26,7 @@ export function ProductCard({
   return (
     <article className="group relative flex flex-col" data-reveal style={{ "--i": index % 4 } as React.CSSProperties}>
       <div className="relative">
-        <Link href={href} className="block focus-visible:outline-none" aria-label={p.name}>
+        <Link href={href} className="block focus-visible:outline-none" tabIndex={-1} aria-hidden="true">
           <div className="relative aspect-[4/5] overflow-hidden rounded-[var(--radius-card)] bg-cream">
             <ProductImage
               src={p.image?.url}

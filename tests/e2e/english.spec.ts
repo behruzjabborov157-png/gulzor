@@ -19,11 +19,11 @@ test("English pages: language, navigation, translated catalog and hreflang", asy
 
 test("language menu keeps the page and offers all three languages", async ({ page }) => {
   await page.goto("/katalog?q=atirgul");
-  await page.getByRole("button", { name: /^Til: / }).click();
+  await page.getByRole("button", { name: /— Til: / }).click();
   await expect(page.getByRole("link", { name: "Русский" })).toBeVisible();
   await page.getByRole("link", { name: "English" }).click();
   await expect(page).toHaveURL(/\/en\/katalog\?q=atirgul$/);
-  await page.getByRole("button", { name: /^Language: / }).click();
+  await page.getByRole("button", { name: /— Language: / }).click();
   await page.getByRole("link", { name: "O‘zbekcha" }).click();
   await expect(page).toHaveURL(/\/katalog\?q=atirgul$/);
   await expect(page.locator("html")).toHaveAttribute("lang", "uz");

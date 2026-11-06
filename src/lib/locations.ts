@@ -56,7 +56,8 @@ export const DATASET_PATH = path.resolve("data/locations/uz-soato.json");
  */
 export async function importLocations(db?: Db, file = DATASET_PATH): Promise<{ added: number; total: number }> {
   db ??= await getDb();
-  const data = JSON.parse(await readFile(file, "utf8")) as Dataset;
+  // Only migrations read the dataset (scripts/migrate.ts); keep it out of the server bundle tracing.
+  const data = JSON.parse(await readFile(/*turbopackIgnore: true*/ file, "utf8")) as Dataset;
   let added = 0;
   const insert = async (rows: (typeof schema.locations.$inferInsert)[]) => {
     for (let i = 0; i < rows.length; i += 500) {
