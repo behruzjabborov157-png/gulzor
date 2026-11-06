@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { fmt, localePath, pick, pickAt, type Locale } from "@/i18n/config";
 import { getDict } from "@/i18n/dict";
-import { getCategories, listProducts, stockState, toPricing } from "@/lib/catalog";
+import { getCategories, getProductsByIds, listProducts, stockState, toPricing } from "@/lib/catalog";
 import { isOrderable } from "@/lib/catalog-shared";
 import { floristApproved } from "@/lib/florists";
 import { dateWindow, getDeliveryConfig } from "@/lib/delivery";
@@ -40,7 +40,7 @@ type Message = {
 type Callback = { id: string; from: TgUser; data?: string; message?: Message };
 export type Update = { update_id?: number; message?: Message; callback_query?: Callback };
 
-type Line = { productId: number; variantId: number | null; stems: number | null; color: string | null; quantity: number };
+type Line = { productId: number; variantId: number | null; stems: number | null; color: string | null; quantity: number; addons?: { productId: number; quantity: number }[] };
 type Draft = {
   config?: Line;
   sid?: string;
@@ -62,8 +62,18 @@ type Draft = {
   card?: string;
   payment?: "cash" | "payme" | "click";
 };
-type Step = "idle" | "phone" | "rname" | "rphone" | "address" | "extra" | "card";
-type Session = { chatId: string; locale: Locale | null; step: Step; cart: Line[]; draft: Draft };
+type Step = "idle" | "phone" | "rname" | "rphone" | "address" | "extra" | "card" | "search" | "pphone";
+type Session = {
+  chatId: string;
+  locale: Locale | null;
+  step: Step;
+  cart: Line[];
+  draft: Draft;
+  favorites: number[];
+  profile: { phone?: string };
+  /** The cart as loaded, to know whether this update changed it. */
+  cartBefore: string;
+};
 
 /** Work to run after the webhook has answered (owner notification). */
 export type AfterTask = { notifyOrderId: string };
@@ -79,13 +89,33 @@ const PAGE_SIZE = 8;
 async function loadSession(chatId: string): Promise<Session> {
   const db = await getDb();
   const [row] = await db.select().from(schema.tgSessions).where(eq(schema.tgSessions.chatId, chatId));
-  if (!row) return { chatId, locale: null, step: "idle", cart: [], draft: {} };
-  return { chatId, locale: row.locale ?? null, step: (row.step as Step) ?? "idle", cart: row.cart ?? [], draft: (row.draft as Draft) ?? {} };
+  if (!row) return { chatId, locale: null, step: "idle", cart: [], draft: {}, favorites: [], profile: {}, cartBefore: "[]" };
+  return {
+    chatId,
+    locale: row.locale ?? null,
+    step: (row.step as Step) ?? "idle",
+    cart: row.cart ?? [],
+    draft: (row.draft as Draft) ?? {},
+    favorites: row.favorites ?? [],
+    profile: row.profile ?? {},
+    cartBefore: JSON.stringify(row.cart ?? []),
+  };
 }
 
 async function saveSession(s: Session) {
   const db = await getDb();
-  const values = { chatId: s.chatId, locale: s.locale, step: s.step, cart: s.cart, draft: s.draft as Record<string, unknown>, updatedAt: new Date() };
+  const values = {
+    chatId: s.chatId,
+    locale: s.locale,
+    step: s.step,
+    cart: s.cart,
+    draft: s.draft as Record<string, unknown>,
+    favorites: s.favorites,
+    profile: s.profile,
+    updatedAt: new Date(),
+    // The Mini App syncs the cart by this time, so it only moves when the cart itself changed.
+    ...(JSON.stringify(s.cart) !== s.cartBefore ? { cartUpdatedAt: new Date() } : {}),
+  };
   await db.insert(schema.tgSessions).values(values).onConflictDoUpdate({ target: schema.tgSessions.chatId, set: values });
 }
 
@@ -100,23 +130,48 @@ const rows = <T,>(items: T[], perRow: number): T[][] => {
 };
 
 function mainMenu(t: BotTexts): Keyboard {
+  const m = t.menu;
   return {
-    keyboard: [[{ text: t.menu.catalog }, { text: t.menu.cart }], [{ text: t.menu.orders }, { text: t.menu.contact }], [{ text: t.menu.language }]],
+    keyboard: [
+      [{ text: m.catalog }, { text: m.search }],
+      [{ text: m.cart }, { text: m.orders }],
+      [{ text: m.delivery }, { text: m.favorites }],
+      [{ text: m.profile }, { text: m.help }],
+    ],
     resize_keyboard: true,
     is_persistent: true,
   };
+}
+
+/** "Back" (when there is somewhere to go back to) and "Main menu" under inline screens. */
+function navRow(t: BotTexts, back?: InlineButton): InlineButton[] {
+  return [...(back ? [back] : []), { text: t.home, callback_data: "H" }];
 }
 
 const languageKeyboard: Keyboard = {
   inline_keyboard: [[{ text: "🇺🇿 O‘zbekcha", callback_data: "L:uz" }, { text: "🇷🇺 Русский", callback_data: "L:ru" }, { text: "🇬🇧 English", callback_data: "L:en" }]],
 };
 
+/** Buttons of the menu used before the 8-button one, still on some customers' keyboards until their next reply. */
+const LEGACY_MENU: Record<string, keyof BotTexts["menu"] | "language"> = {
+  "🌸 Katalog": "catalog",
+  "🌸 Каталог": "catalog",
+  "🌸 Catalog": "catalog",
+  "🛒 Savat": "cart",
+  "📞 Aloqa": "help",
+  "📞 Контакты": "help",
+  "📞 Contact": "help",
+  "🌐 Til": "language",
+  "🌐 Язык": "language",
+  "🌐 Language": "language",
+};
+
 /** Menu button texts in every language, so a button pressed just before switching language still works. */
-function menuAction(text: string): keyof BotTexts["menu"] | null {
+function menuAction(text: string): keyof BotTexts["menu"] | "language" | null {
   for (const t of Object.values(BOT_TEXTS)) {
     for (const [k, v] of Object.entries(t.menu)) if (v === text) return k as keyof BotTexts["menu"];
   }
-  return null;
+  return LEGACY_MENU[text] ?? null;
 }
 const isCancelText = (text: string) => Object.values(BOT_TEXTS).some((t) => t.cancel === text);
 
@@ -196,7 +251,7 @@ function linePrice(lp: LoadedProduct, c: Line) {
   return r.ok ? r.lineTotal : null;
 }
 
-function productCard(lp: LoadedProduct, c: Line, locale: Locale): { caption: string; keyboard: Keyboard } {
+function productCard(lp: LoadedProduct, c: Line, locale: Locale, favorite = false): { caption: string; keyboard: Keyboard } {
   const t = BOT_TEXTS[locale];
   const uzs = (n: number) => formatUZS(n, locale);
   const p = lp.pricing;
@@ -246,7 +301,8 @@ function productCard(lp: LoadedProduct, c: Line, locale: Locale): { caption: str
     ]);
     if (total != null) kb.push([{ text: fmt(t.addToCart, { price: uzs(total) }), callback_data: `A:${id}` }]);
   }
-  kb.push([{ text: t.backToCategories, callback_data: "M" }]);
+  kb.push([{ text: favorite ? t.favRemove : t.favAdd, callback_data: `FV:${lp.prod.id}` }]);
+  kb.push(navRow(t, { text: t.backToCategories, callback_data: "M" }));
   return { caption, keyboard: { inline_keyboard: kb } };
 }
 
@@ -266,7 +322,8 @@ async function show(chatId: string, text: string, keyboard: Keyboard, edit?: Mes
 async function showCategories(s: Session, t: BotTexts, edit?: Message) {
   const all = await getCategories(undefined, s.locale!);
   const cats = BOT_CATEGORY_SLUGS.map((slug) => all.find((c) => c.slug === slug)).filter((c) => c != null);
-  const kb = rows(cats.map((c) => ({ text: c.name, callback_data: `C:${c.id}:1` })), 2);
+  const kb: InlineButton[][] = rows(cats.map((c) => ({ text: c.name, callback_data: `C:${c.id}:1` })), 2);
+  kb.push(navRow(t));
   await show(s.chatId, t.categories, { inline_keyboard: kb }, edit);
 }
 
@@ -275,7 +332,7 @@ async function showCategory(s: Session, t: BotTexts, categoryId: number, page: n
   const cat = (await getCategories(undefined, locale)).find((c) => c.id === categoryId);
   if (!cat) return showCategories(s, t, edit);
   const res = await listProducts({ categories: [cat.slug], perPage: PAGE_SIZE, page, sort: "popular", locale, includeAddons: cat.slug === "sovgalar" });
-  if (!res.items.length) return show(s.chatId, t.noProducts, { inline_keyboard: [[{ text: t.backToCategories, callback_data: "M" }]] }, edit);
+  if (!res.items.length) return show(s.chatId, t.noProducts, { inline_keyboard: [navRow(t, { text: t.backToCategories, callback_data: "M" })] }, edit);
   const uzs = (n: number) => formatUZS(n, locale);
   const kb: InlineButton[][] = res.items.map((p) => [
     { text: `${p.name} · ${p.hasOptions ? fmt(t.from, { price: uzs(p.price) }) : uzs(p.price)}`, callback_data: `P:${p.id}` },
@@ -284,14 +341,14 @@ async function showCategory(s: Session, t: BotTexts, categoryId: number, page: n
   if (res.page > 1) nav.push({ text: t.prev, callback_data: `C:${cat.id}:${res.page - 1}` });
   if (res.page < res.pages) nav.push({ text: t.next, callback_data: `C:${cat.id}:${res.page + 1}` });
   if (nav.length) kb.push(nav);
-  kb.push([{ text: t.backToCategories, callback_data: "M" }]);
+  kb.push(navRow(t, { text: t.backToCategories, callback_data: "M" }));
   await show(s.chatId, fmt(t.products, { name: cat.name, page: res.page, pages: res.pages }), { inline_keyboard: kb }, edit);
 }
 
 async function showCart(s: Session, t: BotTexts, edit?: Message) {
   const locale = s.locale!;
-  if (!s.cart.length) return show(s.chatId, t.cartEmpty, { inline_keyboard: [[{ text: t.menu.catalog, callback_data: "M" }]] }, edit);
-  const q = await quoteCart({ lines: s.cart.map((l) => ({ ...l, addons: [] })) }, { locale });
+  if (!s.cart.length) return show(s.chatId, t.cartEmpty, { inline_keyboard: [[{ text: t.menu.catalog, callback_data: "M" }], navRow(t)] }, edit);
+  const q = await quoteCart({ lines: s.cart.map((l) => ({ ...l, addons: l.addons ?? [] })) }, { locale });
   const uzs = (n: number) => formatUZS(n, locale);
   const lines = q.lines.map((l, i) => {
     const opts = [l.variantName, l.stems ? fmt(getDict(locale).common.pieces, { n: l.stems }) : null, l.colorLabel].filter(Boolean).join(", ");
@@ -302,7 +359,7 @@ async function showCart(s: Session, t: BotTexts, edit?: Message) {
     s.cart.map((_, i) => ({ text: fmt(t.remove, { n: i + 1 }), callback_data: `R:${i}` })),
     5,
   );
-  kb.push([{ text: t.clear, callback_data: "X" }], [{ text: t.checkout, callback_data: "O" }]);
+  kb.push([{ text: t.clear, callback_data: "X" }], [{ text: t.checkout, callback_data: "O" }], navRow(t));
   await show(s.chatId, text, { inline_keyboard: kb }, edit);
 }
 
@@ -348,7 +405,73 @@ async function showContact(s: Session, t: BotTexts) {
     hours ? fmt(t.contactHours, { hours }) : null,
   ].filter(Boolean);
   const site = siteButton(t.site, localePath(locale, "/"));
-  await send(s.chatId, [t.contactTitle, "", ...(lines.length ? lines : [t.contactSoon])].join("\n"), site ? { inline_keyboard: [[site]] } : mainMenu(t));
+  const tg = telegramLink(store.telegramUsername);
+  const kb: InlineButton[][] = [
+    ...(tg ? [[{ text: t.helpWrite, url: tg }]] : []),
+    ...(site ? [[site]] : []),
+    navRow(t),
+  ];
+  await send(s.chatId, [t.helpTitle, "", t.helpText, "", t.contactTitle, ...(lines.length ? lines : [t.contactSoon])].join("\n"), { inline_keyboard: kb });
+}
+
+async function showSearch(s: Session, t: BotTexts, q: string) {
+  const locale = s.locale!;
+  const res = await listProducts({ q, perPage: PAGE_SIZE, sort: "popular", locale, includeAddons: true });
+  const again = { text: t.searchAgain, callback_data: "SR" };
+  if (!res.items.length) return send(s.chatId, fmt(t.searchEmpty, { q }), { inline_keyboard: [navRow(t, again)] });
+  const uzs = (n: number) => formatUZS(n, locale);
+  const kb: InlineButton[][] = res.items.map((p) => [{ text: `${p.name} · ${p.hasOptions ? fmt(t.from, { price: uzs(p.price) }) : uzs(p.price)}`, callback_data: `P:${p.id}` }]);
+  kb.push(navRow(t, again));
+  await send(s.chatId, fmt(t.searchResults, { q }), { inline_keyboard: kb });
+}
+
+async function showFavorites(s: Session, t: BotTexts, edit?: Message) {
+  const locale = s.locale!;
+  const cards = s.favorites.length ? await getProductsByIds(s.favorites, locale) : [];
+  if (!cards.length) return show(s.chatId, t.favoritesEmpty, { inline_keyboard: [[{ text: t.menu.catalog, callback_data: "M" }], navRow(t)] }, edit);
+  const uzs = (n: number) => formatUZS(n, locale);
+  const kb: InlineButton[][] = cards.slice(0, 20).map((p) => [{ text: `${p.name} · ${p.hasOptions ? fmt(t.from, { price: uzs(p.price) }) : uzs(p.price)}`, callback_data: `P:${p.id}` }]);
+  kb.push(navRow(t));
+  await show(s.chatId, t.favoritesTitle, { inline_keyboard: kb }, edit);
+}
+
+async function showDelivery(s: Session, t: BotTexts) {
+  const locale = s.locale!;
+  const [{ regions, slots }, { checkout }] = await Promise.all([getDeliveryConfig(locale), getSettings()]);
+  const uzs = (n: number) => formatUZS(n, locale);
+  const areas = regions.flatMap((r) =>
+    r.zones.map((z) => fmt(t.deliveryLine, { area: `${r.name} — ${z.name}`, fee: uzs(z.fee) }) + (z.freeFrom ? fmt(t.deliveryFree, { amount: uzs(z.freeFrom) }) : "")),
+  );
+  const methods = availablePaymentMethods(checkout, locale).map((m) => m.label);
+  const text = [
+    t.deliveryTitle,
+    "",
+    ...(areas.length ? areas : [t.deliveryNone]),
+    "",
+    slots.length ? fmt(t.deliverySlots, { slots: slots.map((x) => x.label).join(", ") }) : null,
+    methods.length ? fmt(t.deliveryPayments, { methods: methods.join(", ") }) : null,
+  ]
+    .filter((x) => x != null)
+    .join("\n");
+  const more = siteButton(t.deliveryMore, localePath(locale, "/yetkazib-berish"));
+  await send(s.chatId, text, { inline_keyboard: [...(more ? [[more]] : []), navRow(t)] });
+}
+
+async function showProfile(s: Session, t: BotTexts, from: TgUser) {
+  const db = await getDb();
+  const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.orders).where(eq(schema.orders.telegramUserId, String(from.id)));
+  const name = [from.first_name, from.last_name].filter(Boolean).join(" ");
+  const text = [
+    t.profileTitle,
+    "",
+    fmt(t.profileName, { name }),
+    s.profile.phone ? fmt(t.profilePhone, { phone: formatPhone(s.profile.phone) }) : t.profileNoPhone,
+    fmt(t.profileLanguage, { language: t.languageName }),
+    fmt(t.profileOrders, { n }),
+  ].join("\n");
+  await send(s.chatId, text, {
+    inline_keyboard: [[{ text: t.changePhone, callback_data: "PH" }], [{ text: t.changeLanguage, callback_data: "LANG" }], [{ text: t.menu.favorites, callback_data: "FAVS" }], navRow(t)],
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -363,9 +486,15 @@ const cancelKeyboard = (t: BotTexts, extra?: { text: string; request_contact?: b
 
 async function startCheckout(s: Session, t: BotTexts, from: TgUser) {
   if (!s.cart.length) return send(s.chatId, t.cartEmpty, mainMenu(t));
-  const q = await quoteCart({ lines: s.cart.map((l) => ({ ...l, addons: [] })) }, { locale: s.locale! });
+  const q = await quoteCart({ lines: s.cart.map((l) => ({ ...l, addons: l.addons ?? [] })) }, { locale: s.locale! });
   if (q.lines.some((l) => l.error)) return showCart(s, t);
   s.draft = { sid: randomUUID(), name: [from.first_name, from.last_name].filter(Boolean).join(" ").slice(0, 80) || "Telegram" };
+  // A phone given before is reused (it can be changed in "Profile").
+  if (s.profile.phone) {
+    s.draft.phone = s.profile.phone;
+    await send(s.chatId, fmt(t.phoneOk, { phone: formatPhone(s.profile.phone) }), mainMenu(t));
+    return askRecipient(s, t);
+  }
   s.step = "phone";
   await send(s.chatId, t.askPhone, cancelKeyboard(t, { text: t.sharePhone, request_contact: true }));
 }
@@ -465,7 +594,7 @@ async function askDate(s: Session, t: BotTexts, edit?: Message) {
 function quoteInput(s: Session) {
   const d = s.draft;
   return {
-    lines: s.cart.map((l) => ({ ...l, addons: [] })),
+    lines: s.cart.map((l) => ({ ...l, addons: l.addons ?? [] })),
     fulfillment: d.fulfillment,
     zoneId: d.fulfillment === "delivery" ? (d.zoneId ?? null) : null,
     districtId: d.fulfillment === "delivery" ? (d.districtId ?? null) : null,
@@ -499,7 +628,7 @@ function orderPayload(s: Session) {
   const d = s.draft;
   return {
     submissionId: d.sid,
-    lines: s.cart.map((l) => ({ ...l, addons: [] })),
+    lines: s.cart.map((l) => ({ ...l, addons: l.addons ?? [] })),
     couponCode: null,
     fulfillment: d.fulfillment ?? "delivery",
     customerName: d.name ?? "",
@@ -639,9 +768,15 @@ async function onMessage(m: Message): Promise<AfterTask | null> {
       if (isCancelText(text)) await send(s.chatId, t.cancelled, mainMenu(t));
     }
     if (action === "catalog") await showCategories(s, t);
-    else if (action === "cart") await showCart(s, t);
+    else if (action === "search") {
+      s.step = "search";
+      await send(s.chatId, t.askSearch, { inline_keyboard: [navRow(t)] });
+    } else if (action === "cart") await showCart(s, t);
     else if (action === "orders") await showOrders(s, t, m.from.id);
-    else if (action === "contact") await showContact(s, t);
+    else if (action === "delivery") await showDelivery(s, t);
+    else if (action === "favorites") await showFavorites(s, t);
+    else if (action === "profile") await showProfile(s, t, m.from);
+    else if (action === "help") await showContact(s, t);
     await saveSession(s);
     return null;
   }
@@ -655,10 +790,31 @@ async function onMessage(m: Message): Promise<AfterTask | null> {
         break;
       }
       s.draft.phone = phone;
+      s.profile.phone = phone;
       await send(s.chatId, fmt(t.phoneOk, { phone: formatPhone(phone) }), mainMenu(t));
       await askRecipient(s, t);
       break;
     }
+    case "pphone": {
+      const raw = m.contact?.phone_number ?? text;
+      const phone = normalizePhone(raw.startsWith("+") || !m.contact ? raw : `+${raw}`);
+      if (!phone) {
+        await send(s.chatId, t.badPhone);
+        break;
+      }
+      s.profile.phone = phone;
+      s.step = "idle";
+      await send(s.chatId, fmt(t.phoneSaved, { phone: formatPhone(phone) }), mainMenu(t));
+      break;
+    }
+    case "search":
+      if (text.length < 2) {
+        await send(s.chatId, t.askSearch);
+        break;
+      }
+      s.step = "idle";
+      await showSearch(s, t, text.slice(0, 60));
+      break;
     case "rname":
       if (text.length < 2) {
         await send(s.chatId, t.askRecipientName);
@@ -756,6 +912,38 @@ async function onCallback(cb: Callback): Promise<AfterTask | null> {
     switch (kind) {
       case "N":
         break;
+      case "H":
+        s.step = "idle";
+        await send(s.chatId, t.menuHint, mainMenu(t));
+        break;
+      case "SR":
+        s.step = "search";
+        await send(s.chatId, t.askSearch, { inline_keyboard: [navRow(t)] });
+        break;
+      case "FAVS":
+        await showFavorites(s, t, msg);
+        break;
+      case "FV": {
+        const id = num(a);
+        const lp = await loadProduct(id, locale);
+        if (!lp) {
+          toast = t.stale;
+          break;
+        }
+        const on = !s.favorites.includes(id);
+        s.favorites = on ? [id, ...s.favorites].slice(0, 50) : s.favorites.filter((x) => x !== id);
+        toast = on ? t.favAdded : t.favRemoved;
+        const c = s.draft.config?.productId === id ? s.draft.config : defaultConfig(lp);
+        await api("editMessageReplyMarkup", { chat_id: s.chatId, message_id: msg.message_id, reply_markup: productCard(lp, c, locale, on).keyboard });
+        break;
+      }
+      case "LANG":
+        await send(s.chatId, BOT_TEXTS[locale].chooseLanguage, languageKeyboard);
+        break;
+      case "PH":
+        s.step = "pphone";
+        await send(s.chatId, t.askPhone, cancelKeyboard(t, { text: t.sharePhone, request_contact: true }));
+        break;
       case "M":
         await showCategories(s, t, msg);
         break;
@@ -769,7 +957,7 @@ async function onCallback(cb: Callback): Promise<AfterTask | null> {
           break;
         }
         s.draft.config = defaultConfig(lp);
-        const card = productCard(lp, s.draft.config, locale);
+        const card = productCard(lp, s.draft.config, locale, s.favorites.includes(lp.prod.id));
         await sendPhoto(s.chatId, lp.image, card.caption, card.keyboard);
         break;
       }
@@ -817,7 +1005,7 @@ async function onCallback(cb: Callback): Promise<AfterTask | null> {
           });
           break;
         }
-        const card = productCard(lp, c, locale);
+        const card = productCard(lp, c, locale, s.favorites.includes(lp.prod.id));
         const r = msg.photo
           ? await api("editMessageCaption", { chat_id: s.chatId, message_id: msg.message_id, caption: card.caption, reply_markup: card.keyboard })
           : await api("editMessageText", { chat_id: s.chatId, message_id: msg.message_id, text: card.caption, reply_markup: card.keyboard });
@@ -850,7 +1038,7 @@ async function onCallback(cb: Callback): Promise<AfterTask | null> {
       }
       case "X":
         s.cart = [];
-        await show(s.chatId, t.cleared, { inline_keyboard: [[{ text: t.menu.catalog, callback_data: "M" }]] }, msg);
+        await show(s.chatId, t.cleared, { inline_keyboard: [[{ text: t.menu.catalog, callback_data: "M" }], navRow(t)] }, msg);
         break;
       case "O":
         await startCheckout(s, t, cb.from);

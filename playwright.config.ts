@@ -4,6 +4,8 @@ import { defineConfig, devices } from "@playwright/test";
  * End-to-end tests run against a running dev or production server:
  *   E2E_BASE_URL=http://localhost:3000 E2E_ADMIN_EMAIL=... E2E_ADMIN_PASSWORD=... npm run test:e2e
  * They create real orders in the configured database — use a development database.
+ * Start that server with the Telegram and e-mail settings blanked, or every test order is announced to the real
+ * owner chat:  TELEGRAM_BOT_TOKEN= TELEGRAM_CHAT_ID= TELEGRAM_SHOP_BOT_TOKEN= SMTP_HOST= npx next start -p 3100
  */
 export default defineConfig({
   testDir: "tests/e2e",

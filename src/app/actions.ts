@@ -28,6 +28,8 @@ import { notifyCustomerTelegram } from "@/lib/customer-telegram";
 import { createOrder, notifyNewOrder, RETRYABLE_PAYMENT, tokenMatches } from "@/lib/orders";
 import { onlineProvider } from "@/lib/payments/providers";
 import { quoteCart, quoteInputSchema, type Quote } from "@/lib/quote";
+import { describeLines, syncLinesSchema, syncTelegramCart } from "@/lib/bot/cart-sync";
+import { telegramUserFromInitData } from "@/lib/telegram-miniapp";
 import { siteUrl } from "@/lib/settings";
 import { saveImage, UploadError } from "@/lib/storage";
 import { sendTelegram } from "@/lib/telegram";
@@ -354,4 +356,17 @@ Izohingizni buyurtma sahifasida yozing: ${siteUrl()}/florist/buyurtmalar/${o.id}
   );
   revalidatePath(localePath(locale, `/buyurtma/${o.number}`));
   return { ok: true, message: getDict(locale).order.trust.disputeSent };
+}
+
+/* ------------------------------------------------------------------ */
+/* Telegram Mini App: one cart with the ordering bot                   */
+/* ------------------------------------------------------------------ */
+
+/** Only for a signature-verified Telegram user; returns the cart to show and its stamp. */
+export async function syncTelegramCartAction(initData: string, lines: unknown, stamp: number | null) {
+  const user = telegramUserFromInitData(initData);
+  const parsed = syncLinesSchema.safeParse(lines);
+  if (!user || !parsed.success || (stamp != null && !Number.isFinite(stamp))) return null;
+  const res = await syncTelegramCart(user.id, parsed.data, stamp);
+  return { stamp: res.stamp, lines: await describeLines(res.lines, await getLocale()) };
 }

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { RevealObserver } from "@/components/motion";
 import { CartDrawer } from "@/components/store/cart-drawer";
 import { FavoritesSync } from "@/components/store/client-widgets";
+import { TelegramCartSync } from "@/components/store/telegram-cart-sync";
 import { TelegramProvider } from "@/components/telegram";
 import { DemoBanner, Footer, Header } from "@/components/store/layout-parts";
 import { LocaleProvider } from "@/i18n/client";
@@ -28,6 +29,7 @@ export default async function StoreLayout({ children, params }: { children: Reac
       <main id="main">{children}</main>
       <Footer store={store} locale={lang} />
       <FavoritesSync loggedIn={!!customer} />
+      <TelegramCartSync />
       <CartDrawer />
       <RevealObserver />
       </TelegramProvider>

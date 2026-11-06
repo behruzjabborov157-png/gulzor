@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 const ITEMS = [
   { href: "/admin", label: "Bosh sahifa", owner: false },
   { href: "/admin/buyurtmalar", label: "Buyurtmalar", owner: false },
+  { href: "/admin/mijozlar", label: "Mijozlar", owner: false },
   { href: "/admin/floristlar", label: "Do‘konlar", owner: false },
   { href: "/admin/mahsulotlar", label: "Mahsulotlar", owner: false },
   { href: "/admin/kategoriyalar", label: "Kategoriyalar", owner: false },
@@ -20,6 +21,8 @@ const ITEMS = [
   { href: "/admin/komissiya", label: "Komissiya", owner: true },
   { href: "/admin/kuponlar", label: "Promokodlar", owner: true },
   { href: "/admin/import", label: "Import / eksport", owner: true },
+  { href: "/admin/tarjimalar", label: "Tarjimalar", owner: true },
+  { href: "/admin/bildirishnomalar", label: "Bildirishnomalar", owner: true },
   { href: "/admin/sozlamalar", label: "Sozlamalar", owner: true },
   { href: "/admin/jurnal", label: "Jurnal", owner: true },
 ];

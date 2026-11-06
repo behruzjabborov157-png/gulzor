@@ -1279,3 +1279,142 @@ test("payments: double callbacks settle once, closed orders are not paid, refund
   assert.equal(txStatus("click", 1), "paid");
   assert.equal(txStatus("payme", 1), "pending");
 });
+
+test("bot: 8-button menu, search, favorites, profile phone, delivery, help, main-menu button; one cart with the Mini App", async () => {
+  const { syncTelegramCart, mergeCarts } = await import("@/lib/bot/cart-sync");
+  const db = await getDb();
+  await db.update(schema.products).set({ stockQuantity: null, price: 200_000, colorOptions: [], searchText: "test atirgullar" }).where(eq(schema.products.id, productId));
+  const calls: { method: string; body: Record<string, unknown> }[] = [];
+  setBotTransport(async (method, body) => {
+    calls.push({ method, body });
+    return { ok: true, result: { message_id: 99 } };
+  });
+  const chat = { id: 900099, type: "private" };
+  const from = { id: 900099, first_name: "Menyu", language_code: "uz" };
+  let n = 0;
+  const say = (m: Record<string, unknown>) => handleUpdate({ message: { message_id: ++n, chat, from, ...m } });
+  const tap = (data: string) => handleUpdate({ callback_query: { id: `cb${++n}`, from, data, message: { message_id: n, chat } } });
+  const lastText = () => String([...calls].reverse().find((c) => c.method === "sendMessage" || c.method === "editMessageText")?.body.text ?? "");
+  const lastButtons = () => {
+    const c = [...calls].reverse().find((x) => (x.body.reply_markup as { inline_keyboard?: unknown })?.inline_keyboard);
+    return ((c?.body.reply_markup as { inline_keyboard: { callback_data?: string; text: string }[][] }).inline_keyboard ?? []).flat();
+  };
+  const session = async () => (await db.select().from(schema.tgSessions).where(eq(schema.tgSessions.chatId, "900099")))[0];
+  try {
+    await say({ text: "/start" });
+    await tap("L:uz");
+    const menu = calls.at(-1)!.body.reply_markup as { keyboard: { text: string }[][] };
+    assert.deepEqual(menu.keyboard.flat().map((b) => b.text), [
+      "🌸 Gullar katalogi", "🔍 Qidirish", "🛒 Savatcha", "📦 Buyurtmalarim", "🚚 Yetkazib berish", "❤️ Sevimlilar", "👤 Profilim", "💬 Yordam",
+    ]);
+
+    // Search.
+    await say({ text: "🔍 Qidirish" });
+    assert.match(lastText(), /Nima qidiramiz/);
+    await say({ text: "atirgul" });
+    assert.match(lastText(), /«atirgul» bo‘yicha topildi/);
+    assert.ok(lastButtons().some((b) => b.callback_data === `P:${productId}`));
+    assert.ok(lastButtons().some((b) => b.callback_data === "H"), "main menu button under results");
+    await say({ text: "🔍 Qidirish" });
+    await say({ text: "kaktus-yoq" });
+    assert.match(lastText(), /hech narsa topilmadi/);
+
+    // Favorites from the product card.
+    await tap(`P:${productId}`);
+    assert.ok(lastButtons().some((b) => b.callback_data === `FV:${productId}` && /Sevimlilarga/.test(b.text)));
+    await tap(`FV:${productId}`);
+    assert.deepEqual((await session()).favorites, [productId]);
+    assert.ok(lastButtons().some((b) => b.callback_data === `FV:${productId}` && /Sevimlilarda/.test(b.text)));
+    await say({ text: "❤️ Sevimlilar" });
+    assert.ok(lastButtons().some((b) => b.callback_data === `P:${productId}`));
+    await tap(`FV:${productId}`);
+    assert.deepEqual((await session()).favorites, []);
+
+    // Profile: the phone is saved once and reused at checkout.
+    await say({ text: "👤 Profilim" });
+    assert.match(lastText(), /Telefon: kiritilmagan/);
+    await tap("PH");
+    await say({ contact: { phone_number: "998901234500", user_id: from.id } });
+    assert.match(lastText(), /Telefon saqlandi: \+998 90 123 45 00/);
+    await say({ text: "👤 Profilim" });
+    assert.match(lastText(), /Telefon: \+998 90 123 45 00/);
+    await tap(`P:${productId}`);
+    await tap(`A:${productId}`);
+    await tap("O");
+    assert.match(lastText(), /Gulni kim qabul qiladi/, "the phone question is skipped");
+
+    // Delivery, help, home; an old menu button still works.
+    await say({ text: "🚚 Yetkazib berish" });
+    assert.match(lastText(), /^🚚 Yetkazib berish\n\n• .+ — [\d\s]+so‘m/);
+    assert.match(lastText(), /🕐 Vaqt oraliqlari: .*12–15/);
+    assert.match(lastText(), /💳 To‘lov: Naqd pul/);
+    await say({ text: "💬 Yordam" });
+    assert.match(lastText(), /Qanday buyurtma beriladi/);
+    await say({ text: "📞 Aloqa" });
+    assert.match(lastText(), /Qanday buyurtma beriladi/);
+    await tap("H");
+    assert.match(lastText(), /Menyudan tanlang/);
+  } finally {
+    setBotTransport(null);
+  }
+
+  // One cart with the Mini App: last change wins; the first sync in a browser merges.
+  const line = (q: number, pid = productId) => ({ productId: pid, variantId: null, stems: null, color: null, quantity: q, addons: [] });
+  const botCart = (await session()).cart;
+  assert.equal(botCart.length, 1);
+  const first = await syncTelegramCart(900099, [line(1, productId + 100_000)], null);
+  assert.equal(first.lines.length, 2, "merged");
+  const pushed = await syncTelegramCart(900099, [line(3)], first.stamp);
+  assert.deepEqual(pushed.lines, [line(3)], "the Mini App's newer cart replaces the bot's");
+  assert.deepEqual((await session()).cart, [line(3)]);
+  // The bot changes the cart after that: an old stamp gets the bot's cart back.
+  await new Promise((r) => setTimeout(r, 5));
+  await db.update(schema.tgSessions).set({ cart: [line(5)], cartUpdatedAt: new Date() }).where(eq(schema.tgSessions.chatId, "900099"));
+  const stale = await syncTelegramCart(900099, [line(3)], pushed.stamp);
+  assert.deepEqual(stale.lines, [line(5)]);
+  assert.ok(stale.stamp > pushed.stamp);
+  // A bot step that does not touch the cart does not move its stamp.
+  const before = (await session()).cartUpdatedAt!.getTime();
+  setBotTransport(async () => ({ ok: true, result: { message_id: 1 } }));
+  try {
+    await handleUpdate({ message: { message_id: 999, chat: { id: 900099, type: "private" }, from: { id: 900099, first_name: "Menyu" }, text: "💬 Yordam" } });
+  } finally {
+    setBotTransport(null);
+  }
+  assert.equal((await session()).cartUpdatedAt!.getTime(), before);
+  assert.deepEqual(mergeCarts([line(2)], [line(4)]), [line(4)]);
+});
+
+test("admin customers: orders grouped by phone, totals without cancelled orders, search, account flag, detail", async () => {
+  const { listCustomers, customerDetail, phoneParam, phoneFromParam } = await import("@/lib/customers-admin");
+  const db = await getDb();
+  await db.update(schema.products).set({ stockQuantity: null, price: 200_000, colorOptions: [] }).where(eq(schema.products.id, productId));
+  const phone = "+998905550011";
+  const a = await createOrder(checkout({ customerName: "Dilnoza Old", customerPhone: phone }), null);
+  const b = await createOrder(checkout({ customerName: "Dilnoza", customerPhone: phone }), null);
+  const c = await createOrder(checkout({ customerName: "Dilnoza", customerPhone: phone }), null);
+  assert.ok(a.ok && b.ok && c.ok);
+  assert.ok(await changeOrderStatus(c.orderId, "cancelled", "test"));
+  await db.insert(schema.customers).values({ name: "Dilnoza", phone, passwordHash: "x" });
+
+  const found = await listCustomers({ q: "905550011", page: 1, perPage: 10 });
+  assert.equal(found.total, 1);
+  const row = found.rows[0];
+  assert.equal(row.phone, phone);
+  assert.equal(row.orders, 3);
+  assert.equal(row.name, "Dilnoza", "the latest name");
+  assert.equal(row.spent, 2 * 230_000, "cancelled orders are not counted");
+  assert.equal(row.hasAccount, true);
+  assert.equal((await listCustomers({ q: "Dilnoza", page: 1, perPage: 10 })).rows[0]?.phone, phone);
+  assert.equal((await listCustomers({ q: "nobody-like-this", page: 1, perPage: 10 })).total, 0);
+
+  assert.equal(phoneParam(phone), "998905550011");
+  assert.equal(phoneFromParam("998905550011"), phone);
+  assert.equal(phoneFromParam("abc"), null);
+  const d = await customerDetail(phone);
+  assert.ok(d);
+  assert.equal(d.orders.length, 3);
+  assert.equal(d.spent, 460_000);
+  assert.ok(d.account);
+  assert.equal(await customerDetail("+998900000000"), null);
+});

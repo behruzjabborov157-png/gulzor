@@ -1,0 +1,1 @@
+ALTER TABLE "tg_sessions" ADD COLUMN "cart_updated_at" timestamp with time zone;

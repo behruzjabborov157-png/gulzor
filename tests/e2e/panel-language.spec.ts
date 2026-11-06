@@ -25,6 +25,14 @@ test("admin panel switches language, remembers it, and the storefront is not aff
   await expect(page.getByRole("heading", { level: 1, name: "Locations" })).toBeVisible();
   await expect(page.getByText(/UZS|Regions \(/).first()).toBeVisible();
 
+  // New back-office sections.
+  for (const [path, title] of [["/admin/mijozlar", "Customers"], ["/admin/tarjimalar", "Translations"], ["/admin/bildirishnomalar", "Notifications"], ["/admin/tolovlar", "Payments"]]) {
+    await page.goto(path);
+    await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
+  }
+  await page.goto("/admin/buyurtmalar?tolov=pending");
+  await expect(page.locator("#tolov")).toHaveValue("pending");
+
   // A failed save shows a translated message.
   await page.goto("/admin/kuponlar");
   await expect(page.getByRole("heading", { level: 1, name: "Promo codes" })).toBeVisible();

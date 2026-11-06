@@ -39,7 +39,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     where.push(or(...conds)!);
   }
   if (sp.holat && sp.holat in ORDER_STATUS_LABEL) where.push(eq(schema.orders.status, sp.holat as Order["status"]));
-  if (sp.tolov === "refund_requested") where.push(eq(schema.orders.paymentStatus, "refund_requested"));
+  if (sp.tolov && sp.tolov in PAYMENT_STATUS_LABEL) where.push(eq(schema.orders.paymentStatus, sp.tolov as Order["paymentStatus"]));
   if (sp.sana && /^\d{4}-\d{2}-\d{2}$/.test(sp.sana)) where.push(eq(schema.orders.deliveryDate, sp.sana));
   const shopId = Number(sp.dokon) || 0;
   if (shopId > 0) where.push(eq(schema.orders.floristId, shopId));
@@ -69,6 +69,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     const u = new URLSearchParams();
     if (q) u.set("q", q);
     if (sp.holat) u.set("holat", sp.holat);
+    if (sp.tolov) u.set("tolov", sp.tolov);
     if (sp.sana) u.set("sana", sp.sana);
     if (sp.yaratilgan) u.set("yaratilgan", sp.yaratilgan);
     if (shopId > 0) u.set("dokon", String(shopId));
@@ -79,7 +80,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   return (
     <div>
       <h1 className="mb-6 text-4xl">{tt("Buyurtmalar")}</h1>
-      <form className="card mb-6 grid items-end gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[1fr_190px_190px_165px_165px_auto]" role="search">
+      <form className="card mb-6 grid items-end gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[1fr_170px_170px_170px_150px_150px_auto]" role="search">
         <div>
           <label className="mb-1 block text-xs text-muted" htmlFor="q">{tt("Qidiruv")}</label>
           <input id="q" name="q" defaultValue={q} placeholder={tt("Buyurtma raqami, telefon yoki ism")} className="field py-2.5" />
@@ -89,6 +90,15 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           <select id="holat" name="holat" defaultValue={sp.holat ?? ""} className="field py-2.5">
             <option value="">{tt("Barcha holatlar")}</option>
             {Object.entries(ORDER_STATUS_LABEL).map(([k, v]) => (
+              <option key={k} value={k}>{tt(v)}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-muted" htmlFor="tolov">{tt("To‘lov")}</label>
+          <select id="tolov" name="tolov" defaultValue={sp.tolov ?? ""} className="field py-2.5">
+            <option value="">{tt("Barcha to‘lov holatlari")}</option>
+            {Object.entries(PAYMENT_STATUS_LABEL).map(([k, v]) => (
               <option key={k} value={k}>{tt(v)}</option>
             ))}
           </select>

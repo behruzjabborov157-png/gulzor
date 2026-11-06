@@ -92,6 +92,20 @@
       "when": 1793670879829,
       "tag": "0012_refund_requested",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793931963837,
+      "tag": "0013_bot_profile",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793932063452,
+      "tag": "0014_bot_cart_stamp",
+      "breakpoints": true
     }
   ]
 }

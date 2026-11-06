@@ -703,8 +703,17 @@ export const tgSessions = pgTable("tg_sessions", {
   chatId: text("chat_id").primaryKey(),
   locale: text("locale").$type<"uz" | "ru" | "en">(),
   step: text("step").notNull().default("idle"),
-  cart: jsonb("cart").$type<{ productId: number; variantId: number | null; stems: number | null; color: string | null; quantity: number }[]>().notNull().default([]),
+  cart: jsonb("cart")
+    .$type<{ productId: number; variantId: number | null; stems: number | null; color: string | null; quantity: number; addons?: { productId: number; quantity: number }[] }[]>()
+    .notNull()
+    .default([]),
   draft: jsonb("draft").$type<Record<string, unknown>>().notNull().default({}),
+  /** Product ids the customer saved with the heart button in the bot. */
+  favorites: jsonb("favorites").$type<number[]>().notNull().default([]),
+  /** Remembered between orders: the phone number the customer gave. */
+  profile: jsonb("profile").$type<{ phone?: string }>().notNull().default({}),
+  /** Last change of the cart (bot or Mini App); see lib/bot/cart-sync.ts. */
+  cartUpdatedAt: timestamp("cart_updated_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
