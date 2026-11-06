@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { timingSafeEqual } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { DisputeForm, ReviewForm } from "@/components/store/order-trust";
+import { PaymentWatcher } from "@/components/store/payment-watcher";
 import { RetryPayment } from "@/components/store/retry-payment";
+import { onlineProvider } from "@/lib/payments/providers";
 import { Alert, ProductImage } from "@/components/ui/primitives";
 import { fmt, localePath, type Locale } from "@/i18n/config";
 import { locationName } from "@/lib/locations";
@@ -14,7 +15,7 @@ import { getDict } from "@/i18n/dict";
 import { getLocale } from "@/i18n/server";
 import { getCustomer } from "@/lib/auth";
 import { formatDateISO, formatDateTime, formatPhone, formatUZS } from "@/lib/format";
-import { getOrderWithItems, TRACK_STEPS } from "@/lib/orders";
+import { getOrderWithItems, RETRYABLE_PAYMENT, tokenMatches, TRACK_STEPS } from "@/lib/orders";
 import { getSettings, telegramLink } from "@/lib/settings";
 import { canOpenDispute, orderDisputes, orderPhotos, reviewForOrder } from "@/lib/trust";
 
@@ -23,12 +24,6 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 type Props = { params: Promise<{ number: string }>; searchParams: Promise<{ t?: string; yangi?: string }> };
-
-function tokenMatches(a: string, b: string) {
-  const x = Buffer.from(a);
-  const y = Buffer.from(b);
-  return x.length === y.length && timingSafeEqual(x, y);
-}
 
 type Data = NonNullable<Awaited<ReturnType<typeof getOrderWithItems>>>;
 
@@ -158,10 +153,21 @@ export default async function OrderPage({ params, searchParams }: Props) {
         <h1 className="mb-8 text-4xl">{fmt(t.title, { number: o.number })}</h1>
       )}
 
-      {online && o.paymentStatus === "pending" && !closed ? (
+      {onlineProvider(o.paymentMethod)?.testMode() ? (
         <div className="mb-6">
-          <Alert tone="warning">
-            <p>{fmt(t.paymentPending, { provider: t.paymentMethod[o.paymentMethod] })}</p>
+          <Alert tone="warning">{t.paymentTestMode}</Alert>
+        </div>
+      ) : null}
+      {o.paymentStatus === "refund_requested" ? (
+        <div className="mb-6">
+          <Alert tone="warning">{t.refundNote}</Alert>
+        </div>
+      ) : null}
+      {online && RETRYABLE_PAYMENT.includes(o.paymentStatus) && !closed ? (
+        <div className="mb-6">
+          {o.paymentStatus === "pending" ? <PaymentWatcher /> : null}
+          <Alert tone={o.paymentStatus === "pending" ? "warning" : "error"}>
+            <p>{fmt(o.paymentStatus === "pending" ? t.paymentPending : t.paymentFailedNote, { provider: t.paymentMethod[o.paymentMethod] })}</p>
             <div className="mt-3 flex flex-wrap gap-2">
               <RetryPayment number={o.number} token={token ?? ""} />
               <Link href={localePath(locale, `/buyurtma/${o.number}?t=${token ?? ""}`)} className="btn-secondary btn-sm">

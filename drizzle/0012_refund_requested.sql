@@ -1,0 +1,1 @@
+ALTER TYPE "public"."payment_status" ADD VALUE 'refund_requested' BEFORE 'refunded';

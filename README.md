@@ -275,6 +275,8 @@ An order is marked **paid only by these server-to-server callbacks**. The browse
 re-reads the order from the database ("payment pending" until the provider confirms) and offers a
 "continue payment" link. Admins can change payment status manually only for cash orders.
 
+> Step-by-step sandbox and go-live guide: `docs/TOLOV.md`.
+>
 > **Not yet verified with the real providers.** The protocol logic is covered by simulated tests
 > (`tests/orders-payments.test.ts`), but no real merchant credentials were available. Before enabling:
 > obtain merchant accounts, run Payme's sandbox test suite and Click's test requests end-to-end, check the

@@ -16,6 +16,7 @@ const ITEMS = [
   { href: "/admin/tahlil", label: "Tahlil", owner: false },
   { href: "/admin/yetkazib-berish", label: "Yetkazib berish", owner: true },
   { href: "/admin/joylashuvlar", label: "Joylashuvlar", owner: true },
+  { href: "/admin/tolovlar", label: "To‘lovlar", owner: false },
   { href: "/admin/komissiya", label: "Komissiya", owner: true },
   { href: "/admin/kuponlar", label: "Promokodlar", owner: true },
   { href: "/admin/import", label: "Import / eksport", owner: true },

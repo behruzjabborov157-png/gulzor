@@ -110,6 +110,7 @@ async function main() {
   if (checkout.paymeEnabled && !paymeCredentials()) report("FAIL", "Payme is enabled in settings but PAYME_MERCHANT_ID / PAYME_KEY are missing");
   if (checkout.clickEnabled && !clickCredentials()) report("FAIL", "Click is enabled in settings but CLICK_* credentials are missing");
   if (paymeCredentials() && (process.env.PAYME_CHECKOUT_URL ?? "").includes("test.paycom.uz")) report("WARN", "PAYME_CHECKOUT_URL points to the Payme sandbox");
+  if (process.env.CLICK_TEST_MODE === "1") report("WARN", "CLICK_TEST_MODE=1: customers see a test-mode notice");
 
   /* ---- Telegram ---- */
   if (!telegramConfigured()) report("WARN", "Telegram notifications not configured (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)");

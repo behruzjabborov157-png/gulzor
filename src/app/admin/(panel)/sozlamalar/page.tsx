@@ -1,4 +1,5 @@
 import { panelT } from "@/i18n/panel/server";
+import { PROVIDERS } from "@/lib/payments/providers";
 import { saveSettingsAction } from "@/app/admin/actions";
 import { AdminForm, C, F } from "@/components/admin/admin-form";
 import { EmailTest } from "@/components/admin/email-test";
@@ -101,15 +102,15 @@ export default async function SettingsAdmin() {
           ) : null}
           <div className="flex flex-wrap items-center gap-3">
             <strong className="w-24">{tt("Payme")}</strong>
-            <Status ok={!!paymeCredentials()} yes={tt("Kalitlar bor")} no={tt("Kalitlar yo‘q")} />
+            <Status ok={!!paymeCredentials()} yes={PROVIDERS.payme.testMode() ? tt("Test rejimi") : tt("Ishchi rejim")} no={tt("Kalitlar yo‘q")} />
             <span className="text-muted">{tt("Merchant API URL:")}{" "}<code>{tt("{base}/api/payments/payme", { base: base })}</code></span>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <strong className="w-24">{tt("Click")}</strong>
-            <Status ok={!!clickCredentials()} yes={tt("Kalitlar bor")} no={tt("Kalitlar yo‘q")} />
+            <Status ok={!!clickCredentials()} yes={PROVIDERS.click.testMode() ? tt("Test rejimi") : tt("Ishchi rejim")} no={tt("Kalitlar yo‘q")} />
             <span className="text-muted">{tt("Prepare:")}{" "}<code>{tt("{base}/api/payments/click/prepare", { base: base })}</code>{" "}{tt("· Complete:")}{" "}<code>{tt("{base}/api/payments/click/complete", { base: base })}</code></span>
           </div>
-          <p className="text-xs text-muted">{tt("Onlayn to‘lovni yoqishdan oldin provayderning test muhitida to‘liq sinovdan o‘tkazing (README → “To‘lov integratsiyasi”).")}</p>
+          <p className="text-xs text-muted">{tt("Onlayn to‘lovni yoqishdan oldin provayderning test muhitida to‘liq sinovdan o‘tkazing (docs/TOLOV.md).")}</p>
         </div>
       </section>
     </div>

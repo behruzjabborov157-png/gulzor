@@ -7,11 +7,11 @@ import { siteUrl } from "@/lib/settings";
 import { shopBotApi } from "@/lib/telegram-miniapp";
 
 /**
- * Messages from the shop bot to a customer who ordered in the Telegram Mini App: "order received"
- * and every status change, in the language they ordered in. Customers who ordered on the website
+ * Messages from the shop bot to a customer who ordered in the Telegram Mini App: "order received",
+ * every status change and payment results, in the language they ordered in. Customers who ordered on the website
  * have no Telegram id and get nothing. Never throws; the outcome is logged on the order.
  */
-export async function notifyCustomerTelegram(orderId: string, kind: "received" | "status") {
+export async function notifyCustomerTelegram(orderId: string, kind: "received" | "status" | "payment") {
   try {
     const db = await getDb();
     const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId));
@@ -23,9 +23,11 @@ export async function notifyCustomerTelegram(orderId: string, kind: "received" |
     const text =
       kind === "received"
         ? fmt(t.tg.received, { number: o.number, total: formatUZS(o.total, locale) })
-        : [fmt(t.tg.status, { number: o.number, status: t.statuses[o.status] }), o.cancelReason ? fmt(t.tg.reason, { reason: o.cancelReason }) : null]
-            .filter(Boolean)
-            .join("\n");
+        : kind === "payment"
+          ? fmt(t.tg.status, { number: o.number, status: t.paymentStatus[o.paymentStatus] })
+          : [fmt(t.tg.status, { number: o.number, status: t.statuses[o.status] }), o.cancelReason ? fmt(t.tg.reason, { reason: o.cancelReason }) : null]
+              .filter(Boolean)
+              .join("\n");
     // Telegram only accepts HTTPS Mini App links; on a local http:// site the link goes in the text instead.
     const https = base.startsWith("https://");
     const res = await shopBotApi("sendMessage", {
@@ -37,7 +39,7 @@ export async function notifyCustomerTelegram(orderId: string, kind: "received" |
       orderId: o.id,
       channel: "telegram-customer",
       status: res.ok ? "sent" : "failed",
-      detail: res.ok ? `Mijozga: ${kind === "received" ? "qabul qilindi" : t.statuses[o.status]}` : `Telegram API: ${res.description ?? ""}`,
+      detail: res.ok ? `Mijozga: ${kind === "received" ? "qabul qilindi" : kind === "payment" ? t.paymentStatus[o.paymentStatus] : t.statuses[o.status]}` : `Telegram API: ${res.description ?? ""}`,
     });
   } catch (e) {
     console.error("Customer Telegram notification failed", e);

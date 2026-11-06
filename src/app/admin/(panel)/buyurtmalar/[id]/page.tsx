@@ -1,4 +1,6 @@
 import { panelT } from "@/i18n/panel/server";
+import { PROVIDERS } from "@/lib/payments/providers";
+import { txStatus, type TxStatus } from "@/lib/payments/transactions";
 import { LANGUAGE_NAME_UZ } from "@/i18n/config";
 import Link from "next/link";
 import { SubmitButton } from "@/components/admin/submit-button";
@@ -18,6 +20,8 @@ import { ORDER_STATUS_LABEL, ORDER_TRANSITIONS, PAYMENT_METHOD_LABEL, PAYMENT_ST
 export async function generateMetadata() {
   return { title: (await panelT())("Buyurtma") };
 }
+
+const TX_LABEL: Record<TxStatus, string> = { pending: "Jarayonda", paid: "To‘langan", cancelled: "Bekor qilingan", refunded: "Pul qaytarildi" };
 
 const ACTION_LABEL: Record<string, string> = {
   confirmed: "Tasdiqlash",
@@ -184,11 +188,20 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
             <SubmitButton className="btn-secondary btn-sm">{tt("Saqlash")}</SubmitButton>
           </form>
         ) : (
-          <p className="text-sm text-muted">{tt("Onlayn to‘lov holati faqat {p} serveridan kelgan tasdiq orqali o‘zgaradi.", { p: tt(PAYMENT_METHOD_LABEL[o.paymentMethod]) })}</p>
+          <>
+            <p className="text-sm text-muted">{tt("Onlayn to‘lov holati faqat {p} serveridan kelgan tasdiq orqali o‘zgaradi.", { p: tt(PAYMENT_METHOD_LABEL[o.paymentMethod]) })}</p>
+            {o.paymentStatus === "refund_requested" || o.paymentStatus === "paid" ? (
+              <form action={setPaymentStatusAction.bind(null, o.id)} className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+                <input type="hidden" name="paymentStatus" value="refunded" />
+                <SubmitButton className="btn-secondary btn-sm">{tt("Pul qaytarildi deb belgilash")}</SubmitButton>
+                <span className="text-xs text-muted">{tt("Avval pulni provayder kabinetida qaytaring.")}</span>
+              </form>
+            ) : null}
+          </>
         )}
         {pays.length ? (
           <ul className="mt-3 space-y-1 text-xs text-muted">
-            {pays.map((p) => <li key={p.id}>{tt("{provider} #{providerTransactionId} · holat {state} · {p} · {p2}", { provider: p.provider, providerTransactionId: p.providerTransactionId, state: p.state, p: tt.uzs(p.amount), p2: formatDateTime(p.createTime) })}</li>)}
+            {pays.map((p) => <li key={p.id}>{tt("{provider} #{providerTransactionId} · holat {state} · {p} · {p2}", { provider: PROVIDERS[p.provider].label, providerTransactionId: p.providerTransactionId, state: tt(TX_LABEL[txStatus(p.provider, p.state)]), p: tt.uzs(p.amount), p2: formatDateTime(p.createTime) })}</li>)}
           </ul>
         ) : null}
       </section>

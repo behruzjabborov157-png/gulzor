@@ -1203,3 +1203,79 @@ test("English: translated products and messages, the customer's language is save
     setBotTransport(null);
   }
 });
+
+test("payments: double callbacks settle once, closed orders are not paid, refunds and retries", async () => {
+  const { markOrderPaymentCancelled } = await import("@/lib/payments/status");
+  const { PROVIDERS, onlineProvider } = await import("@/lib/payments/providers");
+  const { txStatus } = await import("@/lib/payments/transactions");
+  const db = await getDb();
+  await db.update(schema.products).set({ colorOptions: [], stockQuantity: 50, price: 200_000 }).where(eq(schema.products.id, productId));
+  const orderOf = async (id: string) => (await db.select().from(schema.orders).where(eq(schema.orders.id, id)))[0];
+  const paidEvents = async (id: string) => (await db.select().from(schema.orderEvents).where(eq(schema.orderEvents.orderId, id))).filter((e) => e.code === "payment_paid").length;
+
+  // Payme: parallel PerformTransaction calls mark the order paid once.
+  const a = await onlineOrder("payme");
+  const pay = { amount: a.total * 100, account: { order_id: a.number } };
+  await rpc("CreateTransaction", { id: "race-1", time: Date.now(), ...pay });
+  const both = await Promise.all([rpc("PerformTransaction", { id: "race-1" }), rpc("PerformTransaction", { id: "race-1" })]);
+  assert.ok(both.every((r) => (r.result as { state?: number })?.state === 2), JSON.stringify(both));
+  assert.equal(await paidEvents(a.id), 1);
+
+  // A late failure of some attempt does not undo the payment.
+  await markOrderPaymentCancelled(a.id, "payme", "cancelled", "late cancel");
+  assert.equal((await orderOf(a.id)).paymentStatus, "paid");
+
+  // Cancelling a paid order asks for a refund; the customer cannot pay it again.
+  assert.ok(await changeOrderStatus(a.id, "cancelled", "test", "client changed their mind"));
+  assert.equal((await orderOf(a.id)).paymentStatus, "refund_requested");
+  assert.equal((await rpc("CheckPerformTransaction", pay)).error?.code, -31051);
+  // Payme refund: the transaction goes to -2 and the order to refunded.
+  const refund = await rpc("CancelTransaction", { id: "race-1", reason: 5 });
+  assert.equal((refund.result as { state: number }).state, -2);
+  assert.equal((await orderOf(a.id)).paymentStatus, "refunded");
+
+  // An order cancelled while its Payme transaction is open is not paid by a late PerformTransaction.
+  const b = await onlineOrder("payme");
+  await rpc("CreateTransaction", { id: "closed-1", time: Date.now(), amount: b.total * 100, account: { order_id: b.number } });
+  assert.ok(await changeOrderStatus(b.id, "cancelled", "test"));
+  assert.equal((await rpc("PerformTransaction", { id: "closed-1" })).error?.code, -31008);
+  assert.equal((await orderOf(b.id)).paymentStatus, "pending");
+  assert.equal(await paidEvents(b.id), 0);
+
+  // Click: a failed attempt can be retried with a new transaction, then repeats are refused.
+  const c = await onlineOrder("click");
+  const p1 = await clickRequest(clickForm(c, 0, { click_trans_id: "9001" }), 0);
+  const failed = await clickRequest(clickForm(c, 1, { click_trans_id: "9001", merchant_prepare_id: String(p1.merchant_prepare_id), error: "-5017", error_note: "No funds" }), 1);
+  assert.equal(failed.error, -9);
+  assert.equal((await orderOf(c.id)).paymentStatus, "failed");
+  assert.equal((await clickRequest(clickForm(c, 0, { click_trans_id: "9001" }), 0)).error, -9, "the failed transaction stays failed");
+  const p2 = await clickRequest(clickForm(c, 0, { click_trans_id: "9002" }), 0);
+  assert.equal(p2.error, 0);
+  const done = { click_trans_id: "9002", merchant_prepare_id: String(p2.merchant_prepare_id) };
+  const twice = await Promise.all([clickRequest(clickForm(c, 1, done), 1), clickRequest(clickForm(c, 1, done), 1)]);
+  assert.deepEqual(twice.map((r) => r.error).sort(), [-4, 0], JSON.stringify(twice));
+  assert.equal((await orderOf(c.id)).paymentStatus, "paid");
+  assert.equal(await paidEvents(c.id), 1);
+
+  // A second Click transaction cannot pay the same order again.
+  assert.equal((await clickRequest(clickForm(c, 0, { click_trans_id: "9003" }), 0)).error, -4);
+
+  // A cancelled Click order refuses completion.
+  const d = await onlineOrder("click");
+  const p3 = await clickRequest(clickForm(d, 0, { click_trans_id: "9010" }), 0);
+  assert.ok(await changeOrderStatus(d.id, "cancelled", "test"));
+  assert.equal((await clickRequest(clickForm(d, 1, { click_trans_id: "9010", merchant_prepare_id: String(p3.merchant_prepare_id) }), 1)).error, -9);
+  assert.equal(await paidEvents(d.id), 0);
+
+  // Provider interface.
+  assert.equal(onlineProvider("cash"), null);
+  assert.equal(PROVIDERS.payme.testMode(), false);
+  process.env.PAYME_CHECKOUT_URL = "https://test.paycom.uz";
+  assert.equal(PROVIDERS.payme.testMode(), true);
+  assert.match(PROVIDERS.payme.checkoutUrl({ number: "GZ-1", total: 1000 }, "https://x/y") ?? "", /^https:\/\/test\.paycom\.uz\//);
+  delete process.env.PAYME_CHECKOUT_URL;
+  assert.match(PROVIDERS.click.checkoutUrl({ number: "GZ-1", total: 1000 }, "https://x/y") ?? "", /transaction_param=GZ-1/);
+  assert.equal(txStatus("payme", -2), "refunded");
+  assert.equal(txStatus("click", 1), "paid");
+  assert.equal(txStatus("payme", 1), "pending");
+});

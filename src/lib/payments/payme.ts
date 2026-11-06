@@ -13,7 +13,7 @@ import { timingSafeEqual } from "node:crypto";
 import { and, eq, gte, lte } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { paymeCredentials } from "./config";
-import { markOrderPaid, markOrderPaymentCancelled } from "./status";
+import { markOrderPaymentCancelled, settlePayment } from "./status";
 
 const TIMEOUT_MS = 12 * 3600_000;
 
@@ -54,7 +54,7 @@ async function findPayableOrder(account: unknown, amountTiyin: unknown) {
   const db = await getDb();
   const [order] = await db.select().from(schema.orders).where(eq(schema.orders.number, number));
   if (!order || order.paymentMethod !== "payme") throw E.order();
-  if (order.status === "cancelled" || order.status === "rejected" || order.paymentStatus === "paid" || order.paymentStatus === "refunded") {
+  if (order.status === "cancelled" || order.status === "rejected" || ["paid", "refund_requested", "refunded"].includes(order.paymentStatus)) {
     throw E.orderState();
   }
   if (typeof amountTiyin !== "number" || amountTiyin !== order.total * 100) throw E.amount();
@@ -139,8 +139,9 @@ async function handle(method: string, params: Record<string, unknown>) {
         await cancelTx(t, 4, -1);
         throw E.cannotPerform();
       }
-      const [u] = await db.update(schema.payments).set({ state: 2, performTime: new Date() }).where(eq(schema.payments.id, t.id)).returning();
-      await markOrderPaid(t.orderId, "payme", u.amount);
+      const res = await settlePayment({ paymentId: t.id, orderId: t.orderId, provider: "payme", fromState: 1, toState: 2 });
+      if (res !== "paid" && res !== "already") throw E.cannotPerform();
+      const [u] = await db.select().from(schema.payments).where(eq(schema.payments.id, t.id));
       return { transaction: String(u.id), perform_time: ms(u.performTime), state: 2 };
     }
     case "CancelTransaction": {

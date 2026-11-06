@@ -11,7 +11,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { clickCredentials } from "./config";
-import { markOrderPaid, markOrderPaymentCancelled } from "./status";
+import { markOrderPaymentCancelled, settlePayment } from "./status";
 
 const md5 = (s: string) => createHash("md5").update(s).digest("hex");
 
@@ -48,7 +48,7 @@ export async function clickRequest(form: URLSearchParams, action: 0 | 1): Promis
   const [order] = await db.select().from(schema.orders).where(eq(schema.orders.number, f("merchant_trans_id")));
   if (!order || order.paymentMethod !== "click") return fail(-5, "User does not exist");
   if (Math.round(Number(f("amount")) * 100) !== order.total * 100) return fail(-2, "Incorrect parameter amount");
-  if (order.paymentStatus === "paid") return fail(-4, "Already paid");
+  if (["paid", "refund_requested", "refunded"].includes(order.paymentStatus)) return fail(-4, "Already paid");
   if (order.status === "cancelled" || order.status === "rejected") return fail(-9, "Transaction cancelled");
 
   if (action === 0) {
@@ -71,6 +71,7 @@ export async function clickRequest(form: URLSearchParams, action: 0 | 1): Promis
           })
           .returning()
       )[0];
+    if (row.state === -1) return fail(-9, "Transaction cancelled");
     return { ...base, merchant_prepare_id: row.id, error: 0, error_note: "Success" };
   }
 
@@ -90,8 +91,9 @@ export async function clickRequest(form: URLSearchParams, action: 0 | 1): Promis
     return fail(-9, "Transaction cancelled");
   }
 
-  await db.update(schema.payments).set({ state: 1, performTime: new Date() }).where(eq(schema.payments.id, payment.id));
-  await markOrderPaid(order.id, "click", payment.amount);
+  const res = await settlePayment({ paymentId: payment.id, orderId: order.id, provider: "click", fromState: 0, toState: 1 });
+  if (res === "already" || res === "order-paid") return fail(-4, "Already paid");
+  if (res !== "paid") return fail(-9, "Transaction cancelled");
   return { ...base, merchant_confirm_id: payment.id, error: 0, error_note: "Success" };
 }
 

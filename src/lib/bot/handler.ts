@@ -11,8 +11,7 @@ import { formatDateISO, formatPhone, formatUZS, normalizePhone } from "@/lib/for
 import { createOrder } from "@/lib/orders";
 import { availablePaymentMethods } from "@/lib/payments/config";
 import { linkFloristChat } from "@/lib/florist-notify";
-import { clickCheckoutUrl } from "@/lib/payments/click";
-import { paymeCheckoutUrl } from "@/lib/payments/payme";
+import { onlineProvider } from "@/lib/payments/providers";
 import { MAX_LINE_QUANTITY, priceLine, type PricingProduct } from "@/lib/pricing";
 import { quoteCart } from "@/lib/quote";
 import { getSettings, siteUrl, telegramLink } from "@/lib/settings";
@@ -588,7 +587,7 @@ async function placeOrder(s: Session, t: BotTexts, from: TgUser): Promise<AfterT
     const db = await getDb();
     const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, res.orderId));
     const back = siteUrl() + path;
-    const payUrl = res.paymentMethod === "payme" ? paymeCheckoutUrl(o.number, o.total, back) : clickCheckoutUrl(o.number, o.total, back);
+    const payUrl = onlineProvider(res.paymentMethod)?.checkoutUrl(o, back);
     if (payUrl) buttons.push([{ text: t.payNow, url: payUrl }]);
   }
   const open = siteButton(t.openOrder, path);

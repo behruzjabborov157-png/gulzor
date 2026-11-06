@@ -88,13 +88,13 @@ export async function setOrderStatusAction(orderId: string, to: Order["status"],
 
 export async function setPaymentStatusAction(orderId: string, form: FormData) {
   const admin = await requireAdmin();
-  const status = z.enum(["pending", "paid", "failed", "cancelled", "refunded"]).safeParse(form.get("paymentStatus"));
+  const status = z.enum(["pending", "paid", "failed", "cancelled", "refund_requested", "refunded"]).safeParse(form.get("paymentStatus"));
   if (!status.success) return;
   const db = await getDb();
   const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId));
   // Online payments are confirmed by provider callbacks; manual changes are only allowed for cash orders
-  // (or refunds recorded by the owner).
-  if (!o || (o.paymentMethod !== "cash" && status.data !== "refunded")) return;
+  // (or a refund made in the provider's cabinet, once the order was paid).
+  if (!o || (o.paymentMethod !== "cash" && !(status.data === "refunded" && ["paid", "refund_requested"].includes(o.paymentStatus)))) return;
   await db.update(schema.orders).set({ paymentStatus: status.data, updatedAt: new Date() }).where(eq(schema.orders.id, orderId));
   await db.insert(schema.orderEvents).values({ orderId, type: "payment", message: `To‘lov holati qo‘lda o‘zgartirildi: ${status.data}`, actor: admin.email });
   await audit(admin, "order.payment", "order", orderId, { number: o.number, from: o.paymentStatus, to: status.data });

@@ -1,4 +1,4 @@
-import { randomBytes, randomInt } from "node:crypto";
+import { randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, schema } from "@/db";
@@ -35,8 +35,19 @@ export const PAYMENT_STATUS_LABEL: Record<Order["paymentStatus"], string> = {
   paid: "To‘langan",
   failed: "To‘lov amalga oshmadi",
   cancelled: "To‘lov bekor qilindi",
+  refund_requested: "Pul qaytarilishi kerak",
   refunded: "Pul qaytarildi",
 };
+
+/** Payment states in which the customer may try to pay again. */
+export const RETRYABLE_PAYMENT: Order["paymentStatus"][] = ["pending", "failed", "cancelled"];
+
+/** Compares secret tokens in constant time. */
+export function tokenMatches(a: string, b: string) {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
+}
 
 export const PAYMENT_METHOD_LABEL: Record<Order["paymentMethod"], string> = {
   cash: "Naqd pul",
@@ -396,8 +407,24 @@ export async function changeOrderStatus(orderId: string, to: Order["status"], ac
     const closing = to === "cancelled" || to === "rejected";
     await tx
       .update(schema.orders)
-      .set({ status: to, updatedAt: new Date(), cancelReason: closing ? reason || null : o.cancelReason })
+      .set({
+        status: to,
+        updatedAt: new Date(),
+        cancelReason: closing ? reason || null : o.cancelReason,
+        // A paid order that will not be delivered: the money has to go back.
+        paymentStatus: closing && o.paymentStatus === "paid" ? "refund_requested" : o.paymentStatus,
+      })
       .where(eq(schema.orders.id, orderId));
+    if (closing && o.paymentStatus === "paid") {
+      await tx.insert(schema.orderEvents).values({
+        orderId,
+        type: "payment",
+        message: "Pul mijozga qaytarilishi kerak",
+        code: "payment_refund_requested",
+        actor,
+        isPublic: true,
+      });
+    }
     if (closing) {
       const items = await tx.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
       await adjustStock(tx, items.map((i) => ({ productId: i.productId, variantId: i.variantId, quantity: i.quantity, addons: i.addons })), -1);

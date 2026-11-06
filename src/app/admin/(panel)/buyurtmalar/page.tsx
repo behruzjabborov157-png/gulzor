@@ -22,7 +22,7 @@ const STATUS_STYLE: Record<Order["status"], string> = {
   rejected: "bg-charcoal/10 text-muted",
 };
 
-export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ q?: string; holat?: string; sana?: string; yaratilgan?: string; dokon?: string; sahifa?: string }> }) {
+export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ q?: string; holat?: string; tolov?: string; sana?: string; yaratilgan?: string; dokon?: string; sahifa?: string }> }) {
   const tt = await panelT();
   await requireAdmin();
   const sp = await searchParams;
@@ -39,6 +39,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     where.push(or(...conds)!);
   }
   if (sp.holat && sp.holat in ORDER_STATUS_LABEL) where.push(eq(schema.orders.status, sp.holat as Order["status"]));
+  if (sp.tolov === "refund_requested") where.push(eq(schema.orders.paymentStatus, "refund_requested"));
   if (sp.sana && /^\d{4}-\d{2}-\d{2}$/.test(sp.sana)) where.push(eq(schema.orders.deliveryDate, sp.sana));
   const shopId = Number(sp.dokon) || 0;
   if (shopId > 0) where.push(eq(schema.orders.floristId, shopId));

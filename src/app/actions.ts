@@ -25,9 +25,8 @@ import { getProductsByIds, type ProductCard } from "@/lib/catalog";
 import type { FormState } from "@/lib/form-state";
 import { normalizePhone } from "@/lib/format";
 import { notifyCustomerTelegram } from "@/lib/customer-telegram";
-import { createOrder, notifyNewOrder } from "@/lib/orders";
-import { clickCheckoutUrl } from "@/lib/payments/click";
-import { paymeCheckoutUrl } from "@/lib/payments/payme";
+import { createOrder, notifyNewOrder, RETRYABLE_PAYMENT, tokenMatches } from "@/lib/orders";
+import { onlineProvider } from "@/lib/payments/providers";
 import { quoteCart, quoteInputSchema, type Quote } from "@/lib/quote";
 import { siteUrl } from "@/lib/settings";
 import { saveImage, UploadError } from "@/lib/storage";
@@ -85,9 +84,7 @@ export async function checkoutAction(input: unknown): Promise<CheckoutResult> {
 
     const db = await getDb();
     const [order] = await db.select().from(schema.orders).where(eq(schema.orders.id, res.orderId));
-    const returnUrl = siteUrl() + orderUrl;
-    const providerUrl =
-      res.paymentMethod === "payme" ? paymeCheckoutUrl(order.number, order.total, returnUrl) : clickCheckoutUrl(order.number, order.total, returnUrl);
+    const providerUrl = onlineProvider(res.paymentMethod)?.checkoutUrl(order, siteUrl() + orderUrl);
     // If the provider URL cannot be built the order still exists; the customer sees it with "payment pending".
     return { ok: true, redirectTo: providerUrl ?? orderUrl };
   } catch (err) {
@@ -100,11 +97,8 @@ export async function checkoutAction(input: unknown): Promise<CheckoutResult> {
 export async function retryPaymentAction(number: string, token: string): Promise<string | null> {
   const db = await getDb();
   const [o] = await db.select().from(schema.orders).where(eq(schema.orders.number, number));
-  if (!o || o.accessToken !== token || o.paymentStatus === "paid" || o.status === "cancelled" || o.status === "rejected") return null;
-  const returnUrl = siteUrl() + orderPath(isLocale(o.locale) ? o.locale : "uz", o.number, o.accessToken);
-  if (o.paymentMethod === "payme") return paymeCheckoutUrl(o.number, o.total, returnUrl);
-  if (o.paymentMethod === "click") return clickCheckoutUrl(o.number, o.total, returnUrl);
-  return null;
+  if (!o || !tokenMatches(token, o.accessToken) || !RETRYABLE_PAYMENT.includes(o.paymentStatus) || o.status === "cancelled" || o.status === "rejected") return null;
+  return onlineProvider(o.paymentMethod)?.checkoutUrl(o, siteUrl() + orderPath(isLocale(o.locale) ? o.locale : "uz", o.number, o.accessToken)) ?? null;
 }
 
 /* ------------------------------------------------------------------ */

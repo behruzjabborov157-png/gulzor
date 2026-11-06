@@ -37,7 +37,7 @@ export const orderStatus = pgEnum("order_status", [
   "rejected",
 ]);
 export const paymentMethod = pgEnum("payment_method", ["cash", "payme", "click"]);
-export const paymentStatus = pgEnum("payment_status", ["pending", "paid", "failed", "cancelled", "refunded"]);
+export const paymentStatus = pgEnum("payment_status", ["pending", "paid", "failed", "cancelled", "refund_requested", "refunded"]);
 export const fulfillment = pgEnum("fulfillment", ["delivery", "pickup"]);
 export const couponType = pgEnum("coupon_type", ["percent", "fixed"]);
 

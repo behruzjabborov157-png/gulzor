@@ -30,3 +30,6 @@ services:
       # Uploaded images are stored in the database (the free disk does not persist).
       - key: MEDIA_STORAGE
         value: db
+      # Render puts Cloudflare and its own proxy in front: the client is the 3rd X-Forwarded-For entry from the right.
+      - key: TRUSTED_PROXY_HOPS
+        value: "3"
